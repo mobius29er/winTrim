@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "d54IPVfKfs0=",
+  "dgSpecHash": "l4UXauo7NRI=",
   "success": true,
-  "projectFilePath": "c:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj",
+  "projectFilePath": "C:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\mobiu\\.nuget\\packages\\communitytoolkit.mvvm\\8.2.2\\communitytoolkit.mvvm.8.2.2.nupkg.sha512",
     "C:\\Users\\mobiu\\.nuget\\packages\\harfbuzzsharp\\7.3.0\\harfbuzzsharp.7.3.0.nupkg.sha512",

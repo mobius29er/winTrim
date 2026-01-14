@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -29,6 +30,9 @@ public partial class MainViewModel : ObservableObject
     private readonly IExportService _exportService;
     
     private CancellationTokenSource? _cancellationTokenSource;
+    
+    // Stores files by category for the interactive category view
+    private Dictionary<string, List<FileSystemItem>> _filesByCategory = new();
 
     #region Observable Properties
 
@@ -69,6 +73,12 @@ public partial class MainViewModel : ObservableObject
     private ISeries[] _categorySeries = Array.Empty<ISeries>();
 
     [ObservableProperty]
+    private ObservableCollection<FileSystemItem> _categoryFiles = new();
+
+    [ObservableProperty]
+    private string? _selectedCategoryName;
+
+    [ObservableProperty]
     private ISeries[] _topFoldersSeries = Array.Empty<ISeries>();
 
     [ObservableProperty]
@@ -90,6 +100,9 @@ public partial class MainViewModel : ObservableObject
     private bool _isDarkMode;
 
     [ObservableProperty]
+    private bool _isRedAccent;
+
+    [ObservableProperty]
     private bool _canExport;
 
     #endregion
@@ -106,6 +119,7 @@ public partial class MainViewModel : ObservableObject
 
         // Load settings
         IsDarkMode = _settingsService.IsDarkMode;
+        IsRedAccent = _settingsService.Accent == ThemeAccent.Red;
 
         // Load available drives
         LoadDrives();
@@ -114,28 +128,46 @@ public partial class MainViewModel : ObservableObject
     partial void OnIsDarkModeChanged(bool value)
     {
         _settingsService.IsDarkMode = value;
-        ApplyTheme(value);
+        ApplyTheme();
     }
 
-    private void ApplyTheme(bool isDark)
+    partial void OnIsRedAccentChanged(bool value)
     {
-        var app = Application.Current;
-        var resources = app.Resources.MergedDictionaries;
-        
-        // Remove existing color dictionary
-        var existingColors = resources.FirstOrDefault(d => 
-            d.Source?.OriginalString.Contains("Colors.xaml") == true ||
-            d.Source?.OriginalString.Contains("DarkColors.xaml") == true);
-        
-        if (existingColors != null)
-            resources.Remove(existingColors);
+        _settingsService.Accent = value ? ThemeAccent.Red : ThemeAccent.Green;
+        ApplyTheme();
+    }
 
-        // Add new theme
-        var themeUri = isDark 
-            ? new Uri("Themes/DarkColors.xaml", UriKind.Relative)
-            : new Uri("Themes/Colors.xaml", UriKind.Relative);
-        
-        resources.Insert(0, new ResourceDictionary { Source = themeUri });
+    private void ApplyTheme()
+    {
+        try
+        {
+            var app = Application.Current;
+            var resources = app.Resources.MergedDictionaries;
+            
+            // Remove existing color dictionary
+            var existingColors = resources.FirstOrDefault(d => 
+                d.Source?.OriginalString.Contains("Colors.xaml") == true);
+            
+            if (existingColors != null)
+                resources.Remove(existingColors);
+
+            // Determine theme file based on dark mode and accent
+            string themeFile;
+            if (!IsDarkMode)
+            {
+                themeFile = "Themes/Colors.xaml";
+            }
+            else
+            {
+                themeFile = IsRedAccent ? "Themes/TerminalRedColors.xaml" : "Themes/DarkColors.xaml";
+            }
+            
+            resources.Insert(0, new ResourceDictionary { Source = new Uri(themeFile, UriKind.Relative) });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to apply theme: {ex.Message}");
+        }
     }
 
     private void LoadDrives()
@@ -375,6 +407,12 @@ public partial class MainViewModel : ObservableObject
         IsDarkMode = !IsDarkMode;
     }
 
+    [RelayCommand]
+    private void ToggleRedAccent()
+    {
+        IsRedAccent = !IsRedAccent;
+    }
+
     #endregion
 
     #region Private Methods
@@ -436,8 +474,89 @@ public partial class MainViewModel : ObservableObject
             CleanupSuggestions.Add(suggestion);
         }
 
+        // Build category-to-files mapping
+        BuildCategoryFilesMap();
+
         // Update charts
         UpdateCharts();
+        
+        // Auto-select largest category
+        if (_filesByCategory.Count > 0)
+        {
+            var largestCategory = ScanResult.CategoryBreakdown
+                .OrderByDescending(c => c.Value.TotalSize)
+                .FirstOrDefault();
+            if (largestCategory.Key != default)
+            {
+                SelectCategory(largestCategory.Key.ToString());
+            }
+        }
+    }
+
+    private void BuildCategoryFilesMap()
+    {
+        _filesByCategory.Clear();
+        CategoryFiles.Clear();
+        SelectedCategoryName = null;
+
+        if (ScanResult?.RootItem == null)
+            return;
+
+        // Recursively collect files by category
+        CollectFilesByCategory(ScanResult.RootItem);
+        
+        // Sort files within each category by size (largest first)
+        foreach (var key in _filesByCategory.Keys.ToList())
+        {
+            _filesByCategory[key] = _filesByCategory[key]
+                .OrderByDescending(f => f.Size)
+                .Take(100) // Limit to top 100 per category for performance
+                .ToList();
+        }
+    }
+
+    private void CollectFilesByCategory(FileSystemItem item)
+    {
+        if (!item.IsFolder)
+        {
+            var categoryName = item.Category.ToString();
+            if (!_filesByCategory.ContainsKey(categoryName))
+            {
+                _filesByCategory[categoryName] = new List<FileSystemItem>();
+            }
+            _filesByCategory[categoryName].Add(item);
+        }
+
+        foreach (var child in item.Children)
+        {
+            CollectFilesByCategory(child);
+        }
+    }
+
+    [RelayCommand]
+    private void SelectCategory(string? categoryName)
+    {
+        if (string.IsNullOrEmpty(categoryName))
+            return;
+
+        // Extract just the category name (remove size info if present)
+        var name = categoryName;
+        var parenIndex = name.IndexOf(" (");
+        if (parenIndex > 0)
+        {
+            name = name.Substring(0, parenIndex);
+        }
+
+        SelectedCategoryName = name;
+        CategoryFiles.Clear();
+
+        if (_filesByCategory.TryGetValue(name, out var files))
+        {
+            foreach (var file in files)
+            {
+                CategoryFiles.Add(file);
+            }
+        }
     }
 
     private void UpdateCharts()

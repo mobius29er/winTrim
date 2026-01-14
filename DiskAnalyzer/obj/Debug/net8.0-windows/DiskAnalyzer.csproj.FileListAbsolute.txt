@@ -43,3 +43,4 @@ C:\Github\winLose\DiskAnalyzer\obj\Debug\net8.0-windows\DiskAnalyzer.genruntimec
 C:\Github\winLose\DiskAnalyzer\obj\Debug\net8.0-windows\ref\DiskAnalyzer.dll
 C:\Github\winLose\DiskAnalyzer\obj\Debug\net8.0-windows\Themes\DarkColors.baml
 C:\Github\winLose\DiskAnalyzer\obj\Debug\net8.0-windows\DiskAnalyzer.sourcelink.json
+C:\Github\winLose\DiskAnalyzer\obj\Debug\net8.0-windows\Themes\TerminalRedColors.baml

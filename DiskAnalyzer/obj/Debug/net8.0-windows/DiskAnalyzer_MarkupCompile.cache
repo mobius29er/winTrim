@@ -4,17 +4,17 @@
 winexe
 C#
 .cs
-c:\Github\winLose\DiskAnalyzer\obj\Debug\net8.0-windows\
+C:\Github\winLose\DiskAnalyzer\obj\Debug\net8.0-windows\
 DiskAnalyzer
 none
 false
 TRACE;DEBUG;NET;NET8_0;NETCOREAPP
-c:\Github\winLose\DiskAnalyzer\App.xaml
-4175775623
+C:\Github\winLose\DiskAnalyzer\App.xaml
+51283765839
 
 2017094714
 2081900159206
-Themes\Colors.xaml;Themes\DarkColors.xaml;Themes\Styles.xaml;Views\MainWindow.xaml;
+Themes\Colors.xaml;Themes\DarkColors.xaml;Themes\Styles.xaml;Themes\TerminalRedColors.xaml;Views\MainWindow.xaml;
 
 False
 

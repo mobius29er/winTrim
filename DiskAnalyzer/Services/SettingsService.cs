@@ -5,6 +5,15 @@ using System.Text.Json;
 namespace DiskAnalyzer.Services;
 
 /// <summary>
+/// Theme accent color options for terminal theme
+/// </summary>
+public enum ThemeAccent
+{
+    Green,
+    Red
+}
+
+/// <summary>
 /// Manages user settings with persistence to JSON file
 /// </summary>
 public sealed class SettingsService : ISettingsService
@@ -29,6 +38,16 @@ public sealed class SettingsService : ISettingsService
         set
         {
             _settings.IsDarkMode = value;
+            Save();
+        }
+    }
+
+    public ThemeAccent Accent
+    {
+        get => _settings.Accent;
+        set
+        {
+            _settings.Accent = value;
             Save();
         }
     }
@@ -72,11 +91,13 @@ public sealed class SettingsService : ISettingsService
 public interface ISettingsService
 {
     bool IsDarkMode { get; set; }
+    ThemeAccent Accent { get; set; }
     string? LastScanPath { get; set; }
 }
 
 public class UserSettings
 {
     public bool IsDarkMode { get; set; } = false;
+    public ThemeAccent Accent { get; set; } = ThemeAccent.Green;
     public string? LastScanPath { get; set; }
 }

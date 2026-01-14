@@ -88,9 +88,19 @@
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <!-- Theme Toggle -->
                     <Button Command="{Binding ToggleDarkModeCommand}"
-                            Style="{StaticResource OutlineButton}" Margin="0,0,16,0"
+                            Style="{StaticResource OutlineButton}" Margin="0,0,4,0"
                             ToolTip="Toggle Dark/Light Mode" Padding="8,8">
                         <TextBlock Text="{Binding IsDarkMode, Converter={StaticResource BoolToIcon}, ConverterParameter='☀️|🌙'}" 
+                                   FontSize="16"/>
+                    </Button>
+                    
+                    <!-- Accent Color Toggle (only visible in dark mode) -->
+                    <Button Command="{Binding ToggleRedAccentCommand}"
+                            Style="{StaticResource OutlineButton}" Margin="0,0,16,0"
+                            ToolTip="Toggle Red/Green Terminal Color"
+                            Visibility="{Binding IsDarkMode, Converter={StaticResource BoolToVisibility}}"
+                            Padding="8,8">
+                        <TextBlock Text="{Binding IsRedAccent, Converter={StaticResource BoolToIcon}, ConverterParameter='🟢|🔴'}" 
                                    FontSize="16"/>
                     </Button>
                     
@@ -165,14 +175,110 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     
-                    <!-- Category Breakdown -->
+                    <!-- Category Breakdown - Two Column Layout -->
                     <Border Grid.Column="0" Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,8,8">
-                        <StackPanel>
-                            <TextBlock Text="File Categories" Style="{StaticResource SectionHeader}"/>
-                            <lvc:PieChart Series="{Binding CategorySeries}" 
-                                          Height="250" 
-                                          LegendPosition="Right"/>
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- Left: Pie Chart with Clickable Legend -->
+                            <StackPanel Grid.Column="0" Width="220">
+                                <TextBlock Text="File Categories" Style="{StaticResource SectionHeader}"/>
+                                <lvc:PieChart Series="{Binding CategorySeries}" 
+                                              Height="150" Width="150"
+                                              TooltipPosition="Hidden"
+                                              LegendPosition="Hidden"
+                                              Margin="0,0,0,8"/>
+                                
+                                <!-- Clickable Category Legend -->
+                                <ItemsControl ItemsSource="{Binding CategorySeries}" MaxHeight="120">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Command="{Binding DataContext.SelectCategoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding Name}"
+                                                    HorizontalContentAlignment="Left"
+                                                    Padding="4,2" Margin="0,1"
+                                                    Cursor="Hand">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Background" Value="Transparent"/>
+                                                        <Setter Property="BorderThickness" Value="0"/>
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <Border Background="{TemplateBinding Background}" 
+                                                                            Padding="{TemplateBinding Padding}"
+                                                                            CornerRadius="3">
+                                                                        <ContentPresenter/>
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
+                                                </Button.Style>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="●" FontSize="10" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                               Foreground="{DynamicResource PrimaryBrush}"/>
+                                                    <TextBlock Text="{Binding Name}" FontSize="11"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="180"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            
+                            <!-- Right: Scrollable File List -->
+                            <Grid Grid.Column="1" Margin="12,0,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding SelectedCategoryName, TargetNullValue='Select a category'}" 
+                                               FontWeight="SemiBold" FontSize="14"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="{Binding CategoryFiles.Count, StringFormat=' ({0} files)'}" 
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Visibility="{Binding SelectedCategoryName, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                                
+                                <DataGrid Grid.Row="1" ItemsSource="{Binding CategoryFiles}" 
+                                          Style="{StaticResource DataGridStyle}"
+                                          MaxHeight="200">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="70"/>
+                                        <DataGridTemplateColumn Header="" Width="35">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="📂" 
+                                                            Command="{Binding DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource OutlineButton}" 
+                                                            Padding="2" Cursor="Hand"
+                                                            ToolTip="Open file location"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Grid>
                     </Border>
                     
                     <!-- Largest Folders -->
