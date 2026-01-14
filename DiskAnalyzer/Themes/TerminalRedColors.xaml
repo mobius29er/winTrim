@@ -48,4 +48,7 @@
     <SolidColorBrush x:Key="RiskMediumBrush" Color="#FFFF00"/>
     <SolidColorBrush x:Key="RiskHighBrush" Color="#FF0000"/>
     
+    <!-- Button Text - Black for contrast on bright terminal colors -->
+    <SolidColorBrush x:Key="ButtonTextBrush" Color="#000000"/>
+    
 </ResourceDictionary>

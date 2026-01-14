@@ -35,7 +35,13 @@ public sealed class GameDetector : IGameDetector
             games.AddRange(result);
         }
 
-        return games.OrderByDescending(g => g.Size).ToList();
+        // Deduplicate by path (same game may be detected by multiple platforms)
+        // Keep the first occurrence (which has the most accurate platform info)
+        return games
+            .GroupBy(g => g.Path.ToLowerInvariant())
+            .Select(g => g.First())
+            .OrderByDescending(g => g.Size)
+            .ToList();
     }
 
     private async Task<List<GameInstallation>> DetectSteamGamesAsync(string rootPath, CancellationToken cancellationToken)

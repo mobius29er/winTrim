@@ -29,6 +29,10 @@ public class TreemapControl : SKElement
         DependencyProperty.Register(nameof(MaxDepth), typeof(int), typeof(TreemapControl),
             new PropertyMetadata(3, OnSourceItemChanged));
 
+    public static readonly DependencyProperty IsDarkModeProperty =
+        DependencyProperty.Register(nameof(IsDarkMode), typeof(bool), typeof(TreemapControl),
+            new PropertyMetadata(false, OnThemeChanged));
+
     public FileSystemItem? SourceItem
     {
         get => (FileSystemItem?)GetValue(SourceItemProperty);
@@ -40,6 +44,18 @@ public class TreemapControl : SKElement
         get => (int)GetValue(MaxDepthProperty);
         set => SetValue(MaxDepthProperty, value);
     }
+
+    public bool IsDarkMode
+    {
+        get => (bool)GetValue(IsDarkModeProperty);
+        set => SetValue(IsDarkModeProperty, value);
+    }
+
+    // Theme colors
+    private SKColor BackgroundColor => IsDarkMode ? SKColors.Black : SKColors.White;
+    private SKColor BorderColor => IsDarkMode ? SKColor.Parse("#1A1A1A") : SKColors.White;
+    private SKColor TextColor => IsDarkMode ? SKColor.Parse("#00FF00") : SKColors.White;
+    private SKColor TextShadowColor => IsDarkMode ? SKColors.Black : SKColors.Black.WithAlpha(100);
 
     // Events
     public event EventHandler<TreemapTile>? TileClicked;
@@ -67,6 +83,14 @@ public class TreemapControl : SKElement
         if (d is TreemapControl control)
         {
             control.RebuildTreemap();
+        }
+    }
+
+    private static void OnThemeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is TreemapControl control)
+        {
+            control.InvalidateVisual();
         }
     }
 
@@ -113,7 +137,7 @@ public class TreemapControl : SKElement
         base.OnPaintSurface(e);
 
         var canvas = e.Surface.Canvas;
-        canvas.Clear(SKColors.White);
+        canvas.Clear(BackgroundColor);
 
         if (_currentRoot == null)
         {
@@ -138,7 +162,7 @@ public class TreemapControl : SKElement
     {
         using var paint = new SKPaint
         {
-            Color = SKColor.Parse("#64748B"),
+            Color = IsDarkMode ? SKColor.Parse("#00FF00") : SKColor.Parse("#64748B"),
             TextSize = 16,
             IsAntialias = true,
             TextAlign = SKTextAlign.Center
@@ -175,10 +199,10 @@ public class TreemapControl : SKElement
 
         canvas.DrawRect(rect, fillPaint);
 
-        // Draw border
+        // Draw border - use theme-aware color
         using var borderPaint = new SKPaint
         {
-            Color = SKColors.White,
+            Color = BorderColor,
             Style = SKPaintStyle.Stroke,
             StrokeWidth = 1,
             IsAntialias = true
@@ -207,7 +231,7 @@ public class TreemapControl : SKElement
         
         using var textPaint = new SKPaint
         {
-            Color = SKColors.White,
+            Color = TextColor,
             TextSize = textSize,
             IsAntialias = true,
             Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
@@ -228,7 +252,7 @@ public class TreemapControl : SKElement
         // Draw text shadow for readability
         using var shadowPaint = new SKPaint
         {
-            Color = SKColors.Black.WithAlpha(100),
+            Color = TextShadowColor,
             TextSize = textSize,
             IsAntialias = true,
             Typeface = textPaint.Typeface
@@ -241,7 +265,7 @@ public class TreemapControl : SKElement
         {
             using var sizePaint = new SKPaint
             {
-                Color = SKColors.White.WithAlpha(200),
+                Color = TextColor.WithAlpha(200),
                 TextSize = Math.Max(8, textSize - 2),
                 IsAntialias = true
             };

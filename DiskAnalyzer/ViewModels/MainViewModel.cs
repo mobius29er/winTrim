@@ -82,6 +82,12 @@ public partial class MainViewModel : ObservableObject
     private ISeries[] _topFoldersSeries = Array.Empty<ISeries>();
 
     [ObservableProperty]
+    private ObservableCollection<FileSystemItem> _folderContents = new();
+
+    [ObservableProperty]
+    private string? _selectedFolderName;
+
+    [ObservableProperty]
     private bool _canStart = true;
 
     [ObservableProperty]
@@ -555,6 +561,39 @@ public partial class MainViewModel : ObservableObject
             foreach (var file in files)
             {
                 CategoryFiles.Add(file);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void SelectFolder(string? folderName)
+    {
+        if (string.IsNullOrEmpty(folderName) || ScanResult?.LargestFolders == null)
+            return;
+
+        // Extract just the folder name (remove size info if present)
+        var name = folderName;
+        var parenIndex = name.IndexOf(" (");
+        if (parenIndex > 0)
+        {
+            name = name.Substring(0, parenIndex);
+        }
+
+        SelectedFolderName = name;
+        FolderContents.Clear();
+
+        // Find the folder and show its contents
+        var folder = ScanResult.LargestFolders.FirstOrDefault(f => f.Name == name);
+        if (folder != null)
+        {
+            // Show immediate children sorted by size
+            var contents = folder.Children
+                .OrderByDescending(c => c.Size)
+                .Take(50);
+            
+            foreach (var item in contents)
+            {
+                FolderContents.Add(item);
             }
         }
     }

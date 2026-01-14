@@ -45,4 +45,7 @@
     <SolidColorBrush x:Key="RiskMediumBrush" Color="#F59E0B"/>
     <SolidColorBrush x:Key="RiskHighBrush" Color="#EF4444"/>
     
+    <!-- Button Text - White for contrast on colored buttons in light mode -->
+    <SolidColorBrush x:Key="ButtonTextBrush" Color="#FFFFFF"/>
+    
 </ResourceDictionary>
