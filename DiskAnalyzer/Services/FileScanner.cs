@@ -22,14 +22,45 @@ public sealed class FileScanner : IFileScanner
     private readonly ConcurrentBag<FileSystemItem> _largestFiles = new();
     private readonly ConcurrentDictionary<ItemCategory, CategoryStats> _categoryStats = new();
     
+    // Pause mechanism using ManualResetEventSlim (more efficient than ManualResetEvent)
+    private readonly ManualResetEventSlim _pauseEvent = new(true); // Initially signaled (not paused)
+    private volatile bool _isPaused;
+    
+    // Performance tuning
     private const int LargestFilesLimit = 100;
-    private const int BatchSize = 1000; // Process files in batches for memory efficiency
+    private const int MaxParallelism = 4; // Limit parallel directory scans to prevent disk thrashing
+    private static readonly EnumerationOptions FastEnumerationOptions = new()
+    {
+        IgnoreInaccessible = true,
+        RecurseSubdirectories = false, // We handle recursion manually for better control
+        AttributesToSkip = FileAttributes.ReparsePoint // Skip symlinks/junctions
+    };
+
+    public bool IsPaused => _isPaused;
 
     public FileScanner(IGameDetector gameDetector, ICleanupAdvisor cleanupAdvisor, ICategoryClassifier categoryClassifier)
     {
         _gameDetector = gameDetector;
         _cleanupAdvisor = cleanupAdvisor;
         _categoryClassifier = categoryClassifier;
+    }
+    
+    /// <summary>
+    /// Pauses the current scan. Scanner will stop at next checkpoint and wait.
+    /// </summary>
+    public void Pause()
+    {
+        _isPaused = true;
+        _pauseEvent.Reset(); // Block threads waiting on this event
+    }
+    
+    /// <summary>
+    /// Resumes a paused scan.
+    /// </summary>
+    public void Resume()
+    {
+        _isPaused = false;
+        _pauseEvent.Set(); // Allow threads to continue
     }
 
     public async Task<ScanResult> ScanAsync(string path, IProgress<ScanProgress> progress, CancellationToken cancellationToken)
@@ -111,9 +142,30 @@ public sealed class FileScanner : IFileScanner
         }
         catch (OperationCanceledException)
         {
+            // Return partial results on cancellation - don't discard the work done!
+            if (result.RootItem != null)
+            {
+                CalculatePercentages(result.RootItem);
+                
+                result.LargestFiles = _largestFiles
+                    .OrderByDescending(f => f.Size)
+                    .Take(LargestFilesLimit)
+                    .ToList();
+                
+                result.LargestFolders = GetLargestFolders(result.RootItem, 50);
+                result.CategoryBreakdown = new Dictionary<ItemCategory, CategoryStats>(_categoryStats);
+                result.TotalSize = result.RootItem.Size;
+                result.TotalFiles = scanProgress.FilesScanned;
+                result.TotalFolders = scanProgress.FoldersScanned;
+                result.ErrorCount = scanProgress.ErrorCount;
+            }
+            
             scanProgress.State = ScanState.Cancelled;
-            scanProgress.StatusMessage = "Scan cancelled";
+            scanProgress.StatusMessage = "Scan cancelled - showing partial results";
             progress.Report(scanProgress);
+            
+            result.ScanCompleted = DateTime.Now;
+            result.WasCancelled = true;
         }
         catch (Exception ex)
         {
@@ -132,74 +184,209 @@ public sealed class FileScanner : IFileScanner
         IProgress<ScanProgress> progress,
         CancellationToken cancellationToken)
     {
+        // Check for cancellation first
         cancellationToken.ThrowIfCancellationRequested();
+        
+        // Pause checkpoint - wait here if paused
+        if (_isPaused)
+        {
+            scanProgress.State = ScanState.Paused;
+            scanProgress.StatusMessage = $"Paused at: {folder.FullPath}";
+            progress.Report(scanProgress);
+            
+            // Wait until resumed (or cancelled)
+            _pauseEvent.Wait(cancellationToken);
+            
+            scanProgress.State = ScanState.Scanning;
+            scanProgress.StatusMessage = "Resuming scan...";
+            progress.Report(scanProgress);
+        }
 
         scanProgress.CurrentFolder = folder.FullPath;
-        scanProgress.FoldersScanned++;
+        Interlocked.Increment(ref scanProgress._foldersScanned);
 
         try
         {
             var dirInfo = new DirectoryInfo(folder.FullPath);
 
-            // Process files first (faster than directories)
-            await ProcessFilesAsync(folder, dirInfo, scanProgress, progress, cancellationToken);
+            // Process files using optimized enumeration
+            ProcessFilesOptimized(folder, dirInfo, scanProgress, cancellationToken);
 
-            // Then process subdirectories
-            foreach (var subDir in dirInfo.EnumerateDirectories())
+            // Get subdirectories using fast enumeration options
+            var subDirs = dirInfo.EnumerateDirectories("*", FastEnumerationOptions)
+                .Where(d => !ShouldSkipDirectory(d))
+                .ToList();
+
+            // Process subdirectories - use parallelism for large folders
+            if (subDirs.Count > 4)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
+                // Parallel scan for folders with many subdirectories
+                var parallelOptions = new ParallelOptions
                 {
-                    // Skip system/hidden folders that typically cause access issues
-                    if (ShouldSkipDirectory(subDir))
-                        continue;
+                    MaxDegreeOfParallelism = MaxParallelism,
+                    CancellationToken = cancellationToken
+                };
 
-                    var subFolder = new FileSystemItem
+                await Parallel.ForEachAsync(subDirs, parallelOptions, async (subDir, ct) =>
+                {
+                    // Check for pause
+                    if (_isPaused)
                     {
-                        Name = subDir.Name,
-                        FullPath = subDir.FullName,
-                        IsFolder = true,
-                        Parent = folder,
-                        Created = subDir.CreationTime,
-                        LastModified = subDir.LastWriteTime,
-                        LastAccessed = subDir.LastAccessTime
-                    };
+                        _pauseEvent.Wait(ct);
+                    }
 
-                    folder.Children.Add(subFolder);
+                    try
+                    {
+                        var subFolder = new FileSystemItem
+                        {
+                            Name = subDir.Name,
+                            FullPath = subDir.FullName,
+                            IsFolder = true,
+                            Parent = folder,
+                            Created = subDir.CreationTime,
+                            LastModified = subDir.LastWriteTime,
+                            LastAccessed = subDir.LastAccessTime
+                        };
 
-                    // Recursive scan
-                    await ScanDirectoryAsync(subFolder, scanProgress, progress, cancellationToken);
+                        // Thread-safe add to children
+                        lock (folder.Children)
+                        {
+                            folder.Children.Add(subFolder);
+                        }
 
-                    // Update folder size after scanning children
-                    folder.Size += subFolder.Size;
-                }
-                catch (UnauthorizedAccessException)
+                        // Recursive scan
+                        await ScanDirectoryAsync(subFolder, scanProgress, progress, ct);
+
+                        // Thread-safe size update
+                        Interlocked.Add(ref folder._size, subFolder.Size);
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        Interlocked.Increment(ref scanProgress._errorCount);
+                    }
+                    catch (PathTooLongException)
+                    {
+                        Interlocked.Increment(ref scanProgress._errorCount);
+                    }
+                });
+            }
+            else
+            {
+                // Sequential scan for small folders (avoid parallelism overhead)
+                foreach (var subDir in subDirs)
                 {
-                    scanProgress.ErrorCount++;
-                }
-                catch (PathTooLongException)
-                {
-                    scanProgress.ErrorCount++;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
+                    if (_isPaused)
+                    {
+                        _pauseEvent.Wait(cancellationToken);
+                    }
+
+                    try
+                    {
+                        var subFolder = new FileSystemItem
+                        {
+                            Name = subDir.Name,
+                            FullPath = subDir.FullName,
+                            IsFolder = true,
+                            Parent = folder,
+                            Created = subDir.CreationTime,
+                            LastModified = subDir.LastWriteTime,
+                            LastAccessed = subDir.LastAccessTime
+                        };
+
+                        folder.Children.Add(subFolder);
+                        await ScanDirectoryAsync(subFolder, scanProgress, progress, cancellationToken);
+                        folder.Size += subFolder.Size;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        scanProgress.ErrorCount++;
+                    }
+                    catch (PathTooLongException)
+                    {
+                        scanProgress.ErrorCount++;
+                    }
                 }
             }
 
             // Report progress periodically
-            if (scanProgress.FoldersScanned % 10 == 0)
+            if (scanProgress.FoldersScanned % 20 == 0)
             {
                 progress.Report(scanProgress);
             }
         }
         catch (UnauthorizedAccessException)
         {
-            scanProgress.ErrorCount++;
+            Interlocked.Increment(ref scanProgress._errorCount);
         }
         catch (DirectoryNotFoundException)
         {
-            scanProgress.ErrorCount++;
+            Interlocked.Increment(ref scanProgress._errorCount);
         }
     }
 
+    /// <summary>
+    /// Optimized file processing - no async overhead, uses fast enumeration
+    /// </summary>
+    private void ProcessFilesOptimized(
+        FileSystemItem folder,
+        DirectoryInfo dirInfo,
+        ScanProgress scanProgress,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            foreach (var file in dirInfo.EnumerateFiles("*", FastEnumerationOptions))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var fileItem = new FileSystemItem
+                    {
+                        Name = file.Name,
+                        FullPath = file.FullName,
+                        Size = file.Length,
+                        Extension = file.Extension.ToLowerInvariant(),
+                        IsFolder = false,
+                        Parent = folder,
+                        Created = file.CreationTime,
+                        LastModified = file.LastWriteTime,
+                        LastAccessed = file.LastAccessTime,
+                        Category = _categoryClassifier.Classify(file.Extension)
+                    };
+
+                    // Thread-safe operations
+                    lock (folder.Children)
+                    {
+                        folder.Children.Add(fileItem);
+                    }
+                    Interlocked.Add(ref folder._size, fileItem.Size);
+
+                    // Track largest files (ConcurrentBag is already thread-safe)
+                    _largestFiles.Add(fileItem);
+
+                    // Update category stats (ConcurrentDictionary is thread-safe)
+                    UpdateCategoryStats(fileItem);
+
+                    Interlocked.Increment(ref scanProgress._filesScanned);
+                    Interlocked.Add(ref scanProgress._bytesScanned, fileItem.Size);
+                }
+                catch (Exception)
+                {
+                    Interlocked.Increment(ref scanProgress._errorCount);
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+    }
+
+    // Keep old method for backward compatibility but mark as obsolete
+    [Obsolete("Use ProcessFilesOptimized instead")]
     private Task ProcessFilesAsync(
         FileSystemItem folder,
         DirectoryInfo dirInfo,

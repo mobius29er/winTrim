@@ -13,6 +13,11 @@ public class ScanResult
     public DateTime? ScanCompleted { get; set; }
     public TimeSpan Duration => (ScanCompleted ?? DateTime.Now) - ScanStarted;
     
+    /// <summary>
+    /// Indicates if the scan was cancelled (partial results)
+    /// </summary>
+    public bool WasCancelled { get; set; }
+    
     public long TotalSize { get; set; }
     public int TotalFiles { get; set; }
     public int TotalFolders { get; set; }

@@ -188,3 +188,27 @@ public class DateTimeToRelativeConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
+
+/// <summary>
+/// Converts boolean to icon string (for dark mode toggle)
+/// </summary>
+public class BoolToIconConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool isDark && parameter is string icons)
+        {
+            var parts = icons.Split('|');
+            if (parts.Length == 2)
+            {
+                return isDark ? parts[0] : parts[1]; // dark=sun, light=moon
+            }
+        }
+        return "🌙";
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}

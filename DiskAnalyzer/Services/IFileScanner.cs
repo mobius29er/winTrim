@@ -19,4 +19,19 @@ public interface IFileScanner
     /// Gets the total size of a folder recursively
     /// </summary>
     Task<long> GetFolderSizeAsync(string path, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Pauses the current scan operation
+    /// </summary>
+    void Pause();
+    
+    /// <summary>
+    /// Resumes a paused scan operation
+    /// </summary>
+    void Resume();
+    
+    /// <summary>
+    /// Gets whether the scanner is currently paused
+    /// </summary>
+    bool IsPaused { get; }
 }

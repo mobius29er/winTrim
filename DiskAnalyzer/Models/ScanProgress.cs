@@ -4,6 +4,7 @@ namespace DiskAnalyzer.Models;
 
 /// <summary>
 /// Tracks the current state of a scan operation
+/// Thread-safe for concurrent updates using Interlocked operations
 /// </summary>
 public partial class ScanProgress : ObservableObject
 {
@@ -13,17 +14,36 @@ public partial class ScanProgress : ObservableObject
     [ObservableProperty]
     private string _currentFolder = string.Empty;
 
-    [ObservableProperty]
-    private int _filesScanned;
+    // Public fields for thread-safe Interlocked operations
+    public int _filesScanned;
+    public int _foldersScanned;
+    public long _bytesScanned;
+    public int _errorCount;
 
-    [ObservableProperty]
-    private int _foldersScanned;
+    // Properties that read from the fields
+    public int FilesScanned
+    {
+        get => _filesScanned;
+        set => SetProperty(ref _filesScanned, value);
+    }
 
-    [ObservableProperty]
-    private long _bytesScanned;
+    public int FoldersScanned
+    {
+        get => _foldersScanned;
+        set => SetProperty(ref _foldersScanned, value);
+    }
 
-    [ObservableProperty]
-    private int _errorCount;
+    public long BytesScanned
+    {
+        get => _bytesScanned;
+        set => SetProperty(ref _bytesScanned, value);
+    }
+
+    public int ErrorCount
+    {
+        get => _errorCount;
+        set => SetProperty(ref _errorCount, value);
+    }
 
     [ObservableProperty]
     private double _progressPercentage;
@@ -52,12 +72,18 @@ public partial class ScanProgress : ObservableObject
     {
         State = ScanState.Idle;
         CurrentFolder = string.Empty;
-        FilesScanned = 0;
-        FoldersScanned = 0;
-        BytesScanned = 0;
-        ErrorCount = 0;
+        _filesScanned = 0;
+        _foldersScanned = 0;
+        _bytesScanned = 0;
+        _errorCount = 0;
         ProgressPercentage = 0;
         StatusMessage = "Ready to scan";
+        
+        // Notify property changes
+        OnPropertyChanged(nameof(FilesScanned));
+        OnPropertyChanged(nameof(FoldersScanned));
+        OnPropertyChanged(nameof(BytesScanned));
+        OnPropertyChanged(nameof(ErrorCount));
     }
 }
 

@@ -1,0 +1,2 @@
+Dark mode illegible balck text on dark blue background let's do a cool terminal theme instead black background with red or green text (users' choice)
+the charts are good but the tooltip where it shows the files isn't scrollable and therefore is a snapshot of what could be read. Instead of having a tooltip have two column for that one card pie chart on the elft and a scrollable list on the righ thwere they can open the file location as well

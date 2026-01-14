@@ -1,0 +1,322 @@
+using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using DiskAnalyzer.Models;
+using DiskAnalyzer.Services;
+using SkiaSharp;
+using SkiaSharp.Views.Desktop;
+using SkiaSharp.Views.WPF;
+
+namespace DiskAnalyzer.Controls;
+
+/// <summary>
+/// Custom treemap visualization control using SkiaSharp for high-performance rendering
+/// </summary>
+public class TreemapControl : SKElement
+{
+    private TreemapTile? _rootTile;
+    private TreemapTile? _currentRoot;
+    private TreemapTile? _hoveredTile;
+    private readonly ITreemapLayoutService _layoutService;
+
+    // Dependency Properties
+    public static readonly DependencyProperty SourceItemProperty =
+        DependencyProperty.Register(nameof(SourceItem), typeof(FileSystemItem), typeof(TreemapControl),
+            new PropertyMetadata(null, OnSourceItemChanged));
+
+    public static readonly DependencyProperty MaxDepthProperty =
+        DependencyProperty.Register(nameof(MaxDepth), typeof(int), typeof(TreemapControl),
+            new PropertyMetadata(3, OnSourceItemChanged));
+
+    public FileSystemItem? SourceItem
+    {
+        get => (FileSystemItem?)GetValue(SourceItemProperty);
+        set => SetValue(SourceItemProperty, value);
+    }
+
+    public int MaxDepth
+    {
+        get => (int)GetValue(MaxDepthProperty);
+        set => SetValue(MaxDepthProperty, value);
+    }
+
+    // Events
+    public event EventHandler<TreemapTile>? TileClicked;
+    public event EventHandler<TreemapTile>? TileDoubleClicked;
+    public event EventHandler<TreemapTile?>? TileHovered;
+    public event EventHandler? NavigateBack;
+
+    public TreemapControl()
+    {
+        _layoutService = new TreemapLayoutService();
+        
+        // Enable mouse events
+        this.MouseMove += OnMouseMove;
+        this.MouseLeftButtonUp += OnMouseClick;
+        this.MouseLeftButtonDown += OnMouseDoubleClick;
+        this.MouseRightButtonUp += OnRightClick;
+
+        // Set minimum size
+        this.MinHeight = 200;
+        this.MinWidth = 200;
+    }
+
+    private static void OnSourceItemChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is TreemapControl control)
+        {
+            control.RebuildTreemap();
+        }
+    }
+
+    public void RebuildTreemap()
+    {
+        if (SourceItem == null || ActualWidth <= 0 || ActualHeight <= 0)
+        {
+            _rootTile = null;
+            _currentRoot = null;
+            InvalidateVisual();
+            return;
+        }
+
+        _rootTile = _layoutService.BuildTreemap(SourceItem, (float)ActualWidth, (float)ActualHeight, MaxDepth);
+        _currentRoot = _rootTile;
+        InvalidateVisual();
+    }
+
+    public void NavigateToTile(TreemapTile tile)
+    {
+        if (tile.SourceItem == null || !tile.IsFolder) return;
+
+        _currentRoot = _layoutService.BuildTreemap(tile.SourceItem, (float)ActualWidth, (float)ActualHeight, MaxDepth);
+        InvalidateVisual();
+    }
+
+    public void NavigateUp()
+    {
+        if (_currentRoot?.Parent != null)
+        {
+            _currentRoot = _currentRoot.Parent;
+            InvalidateVisual();
+        }
+        else if (_rootTile != null)
+        {
+            _currentRoot = _rootTile;
+            InvalidateVisual();
+        }
+        NavigateBack?.Invoke(this, EventArgs.Empty);
+    }
+
+    protected override void OnPaintSurface(SKPaintSurfaceEventArgs e)
+    {
+        base.OnPaintSurface(e);
+
+        var canvas = e.Surface.Canvas;
+        canvas.Clear(SKColors.White);
+
+        if (_currentRoot == null)
+        {
+            DrawEmptyState(canvas, e.Info);
+            return;
+        }
+
+        // Rebuild if size changed
+        if (Math.Abs(_currentRoot.Bounds.Width - e.Info.Width) > 1 ||
+            Math.Abs(_currentRoot.Bounds.Height - e.Info.Height) > 1)
+        {
+            if (_currentRoot.SourceItem != null)
+            {
+                _currentRoot = _layoutService.BuildTreemap(_currentRoot.SourceItem, e.Info.Width, e.Info.Height, MaxDepth);
+            }
+        }
+
+        DrawTile(canvas, _currentRoot);
+    }
+
+    private void DrawEmptyState(SKCanvas canvas, SKImageInfo info)
+    {
+        using var paint = new SKPaint
+        {
+            Color = SKColor.Parse("#64748B"),
+            TextSize = 16,
+            IsAntialias = true,
+            TextAlign = SKTextAlign.Center
+        };
+
+        canvas.DrawText("Run a scan to see the treemap visualization",
+            info.Width / 2, info.Height / 2, paint);
+    }
+
+    private void DrawTile(SKCanvas canvas, TreemapTile tile)
+    {
+        if (tile.Bounds.Width < 2 || tile.Bounds.Height < 2)
+            return;
+
+        // Draw tile background
+        using var fillPaint = new SKPaint
+        {
+            Color = tile.Color,
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true
+        };
+
+        // Lighten color if hovered
+        if (tile == _hoveredTile)
+        {
+            fillPaint.Color = tile.Color.WithAlpha(200);
+        }
+
+        var rect = new SKRect(
+            tile.Bounds.Left + 1,
+            tile.Bounds.Top + 1,
+            tile.Bounds.Right - 1,
+            tile.Bounds.Bottom - 1);
+
+        canvas.DrawRect(rect, fillPaint);
+
+        // Draw border
+        using var borderPaint = new SKPaint
+        {
+            Color = SKColors.White,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1,
+            IsAntialias = true
+        };
+        canvas.DrawRect(rect, borderPaint);
+
+        // Draw label if tile is big enough
+        if (rect.Width > 40 && rect.Height > 20)
+        {
+            DrawLabel(canvas, tile, rect);
+        }
+
+        // Draw children (only if not too deep)
+        if (tile.Depth < MaxDepth)
+        {
+            foreach (var child in tile.Children)
+            {
+                DrawTile(canvas, child);
+            }
+        }
+    }
+
+    private void DrawLabel(SKCanvas canvas, TreemapTile tile, SKRect rect)
+    {
+        var textSize = Math.Min(14, Math.Max(9, rect.Height / 4));
+        
+        using var textPaint = new SKPaint
+        {
+            Color = SKColors.White,
+            TextSize = textSize,
+            IsAntialias = true,
+            Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
+        };
+
+        // Truncate text to fit
+        var text = tile.Name;
+        var maxWidth = rect.Width - 8;
+        
+        while (textPaint.MeasureText(text) > maxWidth && text.Length > 3)
+        {
+            text = text.Substring(0, text.Length - 4) + "...";
+        }
+
+        var x = rect.Left + 4;
+        var y = rect.Top + textSize + 2;
+        
+        // Draw text shadow for readability
+        using var shadowPaint = new SKPaint
+        {
+            Color = SKColors.Black.WithAlpha(100),
+            TextSize = textSize,
+            IsAntialias = true,
+            Typeface = textPaint.Typeface
+        };
+        canvas.DrawText(text, x + 1, y + 1, shadowPaint);
+        canvas.DrawText(text, x, y, textPaint);
+
+        // Draw size if room permits
+        if (rect.Height > 35)
+        {
+            using var sizePaint = new SKPaint
+            {
+                Color = SKColors.White.WithAlpha(200),
+                TextSize = Math.Max(8, textSize - 2),
+                IsAntialias = true
+            };
+            canvas.DrawText(tile.SizeFormatted, x, y + textSize + 2, sizePaint);
+        }
+    }
+
+    private void OnMouseMove(object sender, MouseEventArgs e)
+    {
+        var pos = e.GetPosition(this);
+        var tile = FindTileAtPoint((float)pos.X, (float)pos.Y);
+
+        if (tile != _hoveredTile)
+        {
+            _hoveredTile = tile;
+            TileHovered?.Invoke(this, tile);
+            InvalidateVisual();
+        }
+    }
+
+    private void OnMouseClick(object sender, MouseButtonEventArgs e)
+    {
+        var pos = e.GetPosition(this);
+        var tile = FindTileAtPoint((float)pos.X, (float)pos.Y);
+
+        if (tile != null)
+        {
+            TileClicked?.Invoke(this, tile);
+        }
+    }
+
+    private void OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            var pos = e.GetPosition(this);
+            var tile = FindTileAtPoint((float)pos.X, (float)pos.Y);
+
+            if (tile != null && tile.IsFolder)
+            {
+                NavigateToTile(tile);
+                TileDoubleClicked?.Invoke(this, tile);
+            }
+        }
+    }
+
+    private void OnRightClick(object sender, MouseButtonEventArgs e)
+    {
+        NavigateUp();
+    }
+
+    private TreemapTile? FindTileAtPoint(float x, float y)
+    {
+        return FindTileRecursive(_currentRoot, x, y);
+    }
+
+    private TreemapTile? FindTileRecursive(TreemapTile? tile, float x, float y)
+    {
+        if (tile == null || !tile.ContainsPoint(x, y))
+            return null;
+
+        // Check children first (they're on top)
+        foreach (var child in tile.Children)
+        {
+            var found = FindTileRecursive(child, x, y);
+            if (found != null)
+                return found;
+        }
+
+        return tile;
+    }
+
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        RebuildTreemap();
+    }
+}

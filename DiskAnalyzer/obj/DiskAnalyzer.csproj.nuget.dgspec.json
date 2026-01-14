@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj": {}
+    "c:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj": {}
   },
   "projects": {
-    "C:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj": {
+    "c:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj",
+        "projectUniqueName": "c:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj",
         "projectName": "DiskAnalyzer",
-        "projectPath": "C:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj",
+        "projectPath": "c:\\Github\\winLose\\DiskAnalyzer\\DiskAnalyzer.csproj",
         "packagesPath": "C:\\Users\\mobiu\\.nuget\\packages\\",
-        "outputPath": "C:\\Github\\winLose\\DiskAnalyzer\\obj\\",
+        "outputPath": "c:\\Github\\winLose\\DiskAnalyzer\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\mobiu\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -50,6 +50,10 @@
             "LiveChartsCore.SkiaSharpView.WPF": {
               "target": "Package",
               "version": "[2.0.0-rc2, )"
+            },
+            "SkiaSharp.Views.WPF": {
+              "target": "Package",
+              "version": "[2.88.7, )"
             }
           },
           "imports": [

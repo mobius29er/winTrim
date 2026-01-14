@@ -6,6 +6,7 @@ namespace DiskAnalyzer.Models;
 
 /// <summary>
 /// Represents a file system item (file or folder) with metadata
+/// Thread-safe for concurrent updates
 /// </summary>
 public partial class FileSystemItem : ObservableObject
 {
@@ -15,8 +16,14 @@ public partial class FileSystemItem : ObservableObject
     [ObservableProperty]
     private string _fullPath = string.Empty;
 
-    [ObservableProperty]
-    private long _size;
+    // Public field for thread-safe Interlocked operations
+    public long _size;
+    
+    public long Size
+    {
+        get => _size;
+        set => SetProperty(ref _size, value);
+    }
 
     [ObservableProperty]
     private DateTime _lastAccessed;

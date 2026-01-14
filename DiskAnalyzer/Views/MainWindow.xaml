@@ -5,12 +5,13 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:DiskAnalyzer.ViewModels"
         xmlns:conv="clr-namespace:DiskAnalyzer.Converters"
+        xmlns:ctrl="clr-namespace:DiskAnalyzer.Controls"
         xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
         mc:Ignorable="d"
         Title="Disk Analyzer - WinLose" 
         Height="800" Width="1280"
         MinHeight="600" MinWidth="900"
-        Background="{StaticResource BackgroundBrush}"
+        Background="{DynamicResource BackgroundBrush}"
         WindowStartupLocation="CenterScreen">
     
     <Window.DataContext>
@@ -24,6 +25,7 @@
         <conv:RiskLevelToBrushConverter x:Key="RiskToBrush"/>
         <conv:PercentageToWidthConverter x:Key="PercentageToWidth"/>
         <conv:DateTimeToRelativeConverter x:Key="RelativeTime"/>
+        <conv:BoolToIconConverter x:Key="BoolToIcon"/>
     </Window.Resources>
     
     <Grid>
@@ -35,8 +37,8 @@
         </Grid.RowDefinitions>
         
         <!-- Header -->
-        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" 
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
                 Padding="24,16">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -49,9 +51,9 @@
                     <TextBlock Text="💾" FontSize="28" VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Disk Analyzer" FontSize="20" FontWeight="Bold" 
-                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
                         <TextBlock Text="Analyze and optimize your storage" FontSize="12" 
-                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
                     </StackPanel>
                 </StackPanel>
                 
@@ -65,11 +67,11 @@
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="{Binding Name}" FontWeight="Medium" Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding VolumeLabel}" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <TextBlock Text=" - " Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding VolumeLabel}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock Text=" - " Foreground="{DynamicResource TextMutedBrush}"/>
                                     <TextBlock Text="{Binding AvailableFreeSpace, Converter={StaticResource FileSizeConverter}}" 
-                                               Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <TextBlock Text=" free" Foreground="{StaticResource TextMutedBrush}"/>
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock Text=" free" Foreground="{DynamicResource TextMutedBrush}"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
@@ -84,6 +86,24 @@
                 
                 <!-- Scan Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Theme Toggle -->
+                    <Button Command="{Binding ToggleDarkModeCommand}"
+                            Style="{StaticResource OutlineButton}" Margin="0,0,16,0"
+                            ToolTip="Toggle Dark/Light Mode" Padding="8,8">
+                        <TextBlock Text="{Binding IsDarkMode, Converter={StaticResource BoolToIcon}, ConverterParameter='☀️|🌙'}" 
+                                   FontSize="16"/>
+                    </Button>
+                    
+                    <!-- Export Buttons -->
+                    <Button Content="📊 CSV" Command="{Binding ExportToCsvCommand}"
+                            Style="{StaticResource OutlineButton}" Margin="0,0,4,0"
+                            ToolTip="Export results to CSV"
+                            IsEnabled="{Binding CanExport}"/>
+                    <Button Content="📋 JSON" Command="{Binding ExportToJsonCommand}"
+                            Style="{StaticResource OutlineButton}" Margin="0,0,16,0"
+                            ToolTip="Export results to JSON"
+                            IsEnabled="{Binding CanExport}"/>
+                    
                     <Button Content="▶ Start Scan" Command="{Binding StartScanCommand}"
                             Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
                             IsEnabled="{Binding CanStart}"/>
@@ -101,8 +121,8 @@
         </Border>
         
         <!-- Progress Bar -->
-        <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}" 
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+        <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
                 Padding="24,12" 
                 Visibility="{Binding CanStop, Converter={StaticResource BoolToVisibility}}">
             <Grid>
@@ -115,17 +135,17 @@
                     <ProgressBar Value="{Binding ScanProgress.ProgressPercentage, Mode=OneWay}" 
                                  Maximum="100" Style="{StaticResource ScanProgressBar}" Margin="0,0,0,8"/>
                     <TextBlock Text="{Binding ScanProgress.CurrentFolder}" 
-                               FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
                                TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
                 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="24,0,0,0">
                     <TextBlock Text="{Binding ScanProgress.FilesScanned, StringFormat={}{0:N0} files}" 
-                               Margin="0,0,16,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                               Margin="0,0,16,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <TextBlock Text="{Binding ScanProgress.FoldersScanned, StringFormat={}{0:N0} folders}" 
-                               Margin="0,0,16,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                               Margin="0,0,16,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <TextBlock Text="{Binding ScanProgress.BytesScanned, Converter={StaticResource FileSizeConverter}}" 
-                               FontWeight="Medium" Foreground="{StaticResource PrimaryBrush}"/>
+                               FontWeight="Medium" Foreground="{DynamicResource PrimaryBrush}"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -207,6 +227,34 @@
                 </Grid>
             </TabItem>
             
+            <!-- Treemap Tab -->
+            <TabItem Header="🗺️ Treemap" Style="{StaticResource ModernTabItem}">
+                <Grid Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Treemap Header -->
+                    <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,8" Padding="12">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🗺️ Storage Treemap" Style="{StaticResource SectionHeader}" Margin="0"/>
+                            <TextBlock Text=" - Double-click folders to zoom in, right-click to go back" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}" 
+                                       VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Treemap Visualization -->
+                    <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="4">
+                        <ctrl:TreemapControl x:Name="TreemapView"
+                                             SourceItem="{Binding ScanResult.RootItem}"
+                                             MaxDepth="4"
+                                             TileClicked="TreemapView_TileClicked"/>
+                    </Border>
+                </Grid>
+            </TabItem>
+            
             <!-- File Explorer Tab -->
             <TabItem Header="📁 File Explorer" Style="{StaticResource ModernTabItem}">
                 <Grid Margin="0,16,0,0">
@@ -230,11 +278,11 @@
                                             <TextBlock Text="{Binding IsFolder, Converter={StaticResource BoolToVisibility}, ConverterParameter=📁}" 
                                                        Margin="0,0,6,0"/>
                                             <TextBlock Text="{Binding Name}" FontWeight="Medium"/>
-                                            <TextBlock Text=" - " Foreground="{StaticResource TextMutedBrush}"/>
+                                            <TextBlock Text=" - " Foreground="{DynamicResource TextMutedBrush}"/>
                                             <TextBlock Text="{Binding SizeFormatted}" 
-                                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Text="{Binding PercentageOfParent, StringFormat=' ({0:F1}%)'}" 
-                                                       Foreground="{StaticResource TextMutedBrush}"/>
+                                                       Foreground="{DynamicResource TextMutedBrush}"/>
                                         </StackPanel>
                                     </HierarchicalDataTemplate>
                                 </TreeView.ItemTemplate>
@@ -342,14 +390,14 @@
         </TabControl>
         
         <!-- Status Bar -->
-        <Border Grid.Row="3" Background="{StaticResource SurfaceBrush}" 
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0"
+        <Border Grid.Row="3" Background="{DynamicResource SurfaceBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
                 Padding="24,8">
             <Grid>
-                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextSecondaryBrush}" 
+                <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondaryBrush}" 
                            VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding ScanResult.Duration, StringFormat='Scan time: {0:hh\\:mm\\:ss}'}" 
-                           HorizontalAlignment="Right" Foreground="{StaticResource TextMutedBrush}"
+                           HorizontalAlignment="Right" Foreground="{DynamicResource TextMutedBrush}"
                            Visibility="{Binding ScanResult, Converter={StaticResource BoolToVisibility}}"/>
             </Grid>
         </Border>

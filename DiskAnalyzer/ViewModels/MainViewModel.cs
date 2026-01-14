@@ -25,6 +25,8 @@ public partial class MainViewModel : ObservableObject
     private readonly IGameDetector _gameDetector;
     private readonly ICleanupAdvisor _cleanupAdvisor;
     private readonly ICategoryClassifier _categoryClassifier;
+    private readonly ISettingsService _settingsService;
+    private readonly IExportService _exportService;
     
     private CancellationTokenSource? _cancellationTokenSource;
 
@@ -84,18 +86,56 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _statusText = "Select a drive or folder to begin scanning";
 
+    [ObservableProperty]
+    private bool _isDarkMode;
+
+    [ObservableProperty]
+    private bool _canExport;
+
     #endregion
 
     public MainViewModel()
     {
         // Create services
+        _settingsService = new SettingsService();
+        _exportService = new ExportService();
         _categoryClassifier = new CategoryClassifier();
         _gameDetector = new GameDetector();
         _cleanupAdvisor = new CleanupAdvisor();
         _fileScanner = new FileScanner(_gameDetector, _cleanupAdvisor, _categoryClassifier);
 
+        // Load settings
+        IsDarkMode = _settingsService.IsDarkMode;
+
         // Load available drives
         LoadDrives();
+    }
+
+    partial void OnIsDarkModeChanged(bool value)
+    {
+        _settingsService.IsDarkMode = value;
+        ApplyTheme(value);
+    }
+
+    private void ApplyTheme(bool isDark)
+    {
+        var app = Application.Current;
+        var resources = app.Resources.MergedDictionaries;
+        
+        // Remove existing color dictionary
+        var existingColors = resources.FirstOrDefault(d => 
+            d.Source?.OriginalString.Contains("Colors.xaml") == true ||
+            d.Source?.OriginalString.Contains("DarkColors.xaml") == true);
+        
+        if (existingColors != null)
+            resources.Remove(existingColors);
+
+        // Add new theme
+        var themeUri = isDark 
+            ? new Uri("Themes/DarkColors.xaml", UriKind.Relative)
+            : new Uri("Themes/Colors.xaml", UriKind.Relative);
+        
+        resources.Insert(0, new ResourceDictionary { Source = themeUri });
     }
 
     private void LoadDrives()
@@ -148,6 +188,9 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        // Reset pause state before starting
+        _fileScanner.Resume();
+        
         UpdateCommandStates(scanning: true);
         ScanProgress.Reset();
         _cancellationTokenSource = new CancellationTokenSource();
@@ -168,13 +211,30 @@ public partial class MainViewModel : ObservableObject
 
             ScanResult = await _fileScanner.ScanAsync(SelectedPath, progress, _cancellationTokenSource.Token);
 
-            // Update UI with results
+            // Update UI with results (works for both complete and partial results)
             UpdateResults();
-            StatusText = $"Scan completed - {ScanResult.TotalFiles:N0} files, {ScanResult.RootItem?.SizeFormatted}";
+            
+            if (ScanResult.WasCancelled)
+            {
+                StatusText = $"Scan cancelled - showing {ScanResult.TotalFiles:N0} files found so far ({ScanResult.RootItem?.SizeFormatted})";
+            }
+            else
+            {
+                StatusText = $"Scan completed - {ScanResult.TotalFiles:N0} files, {ScanResult.RootItem?.SizeFormatted}";
+            }
         }
         catch (OperationCanceledException)
         {
-            StatusText = "Scan cancelled";
+            // This shouldn't happen anymore as we return partial results, but keep as fallback
+            if (ScanResult != null)
+            {
+                UpdateResults();
+                StatusText = $"Scan stopped - {ScanResult.TotalFiles:N0} files found";
+            }
+            else
+            {
+                StatusText = "Scan cancelled";
+            }
         }
         catch (Exception ex)
         {
@@ -193,6 +253,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanStop))]
     private void StopScan()
     {
+        _fileScanner.Resume(); // Ensure not paused so cancellation can propagate
         _cancellationTokenSource?.Cancel();
         StatusText = "Stopping scan...";
     }
@@ -200,18 +261,19 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanPause))]
     private void PauseScan()
     {
-        // Pause functionality - cancel current scan but keep results
-        _cancellationTokenSource?.Cancel();
-        UpdateCommandStates(scanning: false);
-        ScanProgress.State = ScanState.Paused;
-        StatusText = "Scan paused - results preserved. Click Start to scan again.";
+        // Real pause - scanner will wait at next checkpoint
+        _fileScanner.Pause();
+        UpdateCommandStates(scanning: true, paused: true);
+        StatusText = "Scan paused - click Resume to continue";
     }
 
     [RelayCommand(CanExecute = nameof(CanResume))]
     private void ResumeScan()
     {
-        // Resume is essentially starting a new scan
-        StartScanCommand.Execute(null);
+        // Resume paused scan
+        _fileScanner.Resume();
+        UpdateCommandStates(scanning: true, paused: false);
+        StatusText = "Resuming scan...";
     }
 
     [RelayCommand]
@@ -249,6 +311,70 @@ public partial class MainViewModel : ObservableObject
         LoadDrives();
     }
 
+    [RelayCommand(CanExecute = nameof(CanExport))]
+    private async Task ExportToCsvAsync()
+    {
+        if (ScanResult == null) return;
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export to CSV",
+            Filter = "CSV Files (*.csv)|*.csv",
+            FileName = $"DiskAnalysis_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                await _exportService.ExportToCsvAsync(ScanResult, dialog.FileName);
+                StatusText = $"Exported to {dialog.FileName}";
+                MessageBox.Show($"Successfully exported to:\n{dialog.FileName}", "Export Complete",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export failed: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExport))]
+    private async Task ExportToJsonAsync()
+    {
+        if (ScanResult == null) return;
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export to JSON",
+            Filter = "JSON Files (*.json)|*.json",
+            FileName = $"DiskAnalysis_{DateTime.Now:yyyyMMdd_HHmmss}.json"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                await _exportService.ExportToJsonAsync(ScanResult, dialog.FileName);
+                StatusText = $"Exported to {dialog.FileName}";
+                MessageBox.Show($"Successfully exported to:\n{dialog.FileName}", "Export Complete",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export failed: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleDarkMode()
+    {
+        IsDarkMode = !IsDarkMode;
+    }
+
     #endregion
 
     #region Private Methods
@@ -269,6 +395,11 @@ public partial class MainViewModel : ObservableObject
     private void UpdateResults()
     {
         if (ScanResult == null) return;
+
+        // Enable export now that we have results
+        CanExport = true;
+        ExportToCsvCommand.NotifyCanExecuteChanged();
+        ExportToJsonCommand.NotifyCanExecuteChanged();
 
         // Update tree view
         RootItems.Clear();
