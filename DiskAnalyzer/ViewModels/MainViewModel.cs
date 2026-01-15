@@ -740,8 +740,8 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task QuickCleanAsync()
     {
-        // Get safe/low risk cleanup suggestions
-        var safeItems = CleanupSuggestions.Where(s => s.RiskLevel <= CleanupRisk.Low).ToList();
+        // Get ONLY safe cleanup suggestions - no risk to user data
+        var safeItems = CleanupSuggestions.Where(s => s.RiskLevel == CleanupRisk.Safe).ToList();
         
         if (!safeItems.Any())
         {
@@ -1051,7 +1051,8 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateQuickCleanStatus()
     {
-        var safeItems = CleanupSuggestions.Where(s => s.RiskLevel <= CleanupRisk.Low).ToList();
+        // Only count Safe risk items for Quick Clean - 100% safe guarantee
+        var safeItems = CleanupSuggestions.Where(s => s.RiskLevel == CleanupRisk.Safe).ToList();
         HasQuickCleanItems = safeItems.Any();
         
         if (HasQuickCleanItems)

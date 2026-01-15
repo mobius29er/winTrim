@@ -140,8 +140,8 @@ DiskAnalyzer/
 
 | Theme | Description |
 |-------|-------------|
-| **Default** | Retrofuturistic teal/cyan with orange accents (Territory Studio inspired) |
-| **Tech** | Blade Runner 2049 neon - Cyan/Pink on void black |
+| **Default** | Retrofuturistic teal/cyan with orange accents |
+| **Tech** | Cyberpunk neon - Cyan/Pink on void black |
 | **Enterprise** | Professional Windows-style - Clean blues and grays (light mode) |
 | **Terminal Green** | Classic terminal - Green on black |
 | **Terminal Red** | Alert terminal - Red on black |
