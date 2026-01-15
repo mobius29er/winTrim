@@ -26,7 +26,7 @@ export default function Home() {
               Privacy
             </Link>
             <a 
-              href="https://github.com/mobius29er/winLose" 
+              href="https://github.com/mobius29er/winTrim" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-sm text-gray-400 hover:text-[#00F3FF] transition-colors tracking-wider uppercase"
@@ -67,7 +67,7 @@ export default function Home() {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
             <a 
-              href="https://github.com/mobius29er/winLose/releases"
+              href="https://github.com/mobius29er/winTrim"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-cyber px-8 py-4 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold rounded-lg tracking-wider uppercase hover:shadow-[0_0_30px_rgba(255,153,0,0.5)] transition-all duration-300"
@@ -76,7 +76,7 @@ export default function Home() {
               Download for Windows
             </a>
             <a 
-              href="https://github.com/mobius29er/winLose"
+              href="https://github.com/mobius29er/winTrim"
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-4 border border-[#00F3FF]/30 text-[#00F3FF] font-bold rounded-lg tracking-wider uppercase hover:bg-[#00F3FF]/10 hover:border-[#00F3FF]/60 transition-all duration-300"
@@ -259,7 +259,7 @@ export default function Home() {
             Free. Open source. No account required.
           </p>
           <a 
-            href="https://github.com/mobius29er/winLose/releases"
+            href="https://github.com/mobius29er/winTrim"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-cyber inline-block px-12 py-5 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold text-lg rounded-lg tracking-wider uppercase hover:shadow-[0_0_40px_rgba(255,153,0,0.6)] transition-all duration-300"
@@ -290,7 +290,7 @@ export default function Home() {
                 Privacy
               </Link>
               <a 
-                href="https://github.com/mobius29er/winLose" 
+                href="https://github.com/mobius29er/winTrim" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="hover:text-[#00F3FF] transition-colors"
@@ -325,7 +325,7 @@ export default function Home() {
               </a>
               {" "}// Source available on{" "}
               <a 
-                href="https://github.com/mobius29er/winLose" 
+                href="https://github.com/mobius29er/winTrim" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-[#00F3FF]/60 hover:text-[#00F3FF] transition-colors"

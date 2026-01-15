@@ -1,8 +1,10 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiskAnalyzer", "DiskAnalyzer\DiskAnalyzer.csproj", "{823B13F0-E424-156A-3E67-C2F7F718795C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinTrim.Core", "WinTrim.Core\WinTrim.Core.csproj", "{BE7AE1AC-200C-4385-BF08-A7F3A712B4FA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,6 +16,10 @@ Global
 		{823B13F0-E424-156A-3E67-C2F7F718795C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{823B13F0-E424-156A-3E67-C2F7F718795C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{823B13F0-E424-156A-3E67-C2F7F718795C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE7AE1AC-200C-4385-BF08-A7F3A712B4FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE7AE1AC-200C-4385-BF08-A7F3A712B4FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE7AE1AC-200C-4385-BF08-A7F3A712B4FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE7AE1AC-200C-4385-BF08-A7F3A712B4FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
