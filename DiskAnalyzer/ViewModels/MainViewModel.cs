@@ -410,11 +410,11 @@ public partial class MainViewModel : ObservableObject
                 _settingsService.SaveScanCache(ScanResult);
             }
             
-            if (ScanResult.WasCancelled)
+            if (ScanResult != null && ScanResult.WasCancelled)
             {
                 StatusText = $"Scan cancelled - showing {ScanResult.TotalFiles:N0} files found so far ({ScanResult.RootItem?.SizeFormatted})";
             }
-            else
+            else if (ScanResult != null)
             {
                 StatusText = $"Scan completed - {ScanResult.TotalFiles:N0} files, {ScanResult.RootItem?.SizeFormatted}";
             }
@@ -498,6 +498,31 @@ public partial class MainViewModel : ObservableObject
         if (item != null)
         {
             Clipboard.SetText(item.FullPath);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenGameFolder(GameInstallation? game)
+    {
+        if (game == null) return;
+
+        try
+        {
+            System.Diagnostics.Process.Start("explorer.exe", $"\"{game.Path}\"");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open explorer: {ex.Message}", "Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void CopyGamePath(GameInstallation? game)
+    {
+        if (game != null)
+        {
+            Clipboard.SetText(game.Path);
         }
     }
 

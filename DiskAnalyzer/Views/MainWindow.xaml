@@ -26,6 +26,30 @@
         <conv:PercentageToWidthConverter x:Key="PercentageToWidth"/>
         <conv:DateTimeToRelativeConverter x:Key="RelativeTime"/>
         <conv:BoolToIconConverter x:Key="BoolToIcon"/>
+        
+        <!-- File/Folder Context Menu -->
+        <ContextMenu x:Key="FileItemContextMenu" 
+                     Background="{DynamicResource SurfaceBrush}" 
+                     Foreground="{DynamicResource TextPrimaryBrush}">
+            <MenuItem Header="📂 Open File Location" 
+                      Command="{Binding DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                      CommandParameter="{Binding}"/>
+            <MenuItem Header="📋 Copy Path" 
+                      Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                      CommandParameter="{Binding}"/>
+        </ContextMenu>
+        
+        <!-- Game Context Menu -->
+        <ContextMenu x:Key="GameContextMenu"
+                     Background="{DynamicResource SurfaceBrush}" 
+                     Foreground="{DynamicResource TextPrimaryBrush}">
+            <MenuItem Header="📂 Open Game Folder" 
+                      Command="{Binding DataContext.OpenGameFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                      CommandParameter="{Binding}"/>
+            <MenuItem Header="📋 Copy Path" 
+                      Command="{Binding DataContext.CopyGamePathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                      CommandParameter="{Binding}"/>
+        </ContextMenu>
     </Window.Resources>
     
     <Grid>
@@ -270,6 +294,11 @@
                                 <DataGrid Grid.Row="1" ItemsSource="{Binding CategoryFiles}" 
                                           Style="{StaticResource DataGridStyle}"
                                           MaxHeight="200">
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                            <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
+                                        </Style>
+                                    </DataGrid.RowStyle>
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                                         <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="70"/>
@@ -364,6 +393,11 @@
                             <DataGrid ItemsSource="{Binding Games}" 
                                       Style="{StaticResource DataGridStyle}"
                                       MaxHeight="200">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Setter Property="ContextMenu" Value="{StaticResource GameContextMenu}"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                                     <DataGridTextColumn Header="Platform" Binding="{Binding Platform}" Width="80"/>
@@ -386,9 +420,10 @@
                                 <Button Grid.Column="1" 
                                         Command="{Binding QuickCleanCommand}"
                                         Visibility="{Binding HasQuickCleanItems, Converter={StaticResource BoolToVisibility}}"
-                                        Style="{StaticResource ModernButton}"
                                         Background="#4CAF50"
+                                        Foreground="White"
                                         Padding="12,6"
+                                        Cursor="Hand"
                                         ToolTip="Clean all safe/low-risk items with one click">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="⚡ Quick Clean" FontWeight="SemiBold"/>
@@ -557,6 +592,11 @@
                         <DataGrid ItemsSource="{Binding LargestFiles}" 
                                   Style="{StaticResource DataGridStyle}"
                                   MaxHeight="500">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
+                                </Style>
+                            </DataGrid.RowStyle>
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
                                 <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="100" SortMemberPath="Size"/>

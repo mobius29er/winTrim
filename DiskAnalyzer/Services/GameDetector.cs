@@ -35,11 +35,15 @@ public sealed class GameDetector : IGameDetector
             games.AddRange(result);
         }
 
-        // Deduplicate by path (same game may be detected by multiple platforms)
-        // Keep the first occurrence (which has the most accurate platform info)
+        // Deduplicate games:
+        // 1. First by exact path (case-insensitive) 
+        // 2. Then by name (same game in different library folders)
+        // Keep the largest installation when names match
         return games
             .GroupBy(g => g.Path.ToLowerInvariant())
             .Select(g => g.First())
+            .GroupBy(g => g.Name.ToLowerInvariant())
+            .Select(g => g.OrderByDescending(x => x.Size).First())
             .OrderByDescending(g => g.Size)
             .ToList();
     }
