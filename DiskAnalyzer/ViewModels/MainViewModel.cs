@@ -405,6 +405,9 @@ public partial class MainViewModel : ObservableObject
         ScanProgress.Reset();
         _cancellationTokenSource = new CancellationTokenSource();
 
+        // Start DevTool scanning in parallel with main scan for unified experience
+        var devToolTask = UpdateDevToolItemsAsync();
+
         try
         {
             StatusText = "Scanning...";
@@ -420,6 +423,9 @@ public partial class MainViewModel : ObservableObject
             });
 
             ScanResult = await _fileScanner.ScanAsync(SelectedPath, progress, _cancellationTokenSource.Token);
+
+            // Wait for DevTool scan to complete before updating UI
+            await devToolTask;
 
             // Update UI with results (works for both complete and partial results)
             UpdateResults();
@@ -763,8 +769,7 @@ public partial class MainViewModel : ObservableObject
             Games.Add(game);
         }
 
-        // Update developer tools (scan async, don't block)
-        _ = UpdateDevToolItemsAsync();
+        // DevTool items are already populated from parallel scan - no need to scan again
 
         // Update cleanup suggestions
         CleanupSuggestions.Clear();
