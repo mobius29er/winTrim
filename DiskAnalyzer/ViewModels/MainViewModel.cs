@@ -111,6 +111,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _canExport;
 
+    [ObservableProperty]
+    private bool _hasCachedScan;
+
+    [ObservableProperty]
+    private string? _cachedScanInfo;
+
     #endregion
 
     public MainViewModel()
@@ -129,6 +135,143 @@ public partial class MainViewModel : ObservableObject
 
         // Load available drives
         LoadDrives();
+
+        // Check for cached scan from previous session
+        CheckForCachedScan();
+    }
+
+    private void CheckForCachedScan()
+    {
+        if (_settingsService.HasCachedScan)
+        {
+            var cache = _settingsService.LoadScanCache();
+            if (cache != null)
+            {
+                HasCachedScan = true;
+                var age = DateTime.Now - cache.ScanDate;
+                var ageText = age.TotalDays >= 1 ? $"{(int)age.TotalDays}d ago" : 
+                              age.TotalHours >= 1 ? $"{(int)age.TotalHours}h ago" : 
+                              $"{(int)age.TotalMinutes}m ago";
+                CachedScanInfo = $"📁 {cache.RootPath} • {cache.TotalSizeFormatted} • {ageText}";
+                StatusText = "Previous scan available - Click 'Restore' or start a new scan";
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void RestoreCachedScan()
+    {
+        var cache = _settingsService.LoadScanCache();
+        if (cache == null) return;
+
+        // Populate UI from cache
+        LargestFiles.Clear();
+        foreach (var f in cache.LargestFiles)
+        {
+            LargestFiles.Add(new FileSystemItem
+            {
+                Name = f.Name,
+                FullPath = f.FullPath,
+                Size = f.Size,
+                LastAccessed = f.LastAccessed,
+                LastModified = f.LastModified,
+                Category = Enum.TryParse<ItemCategory>(f.Category, out var cat) ? cat : ItemCategory.Other
+            });
+        }
+
+        LargestFolders.Clear();
+        foreach (var f in cache.LargestFolders)
+        {
+            var folder = new FileSystemItem
+            {
+                Name = f.Name,
+                FullPath = f.FullPath,
+                Size = f.Size,
+                IsFolder = true
+            };
+            foreach (var c in f.Children)
+            {
+                folder.Children.Add(new FileSystemItem
+                {
+                    Name = c.Name,
+                    FullPath = c.FullPath,
+                    Size = c.Size,
+                    IsFolder = c.IsFolder
+                });
+            }
+            LargestFolders.Add(folder);
+        }
+
+        Games.Clear();
+        foreach (var g in cache.Games)
+        {
+            Games.Add(new GameInstallation
+            {
+                Name = g.Name,
+                Path = g.Path,
+                Size = g.Size,
+                Platform = Enum.TryParse<GamePlatform>(g.Platform, out var plat) ? plat : GamePlatform.Other,
+                LastPlayed = g.LastPlayed
+            });
+        }
+
+        CleanupSuggestions.Clear();
+        foreach (var s in cache.CleanupSuggestions)
+        {
+            CleanupSuggestions.Add(new CleanupSuggestion
+            {
+                Description = s.Description,
+                Path = s.Path,
+                PotentialSavings = s.PotentialSavings,
+                RiskLevel = Enum.TryParse<CleanupRisk>(s.RiskLevel, out var risk) ? risk : CleanupRisk.Medium
+            });
+        }
+
+        // Update charts from cached data
+        UpdateChartsFromCache(cache);
+
+        SelectedPath = cache.RootPath;
+        HasCachedScan = false;
+        CanExport = true;
+        StatusText = $"Restored scan from {cache.ScanDate:g} • {cache.TotalFiles:N0} files, {cache.TotalSizeFormatted}";
+    }
+
+    private void UpdateChartsFromCache(ScanCache cache)
+    {
+        var colors = new SkiaSharp.SKColor[]
+        {
+            SkiaSharp.SKColors.RoyalBlue, SkiaSharp.SKColors.Coral, SkiaSharp.SKColors.MediumSeaGreen, 
+            SkiaSharp.SKColors.Gold, SkiaSharp.SKColors.MediumPurple, SkiaSharp.SKColors.Tomato, 
+            SkiaSharp.SKColors.SteelBlue, SkiaSharp.SKColors.Orange, SkiaSharp.SKColors.Teal, 
+            SkiaSharp.SKColors.IndianRed, SkiaSharp.SKColors.SlateGray
+        };
+
+        // Category pie chart
+        var categoryData = cache.CategoryBreakdown
+            .OrderByDescending(c => c.TotalSize)
+            .Take(10)
+            .Select((c, i) => new LiveChartsCore.SkiaSharpView.PieSeries<double>
+            {
+                Values = new[] { (double)c.TotalSize },
+                Name = $"{c.Category} ({c.SizeFormatted})",
+                Fill = new LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint(colors[i % colors.Length])
+            })
+            .ToArray();
+
+        CategorySeries = categoryData;
+
+        // Folders bar chart
+        var folderData = cache.LargestFolders
+            .Take(10)
+            .Select((f, i) => new LiveChartsCore.SkiaSharpView.RowSeries<double>
+            {
+                Values = new[] { (double)f.Size },
+                Name = $"{f.Name} ({f.SizeFormatted})",
+                Fill = new LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint(colors[i % colors.Length])
+            })
+            .ToArray();
+
+        TopFoldersSeries = folderData;
     }
 
     partial void OnIsDarkModeChanged(bool value)
@@ -251,6 +394,12 @@ public partial class MainViewModel : ObservableObject
 
             // Update UI with results (works for both complete and partial results)
             UpdateResults();
+            
+            // Save scan to cache for next app launch
+            if (ScanResult != null && !ScanResult.WasCancelled)
+            {
+                _settingsService.SaveScanCache(ScanResult);
+            }
             
             if (ScanResult.WasCancelled)
             {

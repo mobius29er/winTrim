@@ -104,6 +104,16 @@
                                    FontSize="16"/>
                     </Button>
                     
+                    <!-- Restore Cached Scan -->
+                    <Button Command="{Binding RestoreCachedScanCommand}"
+                            Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            ToolTip="{Binding CachedScanInfo}"
+                            Visibility="{Binding HasCachedScan, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📂 Restore Last Scan" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    
                     <!-- Export Buttons -->
                     <Button Content="📊 CSV" Command="{Binding ExportToCsvCommand}"
                             Style="{StaticResource OutlineButton}" Margin="0,0,4,0"

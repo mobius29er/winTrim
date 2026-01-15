@@ -70,12 +70,50 @@ public class TreemapControl : SKElement
         // Enable mouse events
         this.MouseMove += OnMouseMove;
         this.MouseLeftButtonUp += OnMouseClick;
-        this.MouseLeftButtonDown += OnMouseDoubleClick;
         this.MouseRightButtonUp += OnRightClick;
 
         // Set minimum size
         this.MinHeight = 200;
         this.MinWidth = 200;
+    }
+
+    private DateTime _lastClickTime;
+    private Point _lastClickPos;
+    private const double DoubleClickTimeMs = 500;
+    private const double DoubleClickDistanceThreshold = 5;
+
+    private void OnMouseClick(object sender, MouseButtonEventArgs e)
+    {
+        var pos = e.GetPosition(this);
+        var now = DateTime.Now;
+        
+        // Check for double-click manually
+        var timeSinceLastClick = (now - _lastClickTime).TotalMilliseconds;
+        var distance = Math.Sqrt(Math.Pow(pos.X - _lastClickPos.X, 2) + Math.Pow(pos.Y - _lastClickPos.Y, 2));
+        
+        var tile = FindTileAtPoint((float)pos.X, (float)pos.Y);
+        
+        if (timeSinceLastClick < DoubleClickTimeMs && distance < DoubleClickDistanceThreshold)
+        {
+            // Double-click detected
+            if (tile != null && tile.IsFolder)
+            {
+                NavigateToTile(tile);
+                TileDoubleClicked?.Invoke(this, tile);
+                e.Handled = true;
+            }
+            _lastClickTime = DateTime.MinValue; // Reset to prevent triple-click
+        }
+        else
+        {
+            // Single click
+            if (tile != null)
+            {
+                TileClicked?.Invoke(this, tile);
+            }
+            _lastClickTime = now;
+            _lastClickPos = pos;
+        }
     }
 
     private static void OnSourceItemChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -283,32 +321,6 @@ public class TreemapControl : SKElement
             _hoveredTile = tile;
             TileHovered?.Invoke(this, tile);
             InvalidateVisual();
-        }
-    }
-
-    private void OnMouseClick(object sender, MouseButtonEventArgs e)
-    {
-        var pos = e.GetPosition(this);
-        var tile = FindTileAtPoint((float)pos.X, (float)pos.Y);
-
-        if (tile != null)
-        {
-            TileClicked?.Invoke(this, tile);
-        }
-    }
-
-    private void OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        if (e.ClickCount == 2)
-        {
-            var pos = e.GetPosition(this);
-            var tile = FindTileAtPoint((float)pos.X, (float)pos.Y);
-
-            if (tile != null && tile.IsFolder)
-            {
-                NavigateToTile(tile);
-                TileDoubleClicked?.Invoke(this, tile);
-            }
         }
     }
 
