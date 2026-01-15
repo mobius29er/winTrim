@@ -61,6 +61,9 @@ public partial class MainViewModel : ObservableObject
     private ObservableCollection<GameInstallation> _games = new();
 
     [ObservableProperty]
+    private ObservableCollection<CleanupItem> _devToolItems = new();
+
+    [ObservableProperty]
     private ObservableCollection<CleanupSuggestion> _cleanupSuggestions = new();
 
     [ObservableProperty]
@@ -128,6 +131,24 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private ObservableCollection<CleanupFileItem> _cleanupFiles = new();
+
+    // File Explorer filter properties
+    [ObservableProperty]
+    private string _fileExplorerSearchText = string.Empty;
+
+    [ObservableProperty]
+    private string _fileExplorerFilter = "All";
+
+    [ObservableProperty]
+    private ObservableCollection<FileSystemItem> _filteredChildren = new();
+
+    public string[] FileExplorerFilterOptions { get; } = new[]
+    {
+        "All", "Documents", "Media", "Code", "Archives", "Large Files (>100MB)", "Old Files (>90 days)"
+    };
+
+    partial void OnFileExplorerSearchTextChanged(string value) => ApplyFileExplorerFilters();
+    partial void OnFileExplorerFilterChanged(string value) => ApplyFileExplorerFilters();
 
     #endregion
 
@@ -238,6 +259,9 @@ public partial class MainViewModel : ObservableObject
                 RiskLevel = Enum.TryParse<CleanupRisk>(s.RiskLevel, out var risk) ? risk : CleanupRisk.Medium
             });
         }
+
+        // Scan for dev tools (always fresh, not cached)
+        _ = UpdateDevToolItemsAsync();
 
         // Update quick clean availability
         UpdateQuickCleanStatus();
@@ -624,33 +648,24 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        // Calculate total potential savings
-        var totalSavings = safeItems.Sum(s => s.PotentialSavings);
-        var savingsFormatted = FormatBytes(totalSavings);
-
-        // Build confirmation message
-        var itemList = string.Join("\n", safeItems.Take(10).Select(s => $"  • {s.Description}"));
-        if (safeItems.Count > 10)
+        // Show selection dialog
+        var dialog = new Views.QuickCleanDialog(safeItems)
         {
-            itemList += $"\n  ... and {safeItems.Count - 10} more items";
-        }
+            Owner = Application.Current.MainWindow
+        };
 
-        var message = $"Quick Clean will remove the following safe items:\n\n{itemList}\n\nEstimated space to recover: {savingsFormatted}\n\nProceed with cleanup?";
+        if (dialog.ShowDialog() != true || !dialog.Confirmed)
+            return;
 
-        var result = MessageBox.Show(
-            message,
-            "Quick Clean - Confirm",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (result != MessageBoxResult.Yes)
+        var selectedItems = dialog.GetSelectedItems().ToList();
+        if (!selectedItems.Any())
             return;
 
         // Execute cleanup
         StatusText = "🧹 Cleaning up...";
         
         var cleanupService = new CleanupService();
-        var cleanupResult = await cleanupService.ExecuteCleanupAsync(safeItems, CleanupRisk.Low);
+        var cleanupResult = await cleanupService.ExecuteCleanupAsync(selectedItems, CleanupRisk.Low);
 
         // Show results
         var resultMessage = $"Cleanup complete!\n\n" +
@@ -750,6 +765,9 @@ public partial class MainViewModel : ObservableObject
         {
             Games.Add(game);
         }
+
+        // Update developer tools (scan async, don't block)
+        _ = UpdateDevToolItemsAsync();
 
         // Update cleanup suggestions
         CleanupSuggestions.Clear();
@@ -1010,6 +1028,126 @@ public partial class MainViewModel : ObservableObject
         if (item != null)
         {
             Clipboard.SetText(item.FullPath);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenFileLocation(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+            return;
+
+        try
+        {
+            if (System.IO.Directory.Exists(filePath))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"\"{filePath}\"");
+            }
+            else if (System.IO.File.Exists(filePath))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open location: {ex.Message}", "Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ApplyFileExplorerFilters()
+    {
+        FilteredChildren.Clear();
+
+        if (SelectedItem == null)
+            return;
+
+        var children = SelectedItem.Children.AsEnumerable();
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(FileExplorerSearchText))
+        {
+            var searchLower = FileExplorerSearchText.ToLowerInvariant();
+            children = children.Where(c => 
+                c.Name.ToLowerInvariant().Contains(searchLower) ||
+                c.FullPath.ToLowerInvariant().Contains(searchLower));
+        }
+
+        // Apply category filter
+        children = FileExplorerFilter switch
+        {
+            "Documents" => children.Where(c => c.Category == ItemCategory.Document || 
+                                               c.Extension is ".pdf" or ".doc" or ".docx" or ".txt" or ".xls" or ".xlsx"),
+            "Media" => children.Where(c => c.Category == ItemCategory.Image || 
+                                          c.Category == ItemCategory.Video || 
+                                          c.Category == ItemCategory.Audio ||
+                                          c.Extension is ".jpg" or ".png" or ".mp4" or ".mp3" or ".gif" or ".avi"),
+            "Code" => children.Where(c => c.Category == ItemCategory.Code ||
+                                         c.Extension is ".cs" or ".js" or ".ts" or ".py" or ".java" or ".cpp" or ".h"),
+            "Archives" => children.Where(c => c.Category == ItemCategory.Archive ||
+                                             c.Extension is ".zip" or ".rar" or ".7z" or ".tar" or ".gz"),
+            "Large Files (>100MB)" => children.Where(c => c.Size > 100 * 1024 * 1024),
+            "Old Files (>90 days)" => children.Where(c => c.DaysSinceAccessed > 90),
+            _ => children // "All"
+        };
+
+        // Sort by size descending
+        foreach (var item in children.OrderByDescending(c => c.Size).Take(100))
+        {
+            FilteredChildren.Add(item);
+        }
+    }
+
+    public void UpdateSelectedItemChildren()
+    {
+        ApplyFileExplorerFilters();
+    }
+
+    /// <summary>
+    /// Scans for developer tools and caches asynchronously
+    /// </summary>
+    private async Task UpdateDevToolItemsAsync()
+    {
+        try
+        {
+            var detector = new Services.DevToolDetector();
+            var items = await detector.ScanAllAsync();
+
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                DevToolItems.Clear();
+                foreach (var item in items.OrderByDescending(i => i.SizeBytes))
+                {
+                    DevToolItems.Add(item);
+                }
+            });
+        }
+        catch
+        {
+            // Dev tool scan is optional - don't show errors
+        }
+    }
+
+    [RelayCommand]
+    private void OpenDevToolPath(CleanupItem? item)
+    {
+        if (item == null) return;
+
+        try
+        {
+            if (Directory.Exists(item.Path))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"\"{item.Path}\"");
+            }
+            else if (File.Exists(item.Path))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{item.Path}\"");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open location: {ex.Message}", "Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

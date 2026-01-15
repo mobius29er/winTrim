@@ -67,10 +67,11 @@ public class TreemapControl : SKElement
     {
         _layoutService = new TreemapLayoutService();
         
-        // Enable mouse events
+        // Enable mouse events - use Preview events for better capture
         this.MouseMove += OnMouseMove;
-        this.MouseLeftButtonUp += OnMouseClick;
-        this.MouseRightButtonUp += OnRightClick;
+        this.PreviewMouseLeftButtonUp += OnMouseClick;
+        this.PreviewMouseRightButtonUp += OnRightClick;
+        this.Focusable = true;  // Allow focus for keyboard events
 
         // Set minimum size
         this.MinHeight = 200;

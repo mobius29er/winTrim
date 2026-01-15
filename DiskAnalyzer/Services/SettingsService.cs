@@ -29,7 +29,7 @@ public sealed class SettingsService : ISettingsService
     {
         _appDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "WinLose", "DiskAnalyzer");
+            "WinTrim", "DiskAnalyzer");
         
         Directory.CreateDirectory(_appDataPath);
         _settingsPath = Path.Combine(_appDataPath, "settings.json");

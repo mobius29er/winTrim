@@ -149,5 +149,7 @@ public enum CleanupType
     DuplicateFiles,
     OldLogFiles,
     UnusedGames,
-    LargeFiles
+    LargeFiles,
+    DeveloperTools,
+    MediaCache
 }

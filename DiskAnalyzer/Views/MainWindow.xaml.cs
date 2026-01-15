@@ -21,6 +21,7 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel vm && e.NewValue is FileSystemItem item)
         {
             vm.SelectedItem = item;
+            vm.UpdateSelectedItemChildren(); // Apply filters to new selection
         }
     }
 
@@ -32,14 +33,6 @@ public partial class MainWindow : Window
             
             // Show tooltip with details
             vm.StatusText = $"{tile.Name} - {tile.SizeFormatted} ({tile.FullPath})";
-        }
-    }
-
-    private void CleanupSuggestions_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (DataContext is MainViewModel vm && sender is DataGrid dg && dg.SelectedItem is CleanupSuggestion suggestion)
-        {
-            vm.ViewCleanupDetailsCommand.Execute(suggestion);
         }
     }
 }

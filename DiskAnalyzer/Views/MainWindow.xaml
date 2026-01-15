@@ -8,7 +8,8 @@
         xmlns:ctrl="clr-namespace:DiskAnalyzer.Controls"
         xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
         mc:Ignorable="d"
-        Title="Disk Analyzer - WinLose" 
+        Title="WinTrim - Disk Analyzer" 
+        Icon="/Assets/wintrim.ico"
         Height="800" Width="1280"
         MinHeight="600" MinWidth="900"
         Background="{DynamicResource BackgroundBrush}"
@@ -206,7 +207,8 @@
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     
                     <!-- Category Breakdown - Two Column Layout -->
@@ -293,15 +295,16 @@
                                 
                                 <DataGrid Grid.Row="1" ItemsSource="{Binding CategoryFiles}" 
                                           Style="{StaticResource DataGridStyle}"
-                                          MaxHeight="200">
+                                          MaxHeight="200"
+                                          CanUserSortColumns="True">
                                     <DataGrid.RowStyle>
                                         <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                             <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
                                         </Style>
                                     </DataGrid.RowStyle>
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="70"/>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="70" SortMemberPath="Size"/>
                                         <DataGridTemplateColumn Header="" Width="35">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
@@ -339,18 +342,44 @@
                                     <ItemsControl ItemsSource="{Binding LargestFolders}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Button Command="{Binding DataContext.SelectFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                        CommandParameter="{Binding Name}"
-                                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                                        HorizontalContentAlignment="Stretch" Padding="4,2">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="📁" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding SizeFormatted, StringFormat=' ({0})'}" 
-                                                                   Foreground="{DynamicResource TextSecondaryBrush}" 
-                                                                   VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                                    </StackPanel>
-                                                </Button>
+                                                <Border Padding="4,2" Margin="0,1" Background="Transparent"
+                                                        CornerRadius="4">
+                                                    <Border.ContextMenu>
+                                                        <ContextMenu Background="{DynamicResource SurfaceBrush}" 
+                                                                     Foreground="{DynamicResource TextPrimaryBrush}">
+                                                            <MenuItem Header="📂 Open in Explorer" 
+                                                                      Command="{Binding DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                      CommandParameter="{Binding}"/>
+                                                            <MenuItem Header="📋 Copy Path" 
+                                                                      Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                      CommandParameter="{Binding}"/>
+                                                        </ContextMenu>
+                                                    </Border.ContextMenu>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button Grid.Column="0" 
+                                                                Command="{Binding DataContext.SelectFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding Name}"
+                                                                Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                                                HorizontalContentAlignment="Left" Padding="0">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="📁" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding SizeFormatted, StringFormat=' ({0})'}" 
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                                                           VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <Button Grid.Column="1" Content="📂" ToolTip="Open in Explorer"
+                                                                Command="{Binding DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource OutlineButton}"
+                                                                Padding="4,2" FontSize="12" Margin="4,0,0,0"/>
+                                                    </Grid>
+                                                </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
@@ -392,24 +421,72 @@
                             <TextBlock Text="🎮 Game Installations" Style="{StaticResource SectionHeader}"/>
                             <DataGrid ItemsSource="{Binding Games}" 
                                       Style="{StaticResource DataGridStyle}"
-                                      MaxHeight="200">
+                                      MaxHeight="200"
+                                      CanUserSortColumns="True">
                                 <DataGrid.RowStyle>
                                     <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                         <Setter Property="ContextMenu" Value="{StaticResource GameContextMenu}"/>
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                                    <DataGridTextColumn Header="Platform" Binding="{Binding Platform}" Width="80"/>
-                                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="80"/>
-                                    <DataGridTextColumn Header="Last Played" Binding="{Binding LastPlayed, Converter={StaticResource RelativeTime}}" Width="100"/>
+                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
+                                    <DataGridTextColumn Header="Platform" Binding="{Binding Platform}" Width="80" SortMemberPath="Platform"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="80" SortMemberPath="Size"/>
+                                    <DataGridTextColumn Header="Last Played" Binding="{Binding LastPlayed, Converter={StaticResource RelativeTime}}" Width="100" SortMemberPath="LastPlayed"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </StackPanel>
                     </Border>
+
+                    <!-- Developer Tools Section -->
+                    <Border Grid.Column="0" Grid.Row="2" Style="{StaticResource CardStyle}" Margin="0,8,8,0" MaxHeight="300">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="🛠️ Developer Tools &amp; Caches" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Grid.Row="1" Text="Large caches from development tools that can be safely cleaned"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="11"
+                                       Margin="0,0,0,8"/>
+                            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                <DataGrid ItemsSource="{Binding DevToolItems}" 
+                                          Style="{StaticResource DataGridStyle}"
+                                          CanUserSortColumns="True">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
+                                    <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="100" SortMemberPath="Category"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="80" SortMemberPath="SizeBytes"/>
+                                    <DataGridTextColumn Header="Risk" Binding="{Binding Risk}" Width="60" SortMemberPath="Risk"/>
+                                    <DataGridTemplateColumn Header="" Width="40">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="📂" 
+                                                        Command="{Binding DataContext.OpenDevToolPathCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="Open in Explorer"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Padding="4,2"
+                                                        Cursor="Hand"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Setter Property="ToolTip" Value="{Binding Recommendation}"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                </DataGrid>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
                     
                     <!-- Cleanup Suggestions -->
-                    <Border Grid.Column="1" Grid.Row="1" Style="{StaticResource CardStyle}" Margin="8,8,0,0">
+                    <Border Grid.Column="1" Grid.Row="1" Grid.RowSpan="2" Style="{StaticResource CardStyle}" Margin="8,8,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -439,81 +516,77 @@
                                 </Button>
                             </Grid>
                             
-                            <!-- Suggestions List -->
-                            <DataGrid Grid.Row="1" ItemsSource="{Binding CleanupSuggestions}" 
-                                      SelectedItem="{Binding SelectedCleanupSuggestion}"
-                                      Style="{StaticResource DataGridStyle}"
-                                      MaxHeight="120"
-                                      SelectionChanged="CleanupSuggestions_SelectionChanged">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
-                                    <DataGridTextColumn Header="Savings" Binding="{Binding SavingsFormatted}" Width="80"/>
-                                    <DataGridTemplateColumn Header="Risk" Width="60">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding RiskLevel}" 
-                                                           Foreground="{Binding RiskLevel, Converter={StaticResource RiskToBrush}}"
+                            <!-- Expandable Suggestions TreeView -->
+                            <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" 
+                                    BorderThickness="1" CornerRadius="4" Background="{DynamicResource SurfaceBrush}"
+                                    MaxHeight="250">
+                                <TreeView ItemsSource="{Binding CleanupSuggestions}"
+                                          Background="Transparent" BorderThickness="0"
+                                          VirtualizingStackPanel.IsVirtualizing="True">
+                                    <TreeView.ItemTemplate>
+                                        <HierarchicalDataTemplate ItemsSource="{Binding AffectedFiles}">
+                                            <!-- Category Header -->
+                                            <Grid Margin="0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Description}" 
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                               FontWeight="SemiBold" FontSize="13"/>
+                                                    <TextBlock Text="{Binding Path}" 
+                                                               Foreground="{DynamicResource TextMutedBrush}"
+                                                               FontSize="11" TextTrimming="CharacterEllipsis"
+                                                               MaxWidth="300"/>
+                                                </StackPanel>
+                                                
+                                                <TextBlock Grid.Column="1" Text="{Binding AffectedFiles.Count, StringFormat='{}{0} files'}" 
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           VerticalAlignment="Center" Margin="12,0"
+                                                           FontSize="11"/>
+                                                
+                                                <TextBlock Grid.Column="2" Text="{Binding SavingsFormatted}" 
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           VerticalAlignment="Center" Margin="8,0"
                                                            FontWeight="Medium"/>
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                            
-                            <!-- Affected Files Details -->
-                            <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource BorderBrush}" 
-                                    Margin="0,8,0,0" Padding="0,8,0,0"
-                                    Visibility="{Binding SelectedCleanupSuggestion, Converter={StaticResource BoolToVisibility}}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                                        <TextBlock Text="📄 Files in: " Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        <TextBlock Text="{Binding SelectedCleanupSuggestion.Description}" 
-                                                   Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Medium"/>
-                                        <TextBlock Text="{Binding CleanupFiles.Count, StringFormat=' ({0} files)'}" 
-                                                   Foreground="{DynamicResource TextMutedBrush}"/>
-                                    </StackPanel>
-                                    <DataGrid Grid.Row="1" ItemsSource="{Binding CleanupFiles}" 
-                                              Style="{StaticResource DataGridStyle}"
-                                              MaxHeight="100">
-                                        <DataGrid.RowStyle>
-                                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                                                <Setter Property="ContextMenu">
-                                                    <Setter.Value>
-                                                        <ContextMenu Background="{DynamicResource SurfaceBrush}" 
-                                                                     Foreground="{DynamicResource TextPrimaryBrush}">
-                                                            <MenuItem Header="📂 Open Location" 
-                                                                      Command="{Binding DataContext.OpenCleanupFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                      CommandParameter="{Binding}"/>
-                                                            <MenuItem Header="📋 Copy Path" 
-                                                                      Command="{Binding DataContext.CopyCleanupPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                      CommandParameter="{Binding}"/>
-                                                        </ContextMenu>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </DataGrid.RowStyle>
-                                        <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="70"/>
-                                            <DataGridTemplateColumn Header="" Width="35">
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <Button Content="📂" 
-                                                                Command="{Binding DataContext.OpenCleanupFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                
+                                                <TextBlock Grid.Column="3" Text="{Binding RiskLevel}" 
+                                                           Foreground="{Binding RiskLevel, Converter={StaticResource RiskToBrush}}"
+                                                           VerticalAlignment="Center" Width="40"
+                                                           FontWeight="Medium" FontSize="11"/>
+                                            </Grid>
+                                            
+                                            <!-- Individual File Template -->
+                                            <HierarchicalDataTemplate.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="20,2,0,2">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        
+                                                        <TextBlock Grid.Column="0" Text="{Binding}" 
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   ToolTip="{Binding}"/>
+                                                        
+                                                        <Button Grid.Column="1" Content="📂" 
+                                                                Command="{Binding DataContext.OpenFileLocationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                 CommandParameter="{Binding}"
-                                                                Style="{StaticResource OutlineButton}" 
-                                                                Padding="2" Cursor="Hand"
-                                                                ToolTip="Open file location"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
-                                            </DataGridTemplateColumn>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-                                </Grid>
+                                                                Style="{StaticResource OutlineButton}"
+                                                                Padding="2" Cursor="Hand" Margin="8,0,0,0"
+                                                                ToolTip="Open location"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </HierarchicalDataTemplate.ItemTemplate>
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.ItemTemplate>
+                                </TreeView>
                             </Border>
                         </Grid>
                     </Border>
@@ -540,11 +613,13 @@
                     
                     <!-- Treemap Visualization -->
                     <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="4">
-                        <ctrl:TreemapControl x:Name="TreemapView"
-                                             SourceItem="{Binding ScanResult.RootItem}"
-                                             MaxDepth="5"
-                                             IsDarkMode="{Binding IsDarkMode}"
-                                             TileClicked="TreemapView_TileClicked"/>
+                        <Border Background="Transparent">
+                            <ctrl:TreemapControl x:Name="TreemapView"
+                                                 SourceItem="{Binding ScanResult.RootItem}"
+                                                 MaxDepth="5"
+                                                 IsDarkMode="{Binding IsDarkMode}"
+                                                 TileClicked="TreemapView_TileClicked"/>
+                        </Border>
                     </Border>
                 </Grid>
             </TabItem>
@@ -588,6 +663,7 @@
                     <Border Grid.Column="1" Style="{StaticResource CardStyle}" Margin="8,0,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
@@ -636,14 +712,69 @@
                                 </StackPanel>
                             </StackPanel>
                             
+                            <!-- Filter Controls -->
+                            <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" 
+                                    CornerRadius="4" Padding="8" Margin="0,8,0,8"
+                                    Visibility="{Binding SelectedItem, Converter={StaticResource BoolToVisibility}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <TextBox Grid.Column="0" 
+                                             Text="{Binding FileExplorerSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                             Background="{DynamicResource BackgroundBrush}"
+                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                             BorderBrush="{DynamicResource BorderBrush}"
+                                             Padding="8,6" Margin="0,0,8,0">
+                                        <TextBox.Style>
+                                            <Style TargetType="TextBox">
+                                                <Style.Triggers>
+                                                    <Trigger Property="Text" Value="">
+                                                        <Setter Property="Background" Value="{DynamicResource BackgroundBrush}"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBox.Style>
+                                    </TextBox>
+                                    
+                                    <ComboBox Grid.Column="1" 
+                                              ItemsSource="{Binding FileExplorerFilterOptions}"
+                                              SelectedItem="{Binding FileExplorerFilter}"
+                                              Background="{DynamicResource SurfaceBrush}"
+                                              Foreground="{DynamicResource TextPrimaryBrush}"
+                                              BorderBrush="{DynamicResource BorderBrush}"
+                                              Padding="8,6" MinWidth="150"/>
+                                </Grid>
+                            </Border>
+                            
                             <!-- Children List -->
-                            <DataGrid Grid.Row="1" ItemsSource="{Binding SelectedItem.Children}" 
-                                      Style="{StaticResource DataGridStyle}" Margin="0,16,0,0">
+                            <DataGrid Grid.Row="2" ItemsSource="{Binding FilteredChildren}" 
+                                      Style="{StaticResource DataGridStyle}" Margin="0,0,0,0"
+                                      CanUserSortColumns="True">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="100"/>
-                                    <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="80"/>
-                                    <DataGridTextColumn Header="Last Accessed" Binding="{Binding LastAccessed, Converter={StaticResource RelativeTime}}" Width="120"/>
+                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="100" SortMemberPath="Size"/>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="80" SortMemberPath="Category"/>
+                                    <DataGridTextColumn Header="Last Accessed" Binding="{Binding LastAccessed, Converter={StaticResource RelativeTime}}" Width="100" SortMemberPath="LastAccessed"/>
+                                    <DataGridTemplateColumn Header="" Width="35">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="📂" 
+                                                        Command="{Binding DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource OutlineButton}" 
+                                                        Padding="2" Cursor="Hand"
+                                                        ToolTip="Open location"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>

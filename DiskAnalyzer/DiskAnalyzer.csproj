@@ -5,17 +5,23 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
-    <AssemblyName>DiskAnalyzer</AssemblyName>
+    <AssemblyName>WinTrim</AssemblyName>
     <RootNamespace>DiskAnalyzer</RootNamespace>
     <Version>1.0.0</Version>
-    <Authors>WinLose</Authors>
-    <Description>A clean and safe Windows disk analyzer to view and analyze file contents and locations</Description>
+    <Authors>WinTrim</Authors>
+    <Product>WinTrim - Disk Analyzer</Product>
+    <Description>A clean and safe Windows disk analyzer to view and analyze file contents and storage allocation</Description>
+    <ApplicationIcon>Assets\wintrim.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc2" />
     <PackageReference Include="SkiaSharp.Views.WPF" Version="2.88.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\wintrim.ico" />
   </ItemGroup>
 
 </Project>
