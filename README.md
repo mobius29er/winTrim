@@ -15,20 +15,30 @@ A clean, safe, and powerful Windows 10/11 disk analyzer application to view and 
 - ✅ **Quick Clean** - One-click cleanup with preview and file-level selection
 - ✅ **Largest Files Finder** - Top 50 largest files with quick access
 - ✅ **Game Detection** - Auto-detect Steam, Epic, GOG, and Xbox game installations
+- ✅ **Developer Tools Scanner** - Detect npm, NuGet, pip, Maven caches with cleanup recommendations
 - ✅ **File Age Analysis** - Identify files not accessed in 90+ days
-- ✅ **Scan Caching** - Automatically saves and restores your last scan
+- ✅ **Session Persistence** - Automatically saves and restores your last scan (including treemap & dev tools)
 
 ### Interactive Visualization
 - 🗺️ **Treemap View** - Visual representation of disk usage with drill-down navigation
+- 🎨 **5 Treemap Color Schemes** - Vivid, Pastel, Ocean, Warm, and Cool palettes
 - 📊 **Pie Charts** - Category breakdown (Documents, Media, Games, etc.)
 - 📈 **Bar Charts** - Largest folders at a glance
-- 🌲 **Tree View** - Hierarchical folder navigation
+- 🌲 **Tree View** - Hierarchical folder navigation with search & filters
 
 ### Quick Clean Features
 - 🧹 **Preview Before Delete** - See exactly what will be removed
 - ☑️ **File-Level Selection** - Expand categories to select individual files
 - 📁 **Smart Detection** - Finds temp files, browser cache, Windows Update cache, old logs
 - ⚠️ **Risk Indicators** - Safe/Low/Medium/High risk levels for each item
+
+### Developer Tools Detection
+- 📦 **npm** - node_modules, npm cache
+- 📦 **NuGet** - Package cache
+- 🐍 **pip** - Python package cache
+- ☕ **Maven** - .m2 repository
+- 🦀 **Cargo** - Rust package cache
+- 📱 **Gradle** - Android/Java build cache
 
 ### Data Provided
 - 📅 Date last accessed/modified
@@ -38,11 +48,14 @@ A clean, safe, and powerful Windows 10/11 disk analyzer application to view and 
 - 🎮 Game platform detection (Steam, Epic, GOG, Xbox)
 
 ### UI/UX Features
-- 🎨 **Multiple Themes** - Light, Dark, and Terminal (Red/Green) modes
+- 🎨 **5 Themes** - Default (Retrofuturistic), Tech (Blade Runner), Enterprise (Light), Terminal Green, Terminal Red
+- ⚙️ **Settings Panel** - Font size, treemap colors, treemap depth controls
+- 📏 **4 Font Size Presets** - Small, Medium, Large, Extra Large
 - ▶️ **Scan Controls** - Start/Stop/Pause with progress tracking
 - 📋 **Sortable Data Grids** - Click headers to sort by name, size, date
 - 🖱️ **Context Menus** - Right-click to open location or copy path
 - 📂 **Quick Actions** - Open in Explorer buttons throughout
+- 🔍 **File Explorer Filters** - Search and filter by type, size, age
 
 ## 🚀 Getting Started
 
@@ -73,18 +86,21 @@ dotnet publish -c Release -r win-x64 --self-contained true
 
 ```
 DiskAnalyzer/
-├── Models/           # Data models (FileSystemItem, ScanResult, etc.)
+├── Models/           # Data models (FileSystemItem, ScanResult, ScanCache, etc.)
 ├── ViewModels/       # MVVM ViewModels with commands
 ├── Views/            # XAML UI files
 ├── Controls/         # Custom controls (TreemapControl)
 ├── Services/         # Business logic services
-│   ├── FileScanner   # Core scanning engine
-│   ├── GameDetector  # Steam/Epic/GOG/Xbox detection
-│   ├── CleanupAdvisor # Cleanup recommendations
-│   ├── CleanupService # Execute cleanup operations
-│   └── CategoryClassifier # File type classification
+│   ├── FileScanner       # Core scanning engine
+│   ├── GameDetector      # Steam/Epic/GOG/Xbox detection
+│   ├── DevToolDetector   # Developer cache detection
+│   ├── CleanupAdvisor    # Cleanup recommendations
+│   ├── CleanupService    # Execute cleanup operations
+│   ├── SettingsService   # User preferences & scan caching
+│   ├── TreemapLayoutService # Squarified treemap algorithm
+│   └── CategoryClassifier   # File type classification
 ├── Converters/       # Value converters for UI
-└── Themes/           # Colors and styles (Light/Dark/Terminal)
+└── Themes/           # 5 color themes (Default, Tech, Enterprise, Terminal)
 ```
 
 ## 🛡️ Safety Features
@@ -100,9 +116,11 @@ DiskAnalyzer/
 - **Framework:** .NET 8.0 + WPF
 - **Architecture:** MVVM with CommunityToolkit.Mvvm
 - **Charts:** LiveCharts2 (SkiaSharp)
-- **Treemap:** Custom SkiaSharp-based control
+- **Treemap:** Custom SkiaSharp-based squarified treemap with iterative layout algorithm
 - **Async:** Full async/await with CancellationToken support
-- **Persistence:** JSON-based scan caching
+- **Persistence:** JSON-based settings and scan caching
+- **Themes:** 5 built-in themes with dynamic resource switching
+- **Performance:** Iterative algorithms to prevent stack overflow on large datasets
 
 ## 📸 Screenshots
 
@@ -110,10 +128,23 @@ DiskAnalyzer/
 *Pie chart showing storage allocation by file type*
 
 ### Treemap Visualization  
-*Interactive treemap with double-click drill-down*
+*Interactive treemap with double-click drill-down and 5 color schemes*
 
 ### Quick Clean Dialog
 *Preview and select individual files before cleanup*
+
+### Settings Panel
+*Customize font size, treemap colors, and visualization depth*
+
+## 🎨 Themes
+
+| Theme | Description |
+|-------|-------------|
+| **Default** | Retrofuturistic teal/cyan with orange accents (Territory Studio inspired) |
+| **Tech** | Blade Runner 2049 neon - Cyan/Pink on void black |
+| **Enterprise** | Professional Windows-style - Clean blues and grays (light mode) |
+| **Terminal Green** | Classic terminal - Green on black |
+| **Terminal Red** | Alert terminal - Red on black |
 
 ## 📋 Original Requirements
 
