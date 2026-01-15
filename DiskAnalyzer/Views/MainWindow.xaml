@@ -28,6 +28,7 @@
         <conv:DateTimeToRelativeConverter x:Key="RelativeTime"/>
         <conv:BoolToIconConverter x:Key="BoolToIcon"/>
         <conv:ThemeToIconConverter x:Key="ThemeToIcon"/>
+        <conv:SeriesFillToBrushConverter x:Key="SeriesFillToBrush"/>
         
         <!-- File/Folder Context Menu -->
         <ContextMenu x:Key="FileItemContextMenu" 
@@ -242,58 +243,62 @@
                             <StackPanel Grid.Column="0" Width="220">
                                 <TextBlock Text="File Categories" Style="{StaticResource SectionHeader}"/>
                                 <lvc:PieChart Series="{Binding CategorySeries}" 
-                                              Height="150" Width="150"
-                                              TooltipPosition="Hidden"
+                                              Height="140" Width="140"
+                                              TooltipPosition="Top"
                                               LegendPosition="Hidden"
-                                              Margin="0,0,0,8"/>
+                                              ChartPointPointerDown="PieChart_ChartPointPointerDown"
+                                              Panel.ZIndex="100"
+                                              Margin="5,0,0,12"/>
                                 
-                                <!-- Clickable Category Legend -->
-                                <ItemsControl ItemsSource="{Binding CategorySeries}" MaxHeight="120">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Button Command="{Binding DataContext.SelectCategoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding Name}"
-                                                    HorizontalContentAlignment="Left"
-                                                    Padding="4,2" Margin="0,1"
-                                                    Cursor="Hand">
-                                                <Button.Style>
-                                                    <Style TargetType="Button">
-                                                        <Setter Property="Background" Value="Transparent"/>
-                                                        <Setter Property="BorderThickness" Value="0"/>
-                                                        <Setter Property="Template">
-                                                            <Setter.Value>
-                                                                <ControlTemplate TargetType="Button">
-                                                                    <Border Background="{TemplateBinding Background}" 
-                                                                            Padding="{TemplateBinding Padding}"
-                                                                            CornerRadius="3">
-                                                                        <ContentPresenter/>
-                                                                    </Border>
-                                                                    <ControlTemplate.Triggers>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
-                                                                        </Trigger>
-                                                                    </ControlTemplate.Triggers>
-                                                                </ControlTemplate>
-                                                            </Setter.Value>
-                                                        </Setter>
-                                                    </Style>
-                                                </Button.Style>
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="●" FontSize="10" VerticalAlignment="Center" Margin="0,0,6,0"
-                                                               Foreground="{DynamicResource PrimaryBrush}"/>
-                                                    <TextBlock Text="{Binding Name}" FontSize="11"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                                               TextTrimming="CharacterEllipsis" MaxWidth="180"/>
-                                                </StackPanel>
-                                            </Button>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <!-- Clickable Category Legend with matching colors -->
+                                <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding CategorySeries}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Command="{Binding DataContext.SelectCategoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding Name}"
+                                                        HorizontalContentAlignment="Left"
+                                                        Padding="4,3" Margin="0,1"
+                                                        Cursor="Hand">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Background" Value="Transparent"/>
+                                                            <Setter Property="BorderThickness" Value="0"/>
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border Background="{TemplateBinding Background}" 
+                                                                                Padding="{TemplateBinding Padding}"
+                                                                                CornerRadius="3">
+                                                                            <ContentPresenter/>
+                                                                        </Border>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </Style>
+                                                    </Button.Style>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                 Fill="{Binding Fill, Converter={StaticResource SeriesFillToBrush}}"/>
+                                                        <TextBlock Text="{Binding Name}" FontSize="11"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis" MaxWidth="175"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
                             </StackPanel>
                             
                             <!-- Right: Scrollable File List -->
@@ -563,8 +568,7 @@
                             
                             <!-- Expandable Suggestions TreeView -->
                             <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" 
-                                    BorderThickness="1" CornerRadius="4" Background="{DynamicResource SurfaceBrush}"
-                                    MaxHeight="250">
+                                    BorderThickness="1" CornerRadius="4" Background="{DynamicResource SurfaceBrush}">
                                 <TreeView ItemsSource="{Binding CleanupSuggestions}"
                                           Background="Transparent" BorderThickness="0"
                                           VirtualizingStackPanel.IsVirtualizing="True">
@@ -644,28 +648,86 @@
                 <Grid Margin="0,16,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     
-                    <!-- Treemap Header -->
+                    <!-- Treemap Header with Controls -->
                     <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,8" Padding="12">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🗺️ Storage Treemap" Style="{StaticResource SectionHeader}" Margin="0"/>
-                            <TextBlock Text=" - Double-click folders to zoom in, right-click to go back" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}" 
-                                       VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="🗺️ Storage Treemap" Style="{StaticResource SectionHeader}" Margin="0"/>
+                                <TextBlock Text=" - Double-click to zoom, right-click to go back" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                           VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </StackPanel>
+                            
+                            <!-- Color Mode Selector -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <TextBlock Text="Color by:" VerticalAlignment="Center" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
+                                <ComboBox ItemsSource="{Binding AvailableTreemapColorModes}"
+                                          SelectedItem="{Binding SelectedTreemapColorMode}"
+                                          Width="100"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Color Legend -->
+                    <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,0,0,8" Padding="8,6">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <ItemsControl x:Name="TreemapLegend" ItemsSource="{Binding TreemapLegendItems}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="12,0">
+                                            <Rectangle Width="14" Height="14" RadiusX="2" RadiusY="2" Margin="0,0,6,0">
+                                                <Rectangle.Fill>
+                                                    <SolidColorBrush Color="{Binding Color}"/>
+                                                </Rectangle.Fill>
+                                            </Rectangle>
+                                            <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
                     </Border>
                     
                     <!-- Treemap Visualization -->
-                    <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="4">
+                    <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="4">
                         <Border Background="Transparent">
                             <ctrl:TreemapControl x:Name="TreemapView"
                                                  SourceItem="{Binding ScanResult.RootItem}"
                                                  MaxDepth="{Binding TreemapMaxDepth}"
                                                  SelectedTheme="{Binding SelectedTheme}"
                                                  ColorScheme="{Binding SelectedTreemapColors}"
-                                                 TileClicked="TreemapView_TileClicked"/>
+                                                 ColorMode="{Binding SelectedTreemapColorMode}"
+                                                 TileClicked="TreemapView_TileClicked">
+                                <ctrl:TreemapControl.ContextMenu>
+                                    <ContextMenu Background="{DynamicResource SurfaceBrush}" 
+                                                 Foreground="{DynamicResource TextPrimaryBrush}">
+                                        <MenuItem Header="📂 Open Location" 
+                                                  Click="TreemapContextMenu_OpenLocation"/>
+                                        <MenuItem Header="📋 Copy Path" 
+                                                  Click="TreemapContextMenu_CopyPath"/>
+                                        <Separator/>
+                                        <MenuItem Header="⬆️ Go Back (Right-click)" 
+                                                  Click="TreemapContextMenu_GoBack"/>
+                                    </ContextMenu>
+                                </ctrl:TreemapControl.ContextMenu>
+                            </ctrl:TreemapControl>
                         </Border>
                     </Border>
                 </Grid>
@@ -675,15 +737,39 @@
             <TabItem Header="📁 File Explorer" Style="{StaticResource ModernTabItem}">
                 <Grid Margin="0,16,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="350"/>
+                        <ColumnDefinition Width="350" MinWidth="200" MaxWidth="600"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     
                     <!-- Folder Tree -->
-                    <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,8,0">
+                    <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,0,0">
                         <StackPanel>
                             <TextBlock Text="Folder Structure" Style="{StaticResource SectionHeader}"/>
-                            <TreeView ItemsSource="{Binding RootItems}" 
+                            
+                            <!-- Tree View Search and Sort Controls -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <!-- Search Box -->
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding TreeSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Padding="6"
+                                         ToolTip="Search folders..."
+                                         Margin="0,0,8,0"/>
+                                
+                                <!-- Sort Dropdown -->
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding TreeSortOptions}"
+                                          SelectedItem="{Binding TreeSortBy}"
+                                          Width="90"
+                                          ToolTip="Sort folders by"/>
+                            </Grid>
+                            
+                            <TreeView ItemsSource="{Binding FilteredRootItems}" 
                                       SelectedItemChanged="TreeView_SelectedItemChanged"
                                       VirtualizingStackPanel.IsVirtualizing="True"
                                       VirtualizingStackPanel.VirtualizationMode="Recycling"
@@ -711,8 +797,15 @@
                         </StackPanel>
                     </Border>
                     
+                    <!-- Resizable Splitter -->
+                    <GridSplitter Grid.Column="1" Width="8" 
+                                  Background="Transparent"
+                                  HorizontalAlignment="Center" 
+                                  VerticalAlignment="Stretch"
+                                  Cursor="SizeWE"/>
+                    
                     <!-- File Details -->
-                    <Border Grid.Column="1" Style="{StaticResource CardStyle}" Margin="8,0,0,0">
+                    <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0,0,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -50,6 +51,21 @@ public enum TreemapColorScheme
     Warm,
     /// <summary>Cool mint/purple tones</summary>
     Cool
+}
+
+/// <summary>
+/// Treemap coloring mode - what determines tile colors
+/// </summary>
+public enum TreemapColorMode
+{
+    /// <summary>Colors based on folder depth</summary>
+    Depth,
+    /// <summary>Colors based on file category (Document, Video, etc.)</summary>
+    Category,
+    /// <summary>Colors based on file age (red=new, blue=old)</summary>
+    Age,
+    /// <summary>Colors based on file extension</summary>
+    FileType
 }
 
 /// <summary>
@@ -244,13 +260,7 @@ public sealed class SettingsService : ISettingsService
                     Platform = g.Platform.ToString(),
                     LastPlayed = g.LastPlayed
                 }).ToList(),
-                CategoryBreakdown = result.CategoryBreakdown.Select(c => new CachedCategoryItem
-                {
-                    Category = c.Key.ToString(),
-                    TotalSize = c.Value.TotalSize,
-                    SizeFormatted = c.Value.SizeFormatted,
-                    FileCount = c.Value.FileCount
-                }).ToList(),
+                CategoryBreakdown = BuildCategoryBreakdownWithFiles(result),
                 CleanupSuggestions = result.CleanupSuggestions.Take(50).Select(s => new CachedCleanupItem
                 {
                     Description = s.Description,
@@ -310,6 +320,73 @@ public sealed class SettingsService : ISettingsService
         }
 
         return node;
+    }
+
+    /// <summary>
+    /// Build category breakdown with top files per category
+    /// </summary>
+    private List<CachedCategoryItem> BuildCategoryBreakdownWithFiles(ScanResult result)
+    {
+        // Collect files by category from the tree
+        var filesByCategory = new Dictionary<string, List<FileSystemItem>>();
+        if (result.RootItem != null)
+        {
+            CollectFilesByCategory(result.RootItem, filesByCategory);
+        }
+
+        // Create cached category items with top files
+        return result.CategoryBreakdown.Select(c =>
+        {
+            var categoryName = c.Key.ToString();
+            var topFiles = new List<CachedCategoryFileItem>();
+            
+            if (filesByCategory.TryGetValue(categoryName, out var files))
+            {
+                topFiles = files
+                    .OrderByDescending(f => f.Size)
+                    .Take(50)
+                    .Select(f => new CachedCategoryFileItem
+                    {
+                        Name = f.Name,
+                        FullPath = f.FullPath,
+                        Size = f.Size,
+                        SizeFormatted = f.SizeFormatted,
+                        LastAccessed = f.LastAccessed,
+                        LastModified = f.LastModified
+                    })
+                    .ToList();
+            }
+            
+            return new CachedCategoryItem
+            {
+                Category = categoryName,
+                TotalSize = c.Value.TotalSize,
+                SizeFormatted = c.Value.SizeFormatted,
+                FileCount = c.Value.FileCount,
+                TopFiles = topFiles
+            };
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Recursively collect files by category from the tree
+    /// </summary>
+    private void CollectFilesByCategory(FileSystemItem item, Dictionary<string, List<FileSystemItem>> filesByCategory)
+    {
+        if (!item.IsFolder)
+        {
+            var categoryName = item.Category.ToString();
+            if (!filesByCategory.ContainsKey(categoryName))
+            {
+                filesByCategory[categoryName] = new List<FileSystemItem>();
+            }
+            filesByCategory[categoryName].Add(item);
+        }
+
+        foreach (var child in item.Children)
+        {
+            CollectFilesByCategory(child, filesByCategory);
+        }
     }
 
     /// <summary>

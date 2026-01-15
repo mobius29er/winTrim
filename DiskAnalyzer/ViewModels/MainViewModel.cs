@@ -67,6 +67,9 @@ public partial class MainViewModel : ObservableObject
     private ObservableCollection<CleanupSuggestion> _cleanupSuggestions = new();
 
     [ObservableProperty]
+    private ObservableCollection<TreemapLegendItem> _treemapLegendItems = new();
+
+    [ObservableProperty]
     private ObservableCollection<DriveInfo> _availableDrives = new();
 
     [ObservableProperty]
@@ -115,6 +118,9 @@ public partial class MainViewModel : ObservableObject
     private TreemapColorScheme _selectedTreemapColors = TreemapColorScheme.Vivid;
 
     [ObservableProperty]
+    private TreemapColorMode _selectedTreemapColorMode = TreemapColorMode.Depth;
+
+    [ObservableProperty]
     private int _treemapMaxDepth = 3;
 
     [ObservableProperty]
@@ -151,13 +157,27 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<FileSystemItem> _filteredChildren = new();
 
+    // Tree view filtering properties
+    [ObservableProperty]
+    private string _treeSearchText = string.Empty;
+
+    [ObservableProperty]
+    private string _treeSortBy = "Size";
+
+    [ObservableProperty]
+    private ObservableCollection<FileSystemItem> _filteredRootItems = new();
+
     public string[] FileExplorerFilterOptions { get; } = new[]
     {
         "All", "Documents", "Media", "Code", "Archives", "Large Files (>100MB)", "Old Files (>90 days)"
     };
 
+    public string[] TreeSortOptions { get; } = new[] { "Size", "Name", "Date" };
+
     partial void OnFileExplorerSearchTextChanged(string value) => ApplyFileExplorerFilters();
     partial void OnFileExplorerFilterChanged(string value) => ApplyFileExplorerFilters();
+    partial void OnTreeSearchTextChanged(string value) => ApplyTreeFilters();
+    partial void OnTreeSortByChanged(string value) => ApplyTreeFilters();
 
     #endregion
 
@@ -179,6 +199,7 @@ public partial class MainViewModel : ObservableObject
         
         ApplyTheme();
         ApplyFontSize();
+        UpdateTreemapLegend();
 
         // Load available drives
         LoadDrives();
@@ -197,11 +218,34 @@ public partial class MainViewModel : ObservableObject
     partial void OnSelectedTreemapColorsChanged(TreemapColorScheme value)
     {
         _settingsService.TreemapColors = value;
+        UpdateTreemapLegend();
+    }
+
+    partial void OnSelectedTreemapColorModeChanged(TreemapColorMode value)
+    {
+        UpdateTreemapLegend();
     }
 
     partial void OnTreemapMaxDepthChanged(int value)
     {
         _settingsService.TreemapMaxDepth = value;
+    }
+
+    private void UpdateTreemapLegend()
+    {
+        TreemapLegendItems.Clear();
+        var layoutService = new TreemapLayoutService();
+        layoutService.SetColorScheme(SelectedTreemapColors);
+        layoutService.SetColorMode(SelectedTreemapColorMode);
+        
+        foreach (var item in layoutService.GetLegendItems())
+        {
+            TreemapLegendItems.Add(new TreemapLegendItem
+            {
+                Label = item.Key,
+                Color = System.Windows.Media.Color.FromArgb(item.Value.Alpha, item.Value.Red, item.Value.Green, item.Value.Blue)
+            });
+        }
     }
 
     private void ApplyFontSize()
@@ -222,6 +266,7 @@ public partial class MainViewModel : ObservableObject
 
     public FontSizePreset[] AvailableFontSizes { get; } = Enum.GetValues<FontSizePreset>();
     public TreemapColorScheme[] AvailableTreemapColors { get; } = Enum.GetValues<TreemapColorScheme>();
+    public TreemapColorMode[] AvailableTreemapColorModes { get; } = Enum.GetValues<TreemapColorMode>();
 
     private void CheckForCachedScan()
     {
@@ -341,6 +386,7 @@ public partial class MainViewModel : ObservableObject
             
             RootItems.Clear();
             RootItems.Add(rootItem);
+            RefreshTreeView();
         }
 
         // Update quick clean availability
@@ -348,6 +394,21 @@ public partial class MainViewModel : ObservableObject
 
         // Update charts from cached data
         UpdateChartsFromCache(cache);
+
+        // Restore category files from cache (instead of building from limited tree)
+        RestoreCategoryFilesFromCache(cache);
+
+        // Auto-select largest category if available
+        if (_filesByCategory.Count > 0)
+        {
+            var largestCategory = cache.CategoryBreakdown
+                .OrderByDescending(c => c.TotalSize)
+                .FirstOrDefault();
+            if (largestCategory != null)
+            {
+                SelectCategory(largestCategory.Category.ToString());
+            }
+        }
 
         SelectedPath = cache.RootPath;
         HasCachedScan = false;
@@ -817,6 +878,25 @@ public partial class MainViewModel : ObservableObject
         return $"{size:N2} {suffixes[suffixIndex]}";
     }
 
+    /// <summary>
+    /// Short format for pie chart labels (e.g., "1.5TB" without space)
+    /// </summary>
+    private static string FormatBytesShort(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int suffixIndex = 0;
+        double size = bytes;
+
+        while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+        {
+            size /= 1024;
+            suffixIndex++;
+        }
+
+        // Use shorter format for pie chart labels
+        return size >= 100 ? $"{size:N0}{suffixes[suffixIndex]}" : $"{size:N1}{suffixes[suffixIndex]}";
+    }
+
     #endregion
 
     #region Private Methods
@@ -849,6 +929,7 @@ public partial class MainViewModel : ObservableObject
         {
             RootItems.Add(ScanResult.RootItem);
         }
+        RefreshTreeView();
 
         // Update largest files
         LargestFiles.Clear();
@@ -903,6 +984,35 @@ public partial class MainViewModel : ObservableObject
             if (largestCategory.Key != default)
             {
                 SelectCategory(largestCategory.Key.ToString());
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restore category files from cache data instead of from tree
+    /// </summary>
+    private void RestoreCategoryFilesFromCache(ScanCache cache)
+    {
+        _filesByCategory.Clear();
+        CategoryFiles.Clear();
+        SelectedCategoryName = null;
+
+        foreach (var category in cache.CategoryBreakdown)
+        {
+            if (category.TopFiles != null && category.TopFiles.Count > 0)
+            {
+                var files = category.TopFiles.Select(f => new FileSystemItem
+                {
+                    Name = f.Name,
+                    FullPath = f.FullPath,
+                    Size = f.Size,
+                    IsFolder = false,
+                    Category = Enum.TryParse<ItemCategory>(category.Category, out var cat) ? cat : ItemCategory.Other,
+                    LastAccessed = f.LastAccessed,
+                    LastModified = f.LastModified
+                }).ToList();
+
+                _filesByCategory[category.Category] = files;
             }
         }
     }
@@ -1208,6 +1318,58 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Apply filtering and sorting to the tree view
+    /// </summary>
+    private void ApplyTreeFilters()
+    {
+        FilteredRootItems.Clear();
+
+        if (!RootItems.Any())
+            return;
+
+        var items = RootItems.AsEnumerable();
+
+        // Apply search filter (searches recursively through children names)
+        if (!string.IsNullOrWhiteSpace(TreeSearchText))
+        {
+            var searchLower = TreeSearchText.ToLowerInvariant();
+            items = items.Where(item => ItemMatchesSearch(item, searchLower));
+        }
+
+        // Apply sorting
+        items = TreeSortBy switch
+        {
+            "Name" => items.OrderBy(i => i.Name),
+            "Date" => items.OrderByDescending(i => i.LastModified),
+            _ => items.OrderByDescending(i => i.Size) // "Size" default
+        };
+
+        foreach (var item in items)
+        {
+            FilteredRootItems.Add(item);
+        }
+    }
+
+    /// <summary>
+    /// Recursively check if item or any children match search
+    /// </summary>
+    private bool ItemMatchesSearch(FileSystemItem item, string searchLower)
+    {
+        if (item.Name.ToLowerInvariant().Contains(searchLower))
+            return true;
+
+        return item.Children.Any(child => ItemMatchesSearch(child, searchLower));
+    }
+
+    /// <summary>
+    /// Refresh tree filter when root items change
+    /// </summary>
+    public void RefreshTreeView()
+    {
+        ApplyTreeFilters();
+    }
+
     public void UpdateSelectedItemChildren()
     {
         ApplyFileExplorerFilters();
@@ -1277,4 +1439,13 @@ public class CleanupFileItem
             return $"{size:N2} {suffixes[suffixIndex]}";
         }
     }
+}
+
+/// <summary>
+/// Legend item for treemap color mode display
+/// </summary>
+public class TreemapLegendItem
+{
+    public string Label { get; set; } = string.Empty;
+    public System.Windows.Media.Color Color { get; set; }
 }

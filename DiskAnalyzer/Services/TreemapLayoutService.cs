@@ -16,6 +16,9 @@ namespace DiskAnalyzer.Services;
 public sealed class TreemapLayoutService : ITreemapLayoutService
 {
     private TreemapColorScheme _colorScheme = TreemapColorScheme.Vivid;
+    private TreemapColorMode _colorMode = TreemapColorMode.Depth;
+
+    public TreemapColorMode CurrentColorMode => _colorMode;
 
     // Color palettes for different schemes - designed for high contrast and readability
     private static readonly Dictionary<TreemapColorScheme, SKColor[]> DepthColorSchemes = new()
@@ -173,6 +176,62 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
     public void SetColorScheme(TreemapColorScheme scheme)
     {
         _colorScheme = scheme;
+    }
+
+    public void SetColorMode(TreemapColorMode mode)
+    {
+        _colorMode = mode;
+    }
+
+    /// <summary>
+    /// Get legend items for the current color mode
+    /// </summary>
+    public Dictionary<string, SKColor> GetLegendItems()
+    {
+        var items = new Dictionary<string, SKColor>();
+        
+        switch (_colorMode)
+        {
+            case TreemapColorMode.Category:
+                var categoryColors = CategoryColorSchemes[_colorScheme];
+                foreach (var kvp in categoryColors)
+                {
+                    items[kvp.Key.ToString()] = kvp.Value;
+                }
+                break;
+                
+            case TreemapColorMode.Age:
+                items["Used < 7 days"] = SKColor.Parse("#EF4444");       // Red
+                items["Used < 30 days"] = SKColor.Parse("#F97316");      // Orange
+                items["1-3 months ago"] = SKColor.Parse("#EAB308");      // Yellow
+                items["3-6 months ago"] = SKColor.Parse("#22C55E");      // Green
+                items["6-12 months ago"] = SKColor.Parse("#06B6D4");     // Cyan
+                items["1+ year stale"] = SKColor.Parse("#3B82F6");       // Blue
+                items["2+ years stale"] = SKColor.Parse("#6366F1");      // Indigo
+                break;
+                
+            case TreemapColorMode.FileType:
+                items[".exe/.dll"] = SKColor.Parse("#6366F1");
+                items[".mp4/.mkv"] = SKColor.Parse("#DC2626");
+                items[".mp3/.wav"] = SKColor.Parse("#F59E0B");
+                items[".jpg/.png"] = SKColor.Parse("#EC4899");
+                items[".pdf/.doc"] = SKColor.Parse("#2563EB");
+                items[".zip/.rar"] = SKColor.Parse("#8B5CF6");
+                items["Code files"] = SKColor.Parse("#10B981");
+                items["Other"] = SKColor.Parse("#6B7280");
+                break;
+                
+            case TreemapColorMode.Depth:
+            default:
+                var depthColors = DepthColorSchemes[_colorScheme];
+                for (int i = 0; i < Math.Min(5, depthColors.Length); i++)
+                {
+                    items[$"Level {i + 1}"] = depthColors[i];
+                }
+                break;
+        }
+        
+        return items;
     }
 
     public TreemapTile BuildTreemap(FileSystemItem root, float width, float height, int maxDepth = 3)
@@ -390,14 +449,79 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
         var categoryColors = CategoryColorSchemes[_colorScheme];
         var depthColors = DepthColorSchemes[_colorScheme];
         
-        if (!item.IsFolder)
+        switch (_colorMode)
         {
-            // Use category color for files
-            return categoryColors.GetValueOrDefault(item.Category, categoryColors[ItemCategory.Other]);
+            case TreemapColorMode.Category:
+                // Always use category color
+                return categoryColors.GetValueOrDefault(item.Category, categoryColors[ItemCategory.Other]);
+                
+            case TreemapColorMode.Age:
+                // Color based on file age
+                return GetAgeColor(item);
+                
+            case TreemapColorMode.FileType:
+                // Color based on file extension
+                return GetFileTypeColor(item);
+                
+            case TreemapColorMode.Depth:
+            default:
+                if (!item.IsFolder)
+                {
+                    // Use category color for files in depth mode
+                    return categoryColors.GetValueOrDefault(item.Category, categoryColors[ItemCategory.Other]);
+                }
+                // Use depth-based color for folders
+                return depthColors[depth % depthColors.Length];
         }
+    }
 
-        // Use depth-based color for folders
-        return depthColors[depth % depthColors.Length];
+    private SKColor GetAgeColor(FileSystemItem item)
+    {
+        // Use last accessed date for "staleness" detection
+        var daysSinceAccessed = (DateTime.Now - item.LastAccessed).TotalDays;
+        
+        if (daysSinceAccessed < 7)
+            return SKColor.Parse("#EF4444");      // Red - recently used
+        if (daysSinceAccessed < 30)
+            return SKColor.Parse("#F97316");      // Orange - used this month
+        if (daysSinceAccessed < 90)
+            return SKColor.Parse("#EAB308");      // Yellow - 1-3 months
+        if (daysSinceAccessed < 180)
+            return SKColor.Parse("#22C55E");      // Green - 3-6 months
+        if (daysSinceAccessed < 365)
+            return SKColor.Parse("#06B6D4");      // Cyan - 6-12 months
+        if (daysSinceAccessed < 730)
+            return SKColor.Parse("#3B82F6");      // Blue - 1-2 years
+            
+        return SKColor.Parse("#6366F1");          // Indigo - 2+ years (stale)
+    }
+
+    private SKColor GetFileTypeColor(FileSystemItem item)
+    {
+        if (item.IsFolder)
+            return SKColor.Parse("#374151");      // Dark gray for folders
+            
+        var ext = item.Extension?.ToLowerInvariant() ?? "";
+        
+        return ext switch
+        {
+            // Executables
+            ".exe" or ".dll" or ".msi" or ".bat" or ".cmd" => SKColor.Parse("#6366F1"),
+            // Video
+            ".mp4" or ".mkv" or ".avi" or ".mov" or ".wmv" or ".flv" or ".webm" => SKColor.Parse("#DC2626"),
+            // Audio
+            ".mp3" or ".wav" or ".flac" or ".aac" or ".ogg" or ".wma" or ".m4a" => SKColor.Parse("#F59E0B"),
+            // Images
+            ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp" or ".svg" or ".ico" => SKColor.Parse("#EC4899"),
+            // Documents
+            ".pdf" or ".doc" or ".docx" or ".xls" or ".xlsx" or ".ppt" or ".pptx" or ".txt" or ".rtf" => SKColor.Parse("#2563EB"),
+            // Archives
+            ".zip" or ".rar" or ".7z" or ".tar" or ".gz" or ".bz2" => SKColor.Parse("#8B5CF6"),
+            // Code
+            ".cs" or ".js" or ".ts" or ".py" or ".java" or ".cpp" or ".c" or ".h" or ".html" or ".css" or ".json" or ".xml" => SKColor.Parse("#10B981"),
+            // Other
+            _ => SKColor.Parse("#6B7280")
+        };
     }
 }
 
@@ -405,4 +529,7 @@ public interface ITreemapLayoutService
 {
     TreemapTile BuildTreemap(FileSystemItem root, float width, float height, int maxDepth = 3);
     void SetColorScheme(TreemapColorScheme scheme);
+    void SetColorMode(TreemapColorMode mode);
+    TreemapColorMode CurrentColorMode { get; }
+    Dictionary<string, SKColor> GetLegendItems();
 }

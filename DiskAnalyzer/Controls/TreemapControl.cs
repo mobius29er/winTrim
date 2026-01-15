@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -41,6 +42,10 @@ public class TreemapControl : SKElement
         DependencyProperty.Register(nameof(ColorScheme), typeof(TreemapColorScheme), typeof(TreemapControl),
             new PropertyMetadata(TreemapColorScheme.Vivid, OnColorSchemeChanged));
 
+    public static readonly DependencyProperty ColorModeProperty =
+        DependencyProperty.Register(nameof(ColorMode), typeof(TreemapColorMode), typeof(TreemapControl),
+            new PropertyMetadata(TreemapColorMode.Depth, OnColorModeChanged));
+
     public FileSystemItem? SourceItem
     {
         get => (FileSystemItem?)GetValue(SourceItemProperty);
@@ -57,6 +62,12 @@ public class TreemapControl : SKElement
     {
         get => (TreemapColorScheme)GetValue(ColorSchemeProperty);
         set => SetValue(ColorSchemeProperty, value);
+    }
+
+    public TreemapColorMode ColorMode
+    {
+        get => (TreemapColorMode)GetValue(ColorModeProperty);
+        set => SetValue(ColorModeProperty, value);
     }
 
     public AppTheme SelectedTheme
@@ -181,6 +192,15 @@ public class TreemapControl : SKElement
         if (d is TreemapControl control)
         {
             control._layoutService.SetColorScheme((TreemapColorScheme)e.NewValue);
+            control.RebuildTreemap();
+        }
+    }
+
+    private static void OnColorModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is TreemapControl control)
+        {
+            control._layoutService.SetColorMode((TreemapColorMode)e.NewValue);
             control.RebuildTreemap();
         }
     }
@@ -323,68 +343,166 @@ public class TreemapControl : SKElement
         };
         canvas.DrawRect(rect, borderPaint);
 
-        // Draw label if tile is big enough
-        if (rect.Width > 40 && rect.Height > 20)
-        {
-            DrawLabel(canvas, tile, rect);
-        }
-
-        // Draw children (only if not too deep)
-        if (tile.Depth < MaxDepth)
+        // Draw children first (only if not too deep)
+        var hasVisibleChildren = tile.Depth < MaxDepth && tile.Children.Any(c => c.Bounds.Width >= 2 && c.Bounds.Height >= 2);
+        
+        if (hasVisibleChildren)
         {
             foreach (var child in tile.Children)
             {
                 DrawTile(canvas, child);
             }
         }
+        
+        // Only draw label on leaf tiles (no visible children) to prevent overlap
+        if (!hasVisibleChildren && rect.Width > 40 && rect.Height > 20)
+        {
+            DrawLabel(canvas, tile, rect);
+        }
     }
 
     private void DrawLabel(SKCanvas canvas, TreemapTile tile, SKRect rect)
     {
-        var textSize = Math.Min(14, Math.Max(9, rect.Height / 4));
+        var textSize = Math.Min(18, Math.Max(11, rect.Height / 3.5f));
+        
+        // Calculate text color based on tile brightness for legibility
+        var tileBrightness = (tile.Color.Red * 0.299f + tile.Color.Green * 0.587f + tile.Color.Blue * 0.114f) / 255f;
+        
+        // Use white text on dark background pill for best readability
+        var textColor = SKColors.White;
+        var bgColor = SKColors.Black.WithAlpha(160);
         
         using var textPaint = new SKPaint
         {
-            Color = TextColor,
-            TextSize = textSize,
+            Color = textColor,
+            TextSize = (float)textSize,
             IsAntialias = true,
             Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
         };
 
-        // Truncate text to fit
-        var text = tile.Name;
+        // Get available space
         var maxWidth = rect.Width - 8;
+        var availableHeight = rect.Height - 8;
         
-        while (textPaint.MeasureText(text) > maxWidth && text.Length > 3)
+        // Prepare text lines
+        var name = tile.Name;
+        var lines = new List<string>();
+        
+        // Try to fit the full name, wrapping if needed
+        if (textPaint.MeasureText(name) <= maxWidth)
         {
-            text = text.Substring(0, text.Length - 4) + "...";
+            lines.Add(name);
+        }
+        else if (availableHeight > textSize * 2.5f && rect.Width > 60)
+        {
+            // Try word wrap for 2 lines
+            var words = name.Split(new[] { ' ', '_', '-', '.' }, StringSplitOptions.RemoveEmptyEntries);
+            var line1 = "";
+            var line2 = "";
+            
+            foreach (var word in words)
+            {
+                var testLine = string.IsNullOrEmpty(line1) ? word : line1 + " " + word;
+                if (textPaint.MeasureText(testLine) <= maxWidth)
+                {
+                    line1 = testLine;
+                }
+                else if (string.IsNullOrEmpty(line2))
+                {
+                    line2 = word;
+                }
+                else
+                {
+                    var testLine2 = line2 + " " + word;
+                    if (textPaint.MeasureText(testLine2) <= maxWidth)
+                    {
+                        line2 = testLine2;
+                    }
+                }
+            }
+            
+            if (!string.IsNullOrEmpty(line1)) lines.Add(line1);
+            if (!string.IsNullOrEmpty(line2)) lines.Add(TruncateText(line2, textPaint, maxWidth));
+        }
+        else
+        {
+            // Single line with truncation
+            lines.Add(TruncateText(name, textPaint, maxWidth));
         }
 
-        var x = rect.Left + 4;
-        var y = rect.Top + textSize + 2;
+        // Calculate total text block height
+        var lineHeight = (float)textSize + 2;
+        var totalTextHeight = lines.Count * lineHeight;
+        var showSize = rect.Height > 45 && totalTextHeight + lineHeight < availableHeight;
+        if (showSize) totalTextHeight += lineHeight;
         
-        // Draw text shadow for readability
-        using var shadowPaint = new SKPaint
+        // Draw semi-transparent background pill for text
+        var maxTextWidth = lines.Max(l => textPaint.MeasureText(l));
+        if (showSize)
         {
-            Color = TextShadowColor,
-            TextSize = textSize,
-            IsAntialias = true,
-            Typeface = textPaint.Typeface
+            using var sizePaint = new SKPaint { TextSize = Math.Max(10, (float)textSize - 2) };
+            maxTextWidth = Math.Max(maxTextWidth, sizePaint.MeasureText(tile.SizeFormatted));
+        }
+        
+        var bgRect = new SKRect(
+            rect.Left + 2,
+            rect.Top + 2,
+            Math.Min(rect.Left + maxTextWidth + 10, rect.Right - 2),
+            Math.Min(rect.Top + totalTextHeight + 8, rect.Bottom - 2)
+        );
+        
+        using var bgPaint = new SKPaint
+        {
+            Color = bgColor,
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true
         };
-        canvas.DrawText(text, x + 1, y + 1, shadowPaint);
-        canvas.DrawText(text, x, y, textPaint);
+        canvas.DrawRoundRect(bgRect, 3, 3, bgPaint);
+
+        // Draw text
+        var x = rect.Left + 5;
+        var y = rect.Top + (float)textSize + 4;
+        
+        foreach (var line in lines)
+        {
+            canvas.DrawText(line, x, y, textPaint);
+            y += lineHeight;
+        }
 
         // Draw size if room permits
-        if (rect.Height > 35)
+        if (showSize)
         {
             using var sizePaint = new SKPaint
             {
-                Color = TextColor.WithAlpha(200),
-                TextSize = Math.Max(8, textSize - 2),
+                Color = SKColors.White.WithAlpha(200),
+                TextSize = Math.Max(10, (float)textSize - 2),
                 IsAntialias = true
             };
-            canvas.DrawText(tile.SizeFormatted, x, y + textSize + 2, sizePaint);
+            canvas.DrawText(tile.SizeFormatted, x, y, sizePaint);
         }
+    }
+
+    private string TruncateText(string text, SKPaint paint, float maxWidth)
+    {
+        if (paint.MeasureText(text) <= maxWidth)
+            return text;
+            
+        // Binary search for optimal truncation point
+        var ellipsis = "…";
+        var low = 0;
+        var high = text.Length;
+        
+        while (low < high)
+        {
+            var mid = (low + high + 1) / 2;
+            var testText = text.Substring(0, mid) + ellipsis;
+            if (paint.MeasureText(testText) <= maxWidth)
+                low = mid;
+            else
+                high = mid - 1;
+        }
+        
+        return low > 0 ? text.Substring(0, low) + ellipsis : ellipsis;
     }
 
     private void OnMouseMove(object sender, MouseEventArgs e)
@@ -402,7 +520,14 @@ public class TreemapControl : SKElement
 
     private void OnRightClick(object sender, MouseButtonEventArgs e)
     {
-        NavigateUp();
+        // Don't auto-navigate - let context menu handle actions
+        // Just select the tile under cursor for context menu operations
+        var pos = e.GetPosition(this);
+        var tile = FindTileAtPoint((float)pos.X, (float)pos.Y);
+        if (tile != null)
+        {
+            TileClicked?.Invoke(this, tile);
+        }
     }
 
     private TreemapTile? FindTileAtPoint(float x, float y)

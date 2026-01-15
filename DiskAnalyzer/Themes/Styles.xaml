@@ -10,13 +10,14 @@
     <!-- Global Window/App Font -->
     <Style TargetType="Window">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
     </Style>
 
     <!-- Global TextBlock Style - Monospace throughout -->
     <Style TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
     </Style>
 
     <!-- Global Label Style -->
@@ -29,7 +30,7 @@
     <Style x:Key="BaseButtonStyle" TargetType="Button">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
         <Setter Property="Padding" Value="16,8"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -148,7 +149,7 @@
     <!-- Section Header - Uppercase tracking like mockup -->
     <Style x:Key="SectionHeader" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="{DynamicResource TitleFontSize}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="Margin" Value="0,0,0,12"/>
@@ -166,7 +167,7 @@
     <!-- Stat Label - "ANALYZED" text under stats -->
     <Style x:Key="StatLabel" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontSize" Value="{DynamicResource SmallFontSize}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
         <Setter Property="TextAlignment" Value="Center"/>
@@ -175,7 +176,7 @@
     <!-- Data Label -->
     <Style x:Key="DataLabel" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontSize" Value="{DynamicResource SmallFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
         <!-- Note: Use UPPERCASE text in XAML for labels -->
     </Style>
@@ -183,7 +184,7 @@
     <!-- Data Value -->
     <Style x:Key="DataValue" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="{DynamicResource LargeFontSize}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
@@ -191,7 +192,7 @@
     <!-- Monospace Text for file paths, data -->
     <Style x:Key="MonoText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
     </Style>
 
@@ -199,7 +200,7 @@
     <Style x:Key="TreeViewItemStyle" TargetType="TreeViewItem">
         <Setter Property="Padding" Value="4"/>
         <Setter Property="Margin" Value="0,2,0,2"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
         <Style.Triggers>
             <Trigger Property="IsSelected" Value="True">
                 <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}"/>
@@ -216,7 +217,7 @@
         <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource BorderBrush}"/>
         <Setter Property="RowBackground" Value="Transparent"/>
         <Setter Property="AlternatingRowBackground" Value="{DynamicResource SurfaceBrush}"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
         <Setter Property="HeadersVisibility" Value="Column"/>
         <Setter Property="SelectionMode" Value="Single"/>
         <Setter Property="SelectionUnit" Value="FullRow"/>
@@ -255,7 +256,7 @@
 
     <Style x:Key="ModernTabItem" TargetType="TabItem">
         <Setter Property="Padding" Value="16,8"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="Background" Value="Transparent"/>

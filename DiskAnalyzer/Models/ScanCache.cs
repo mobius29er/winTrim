@@ -80,6 +80,18 @@ public class CachedCategoryItem
     public long TotalSize { get; set; }
     public string SizeFormatted { get; set; } = string.Empty;
     public int FileCount { get; set; }
+    /// <summary>Top files in this category (up to 50 largest)</summary>
+    public List<CachedCategoryFileItem> TopFiles { get; set; } = new();
+}
+
+public class CachedCategoryFileItem
+{
+    public string Name { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty;
+    public long Size { get; set; }
+    public string SizeFormatted { get; set; } = string.Empty;
+    public DateTime LastAccessed { get; set; }
+    public DateTime LastModified { get; set; }
 }
 
 public class CachedCleanupItem

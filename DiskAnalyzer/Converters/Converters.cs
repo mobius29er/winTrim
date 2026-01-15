@@ -240,3 +240,25 @@ public class ThemeToIconConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
+
+/// <summary>
+/// Converts LiveCharts series Fill paint to a WPF brush for legend display
+/// </summary>
+public class SeriesFillToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint paint)
+        {
+            var skColor = paint.Color;
+            return new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromArgb(skColor.Alpha, skColor.Red, skColor.Green, skColor.Blue));
+        }
+        return System.Windows.Application.Current.Resources["PrimaryBrush"];
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
