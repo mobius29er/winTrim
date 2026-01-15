@@ -5,8 +5,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Default theme: Tech (Blade Runner style) - changed dynamically by MainViewModel -->
-                <ResourceDictionary Source="Themes/TechColors.xaml"/>
+                <!-- Default theme: Retrofuturistic (Territory Studio inspired) - changed dynamically by MainViewModel -->
+                <ResourceDictionary Source="Themes/DefaultColors.xaml"/>
                 <ResourceDictionary Source="Themes/Styles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

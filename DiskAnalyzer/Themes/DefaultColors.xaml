@@ -1,0 +1,127 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- 
+    ══════════════════════════════════════════════════════════════════════════════
+    DEFAULT THEME - RETROFUTURISTIC 
+    Inspired by Blade Runner 2049 UI design by Territory Studio
+    Combines vintage CRT aesthetics with modern clarity
+    ══════════════════════════════════════════════════════════════════════════════
+    -->
+    
+    <!-- Core Background Colors - Deep space black with subtle teal undertone -->
+    <Color x:Key="BackgroundColor">#030A0D</Color>           <!-- Near-black with teal tint -->
+    <Color x:Key="SurfaceColor">#071418</Color>              <!-- Dark teal surface -->
+    <Color x:Key="SurfaceHoverColor">#0A1E24</Color>         <!-- Slightly lighter hover -->
+    <Color x:Key="CardColor">#0A1A1F</Color>                 <!-- Card background -->
+    
+    <!-- Primary Colors - Cyan/Teal (the signature Blade Runner color) -->
+    <Color x:Key="PrimaryColor">#00D4E5</Color>              <!-- Bright cyan -->
+    <Color x:Key="PrimaryHoverColor">#00F3FF</Color>         <!-- Glowing cyan hover -->
+    <Color x:Key="PrimaryDimColor">#007A8A</Color>           <!-- Muted cyan for less emphasis -->
+    
+    <!-- Accent Colors - Orange/Amber (for warnings, highlights, CTAs) -->
+    <Color x:Key="AccentColor">#FF7B00</Color>               <!-- Warm orange accent -->
+    <Color x:Key="AccentHoverColor">#FF9500</Color>          <!-- Brighter orange hover -->
+    <Color x:Key="AccentDimColor">#CC6200</Color>            <!-- Muted orange -->
+    
+    <!-- Secondary Colors - Teal green tones -->
+    <Color x:Key="SecondaryColor">#0D4A4A</Color>            <!-- Deep teal -->
+    <Color x:Key="SecondaryHoverColor">#0F5C5C</Color>       <!-- Teal hover -->
+    
+    <!-- Text Colors - Layered for hierarchy -->
+    <Color x:Key="TextPrimaryColor">#E0F7FA</Color>          <!-- Bright cyan-white -->
+    <Color x:Key="TextSecondaryColor">#80DEEA</Color>        <!-- Medium cyan -->
+    <Color x:Key="TextMutedColor">#4A7C7F</Color>            <!-- Dim teal-gray -->
+    <Color x:Key="TextDisabledColor">#2A4A4D</Color>         <!-- Very dim -->
+    
+    <!-- Border Colors - Grid-like structure -->
+    <Color x:Key="BorderColor">#1A3A40</Color>               <!-- Subtle teal border -->
+    <Color x:Key="BorderHoverColor">#00D4E5</Color>          <!-- Glowing border on hover -->
+    <Color x:Key="GridLineColor">#0D2A30</Color>             <!-- Background grid pattern -->
+    
+    <!-- Status Colors - Functional with retrofuturistic twist -->
+    <Color x:Key="SuccessColor">#00E676</Color>              <!-- Bright green success -->
+    <Color x:Key="WarningColor">#FF7B00</Color>              <!-- Orange warning (matches accent) -->
+    <Color x:Key="DangerColor">#FF3D00</Color>               <!-- Red-orange danger -->
+    <Color x:Key="InfoColor">#00D4E5</Color>                 <!-- Cyan info (matches primary) -->
+    
+    <!-- Special Effect Colors -->
+    <Color x:Key="GlowColor">#00F3FF</Color>                 <!-- Scanline/glow effect -->
+    <Color x:Key="ScanlineColor">#051215</Color>             <!-- CRT scanline overlay -->
+    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BRUSHES -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
+    <!-- Background Brushes -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{StaticResource SurfaceHoverColor}"/>
+    <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}"/>
+    
+    <!-- Primary Brushes -->
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{StaticResource PrimaryHoverColor}"/>
+    <SolidColorBrush x:Key="PrimaryDimBrush" Color="{StaticResource PrimaryDimColor}"/>
+    
+    <!-- Accent Brushes -->
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}"/>
+    <SolidColorBrush x:Key="AccentDimBrush" Color="{StaticResource AccentDimColor}"/>
+    
+    <!-- Secondary Brushes -->
+    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource SecondaryColor}"/>
+    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="{StaticResource SecondaryHoverColor}"/>
+    
+    <!-- Text Brushes -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextDisabledColor}"/>
+    
+    <!-- Border Brushes -->
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderHoverBrush" Color="{StaticResource BorderHoverColor}"/>
+    <SolidColorBrush x:Key="GridLineBrush" Color="{StaticResource GridLineColor}"/>
+    
+    <!-- Status Brushes -->
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
+    
+    <!-- Special Effect Brushes -->
+    <SolidColorBrush x:Key="GlowBrush" Color="{StaticResource GlowColor}"/>
+    <SolidColorBrush x:Key="ScanlineBrush" Color="{StaticResource ScanlineColor}"/>
+    
+    <!-- Gradient Brushes for depth and glow effects -->
+    <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#0A1E24" Offset="0"/>
+        <GradientStop Color="#071418" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="GlowGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#00000000" Offset="0"/>
+        <GradientStop Color="#3300D4E5" Offset="0.5"/>
+        <GradientStop Color="#00000000" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="AccentGlowGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#00000000" Offset="0"/>
+        <GradientStop Color="#33FF7B00" Offset="0.5"/>
+        <GradientStop Color="#00000000" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <!-- Button gradient for that modern glass effect -->
+    <LinearGradientBrush x:Key="ButtonGradient" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#1500D4E5" Offset="0"/>
+        <GradientStop Color="#0500D4E5" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="AccentButtonGradient" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FF7B00" Offset="0"/>
+        <GradientStop Color="#CC6200" Offset="1"/>
+    </LinearGradientBrush>
+    
+</ResourceDictionary>

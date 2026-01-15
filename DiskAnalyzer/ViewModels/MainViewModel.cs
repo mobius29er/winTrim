@@ -333,11 +333,12 @@ public partial class MainViewModel : ObservableObject
             // Select theme file based on current theme
             string themeFile = SelectedTheme switch
             {
+                AppTheme.Default => "Themes/DefaultColors.xaml",
                 AppTheme.Tech => "Themes/TechColors.xaml",
                 AppTheme.Enterprise => "Themes/EnterpriseColors.xaml",
                 AppTheme.TerminalGreen => "Themes/TerminalGreenColors.xaml",
                 AppTheme.TerminalRed => "Themes/TerminalRedColors.xaml",
-                _ => "Themes/TechColors.xaml"  // Default to Tech theme
+                _ => "Themes/DefaultColors.xaml"  // Default to retrofuturistic theme
             };
             
             resources.Insert(0, new ResourceDictionary { Source = new Uri(themeFile, UriKind.Relative) });

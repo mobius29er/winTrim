@@ -224,8 +224,9 @@ public class ThemeToIconConverter : IValueConverter
         {
             return theme switch
             {
-                Services.AppTheme.Tech => "🔷",        // Blue diamond - cyberpunk/tech
-                Services.AppTheme.Enterprise => "☀️", // Sun - light/professional
+                Services.AppTheme.Default => "🌐",       // Globe - retrofuturistic default
+                Services.AppTheme.Tech => "🔷",          // Blue diamond - cyberpunk/tech
+                Services.AppTheme.Enterprise => "☀️",   // Sun - light/professional
                 Services.AppTheme.TerminalGreen => "🟢", // Green circle - terminal
                 Services.AppTheme.TerminalRed => "🔴",   // Red circle - terminal
                 _ => "🎨"

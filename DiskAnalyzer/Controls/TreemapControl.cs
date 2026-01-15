@@ -60,29 +60,32 @@ public class TreemapControl : SKElement
     
     private SKColor BackgroundColor => SelectedTheme switch
     {
+        AppTheme.Default => SKColor.Parse("#030A0D"),       // Deep teal-black
         AppTheme.Tech => SKColor.Parse("#050505"),          // Void Black
         AppTheme.Enterprise => SKColors.White,
         AppTheme.TerminalGreen => SKColors.Black,
         AppTheme.TerminalRed => SKColors.Black,
-        _ => SKColor.Parse("#050505")
+        _ => SKColor.Parse("#030A0D")
     };
     
     private SKColor BorderColor => SelectedTheme switch
     {
+        AppTheme.Default => SKColor.Parse("#1A3A40"),       // Teal border
         AppTheme.Tech => SKColor.Parse("#1F2937"),          // Off-World Gray
         AppTheme.Enterprise => SKColors.White,
         AppTheme.TerminalGreen => SKColor.Parse("#1A1A1A"),
         AppTheme.TerminalRed => SKColor.Parse("#1A1A1A"),
-        _ => SKColor.Parse("#1F2937")
+        _ => SKColor.Parse("#1A3A40")
     };
     
     private SKColor TextColor => SelectedTheme switch
     {
+        AppTheme.Default => SKColor.Parse("#00D4E5"),       // Cyan
         AppTheme.Tech => SKColor.Parse("#00F3FF"),          // K Teal
         AppTheme.Enterprise => SKColors.White,
         AppTheme.TerminalGreen => SKColor.Parse("#00FF00"),
         AppTheme.TerminalRed => SKColor.Parse("#FF3333"),
-        _ => SKColor.Parse("#00F3FF")
+        _ => SKColor.Parse("#00D4E5")
     };
     
     private SKColor TextShadowColor => IsDarkTheme ? SKColors.Black : SKColors.Black.WithAlpha(100);

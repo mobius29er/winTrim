@@ -9,6 +9,9 @@ namespace DiskAnalyzer.Services;
 /// <summary>
 /// Implements the Squarified Treemap algorithm for visualizing hierarchical data
 /// Based on: "Squarified Treemaps" by Bruls, Huizing, and van Wijk
+/// 
+/// Key design: Uses separate LayoutElement class for calculations to avoid
+/// corrupting the actual Size property on tiles (which stores file bytes).
 /// </summary>
 public sealed class TreemapLayoutService : ITreemapLayoutService
 {
@@ -42,6 +45,15 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
         { ItemCategory.Other, SKColor.Parse("#CBD5E1") },
     };
 
+    /// <summary>
+    /// Internal class for layout calculations - keeps pixel area separate from file size
+    /// </summary>
+    private class LayoutElement
+    {
+        public TreemapTile Tile { get; set; } = null!;
+        public double Area { get; set; }  // Calculated pixel area (NOT file size)
+    }
+
     public TreemapTile BuildTreemap(FileSystemItem root, float width, float height, int maxDepth = 3)
     {
         var rootTile = new TreemapTile
@@ -59,13 +71,13 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
 
         if (root.Size > 0 && root.Children.Any())
         {
-            LayoutChildren(rootTile, root.Children.ToList(), maxDepth);
+            LayoutChildren(rootTile, root.Children.ToList(), rootTile.Bounds, maxDepth);
         }
 
         return rootTile;
     }
 
-    private void LayoutChildren(TreemapTile parent, List<FileSystemItem> children, int maxDepth)
+    private void LayoutChildren(TreemapTile parent, List<FileSystemItem> children, SKRect layoutBounds, int maxDepth)
     {
         if (parent.Depth >= maxDepth || !children.Any())
             return;
@@ -79,7 +91,7 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
         if (!validChildren.Any())
             return;
 
-        // Create tiles for children
+        // Create tiles for children (Size remains as file bytes - NEVER overwrite)
         var childTiles = validChildren.Select(child => new TreemapTile
         {
             Name = child.Name,
@@ -93,52 +105,46 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
             SourceItem = child
         }).ToList();
 
-        // Apply squarified layout
-        Squarify(childTiles, parent.Bounds, parent.Size);
-
         parent.Children = childTiles;
+
+        // Calculate pixel areas using separate LayoutElement (preserves Size)
+        double totalSize = validChildren.Sum(c => (double)c.Size);
+        double totalArea = layoutBounds.Width * layoutBounds.Height;
+
+        var elements = childTiles.Select(t => new LayoutElement
+        {
+            Tile = t,
+            Area = (t.Size / totalSize) * totalArea  // Area for layout, Size stays intact
+        }).ToList();
+
+        // Apply squarified layout algorithm
+        SquarifyRecursive(elements, new List<LayoutElement>(), layoutBounds, Math.Min(layoutBounds.Width, layoutBounds.Height));
 
         // Recursively layout grandchildren for folders
         foreach (var childTile in childTiles.Where(t => t.IsFolder && t.SourceItem != null))
         {
             var grandchildren = childTile.SourceItem!.Children.ToList();
-            if (grandchildren.Any())
-            {
-                // Add small padding for nested rectangles
-                var paddedBounds = new SKRect(
-                    childTile.Bounds.Left + 2,
-                    childTile.Bounds.Top + 16, // Leave room for label
-                    childTile.Bounds.Right - 2,
-                    childTile.Bounds.Bottom - 2);
+            if (!grandchildren.Any()) continue;
 
-                if (paddedBounds.Width > 20 && paddedBounds.Height > 20)
-                {
-                    childTile.Bounds = new SKRect(
-                        childTile.Bounds.Left, childTile.Bounds.Top,
-                        childTile.Bounds.Right, childTile.Bounds.Bottom);
-                    
-                    LayoutChildren(childTile, grandchildren, maxDepth);
-                }
+            // Calculate inner bounds for children (header space + padding)
+            const float headerHeight = 18f;
+            const float padding = 2f;
+
+            var innerBounds = new SKRect(
+                childTile.Bounds.Left + padding,
+                childTile.Bounds.Top + headerHeight,
+                childTile.Bounds.Right - padding,
+                childTile.Bounds.Bottom - padding);
+
+            // Only recurse if we have enough space
+            if (innerBounds.Width > 20 && innerBounds.Height > 20)
+            {
+                LayoutChildren(childTile, grandchildren, innerBounds, maxDepth);
             }
         }
     }
 
-    private void Squarify(List<TreemapTile> tiles, SKRect bounds, long totalSize)
-    {
-        if (!tiles.Any() || totalSize == 0)
-            return;
-
-        // Normalize sizes to fit in bounds
-        var totalArea = bounds.Width * bounds.Height;
-        foreach (var tile in tiles)
-        {
-            tile.Size = (long)((double)tile.Size / totalSize * totalArea);
-        }
-
-        SquarifyRecursive(tiles, new List<TreemapTile>(), bounds, GetShortestSide(bounds));
-    }
-
-    private void SquarifyRecursive(List<TreemapTile> remaining, List<TreemapTile> row, SKRect bounds, float shortestSide)
+    private void SquarifyRecursive(List<LayoutElement> remaining, List<LayoutElement> row, SKRect bounds, double shortestSide)
     {
         if (!remaining.Any())
         {
@@ -146,87 +152,88 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
             return;
         }
 
-        var next = remaining.First();
-        var newRow = row.ToList();
-        newRow.Add(next);
+        var next = remaining[0];
+        var rowWithNext = new List<LayoutElement>(row) { next };
 
-        if (row.Count == 0 || WorstRatio(row, shortestSide) >= WorstRatio(newRow, shortestSide))
+        if (row.Count == 0 || WorstRatio(row, shortestSide) >= WorstRatio(rowWithNext, shortestSide))
         {
-            // Add to current row
+            // Add to current row - improves or maintains aspect ratio
             remaining.RemoveAt(0);
-            SquarifyRecursive(remaining, newRow, bounds, shortestSide);
+            SquarifyRecursive(remaining, rowWithNext, bounds, shortestSide);
         }
         else
         {
-            // Start new row
+            // Row is complete - layout and start new row with remaining bounds
             var newBounds = LayoutRow(row, bounds, shortestSide);
-            SquarifyRecursive(remaining, new List<TreemapTile>(), newBounds, GetShortestSide(newBounds));
+            SquarifyRecursive(remaining, new List<LayoutElement>(), newBounds, Math.Min(newBounds.Width, newBounds.Height));
         }
     }
 
-    private SKRect LayoutRow(List<TreemapTile> row, SKRect bounds, float shortestSide)
+    private SKRect LayoutRow(List<LayoutElement> row, SKRect bounds, double shortestSide)
     {
         if (!row.Any())
             return bounds;
 
-        var totalSize = row.Sum(t => t.Size);
-        var isHorizontal = bounds.Width >= bounds.Height;
-        var rowSize = (float)totalSize / shortestSide;
+        double totalArea = row.Sum(e => e.Area);
+        double rowThickness = totalArea / shortestSide;  // Width of the strip we're laying out
 
-        float offset = 0;
-        foreach (var tile in row)
+        bool layoutVertically = bounds.Width >= bounds.Height;  // Stack items in the shorter dimension
+        double offset = 0;
+
+        foreach (var element in row)
         {
-            var tileSize = (float)tile.Size / rowSize;
+            double itemLength = element.Area / rowThickness;
 
-            if (isHorizontal)
+            if (layoutVertically)
             {
-                tile.Bounds = new SKRect(
-                    bounds.Left,
-                    bounds.Top + offset,
-                    bounds.Left + rowSize,
-                    bounds.Top + offset + tileSize);
-                offset += tileSize;
+                // Vertical strip on the left side, items stack top-to-bottom
+                element.Tile.Bounds = new SKRect(
+                    (float)bounds.Left,
+                    (float)(bounds.Top + offset),
+                    (float)(bounds.Left + rowThickness),
+                    (float)(bounds.Top + offset + itemLength));
+                offset += itemLength;
             }
             else
             {
-                tile.Bounds = new SKRect(
-                    bounds.Left + offset,
-                    bounds.Top,
-                    bounds.Left + offset + tileSize,
-                    bounds.Top + rowSize);
-                offset += tileSize;
+                // Horizontal strip on the top, items stack left-to-right
+                element.Tile.Bounds = new SKRect(
+                    (float)(bounds.Left + offset),
+                    (float)bounds.Top,
+                    (float)(bounds.Left + offset + itemLength),
+                    (float)(bounds.Top + rowThickness));
+                offset += itemLength;
             }
         }
 
-        // Return remaining bounds
-        if (isHorizontal)
+        // Return remaining bounds after this row
+        if (layoutVertically)
         {
-            return new SKRect(bounds.Left + rowSize, bounds.Top, bounds.Right, bounds.Bottom);
+            return new SKRect((float)(bounds.Left + rowThickness), bounds.Top, bounds.Right, bounds.Bottom);
         }
         else
         {
-            return new SKRect(bounds.Left, bounds.Top + rowSize, bounds.Right, bounds.Bottom);
+            return new SKRect(bounds.Left, (float)(bounds.Top + rowThickness), bounds.Right, bounds.Bottom);
         }
     }
 
-    private float WorstRatio(List<TreemapTile> row, float shortestSide)
+    private double WorstRatio(List<LayoutElement> row, double shortestSide)
     {
         if (!row.Any())
-            return float.MaxValue;
+            return double.MaxValue;
 
-        var sum = row.Sum(t => (float)t.Size);
-        var max = row.Max(t => (float)t.Size);
-        var min = row.Min(t => (float)t.Size);
+        double sum = row.Sum(e => e.Area);
+        double max = row.Max(e => e.Area);
+        double min = row.Min(e => e.Area);
 
-        var s2 = shortestSide * shortestSide;
-        var sumSq = sum * sum;
+        if (sum == 0 || min == 0)
+            return double.MaxValue;
 
-        return Math.Max(s2 * max / sumSq, sumSq / (s2 * min));
-    }
+        double s2 = shortestSide * shortestSide;
+        double sumSq = sum * sum;
 
-    private float GetShortestSide(SKRect bounds)
-    {
-        return Math.Min(bounds.Width, bounds.Height);
+        // Aspect ratio formula from the Squarified Treemap paper
+        return Math.Max((s2 * max) / sumSq, sumSq / (s2 * min));
     }
 
     private SKColor GetColorForItem(FileSystemItem item, int depth)

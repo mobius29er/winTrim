@@ -12,7 +12,9 @@ namespace DiskAnalyzer.Services;
 /// </summary>
 public enum AppTheme
 {
-    /// <summary>Blade Runner 2049 inspired - Cyan/Pink neon on void black</summary>
+    /// <summary>Retrofuturistic - Teal/Cyan with orange accents on deep black (Territory Studio inspired)</summary>
+    Default,
+    /// <summary>Blade Runner 2049 neon - Cyan/Pink on void black</summary>
     Tech,
     /// <summary>Professional Windows-style - Clean blues and grays</summary>
     Enterprise,
