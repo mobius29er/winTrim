@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
     
     <!-- Terminal Theme - Red Accent -->
     <!-- Pure black background with high-contrast red text -->
@@ -50,5 +51,12 @@
     
     <!-- Button Text - Black for contrast on bright terminal colors -->
     <SolidColorBrush x:Key="ButtonTextBrush" Color="#000000"/>
+    
+    <!-- Font Sizes -->
+    <sys:Double x:Key="BaseFontSize">13</sys:Double>
+    <sys:Double x:Key="SmallFontSize">11</sys:Double>
+    <sys:Double x:Key="LargeFontSize">15</sys:Double>
+    <sys:Double x:Key="HeaderFontSize">19</sys:Double>
+    <sys:Double x:Key="TitleFontSize">17</sys:Double>
     
 </ResourceDictionary>

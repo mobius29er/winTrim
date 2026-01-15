@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
     
     <!-- Tech Theme - Blade Runner "Tech-Noir" Style -->
     <!-- Inspired by: K Teal, Joi Pink, Wallace Amber on Void Black -->
@@ -52,5 +53,12 @@
     
     <!-- Button Text - Dark for contrast on bright cyber colors -->
     <SolidColorBrush x:Key="ButtonTextBrush" Color="#050505"/>
+    
+    <!-- Font Sizes -->
+    <sys:Double x:Key="BaseFontSize">13</sys:Double>
+    <sys:Double x:Key="SmallFontSize">11</sys:Double>
+    <sys:Double x:Key="LargeFontSize">15</sys:Double>
+    <sys:Double x:Key="HeaderFontSize">19</sys:Double>
+    <sys:Double x:Key="TitleFontSize">17</sys:Double>
     
 </ResourceDictionary>

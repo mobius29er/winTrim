@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using DiskAnalyzer.Controls;
 using DiskAnalyzer.Models;
 using DiskAnalyzer.ViewModels;
@@ -33,6 +34,15 @@ public partial class MainWindow : Window
             
             // Show tooltip with details
             vm.StatusText = $"{tile.Name} - {tile.SizeFormatted} ({tile.FullPath})";
+        }
+    }
+
+    private void SettingsOverlay_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        // Close settings when clicking outside the settings panel
+        if (DataContext is MainViewModel vm && e.OriginalSource == sender)
+        {
+            vm.IsSettingsOpen = false;
         }
     }
 }

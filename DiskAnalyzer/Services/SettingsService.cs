@@ -25,6 +25,34 @@ public enum AppTheme
 }
 
 /// <summary>
+/// Font size presets
+/// </summary>
+public enum FontSizePreset
+{
+    Small,      // 11px base
+    Medium,     // 13px base (default)
+    Large,      // 15px base
+    ExtraLarge  // 17px base
+}
+
+/// <summary>
+/// Treemap color scheme options
+/// </summary>
+public enum TreemapColorScheme
+{
+    /// <summary>High contrast blues, greens, oranges - easy to read</summary>
+    Vivid,
+    /// <summary>Softer pastel tones</summary>
+    Pastel,
+    /// <summary>Ocean-inspired blues and teals</summary>
+    Ocean,
+    /// <summary>Warm sunset colors - oranges, reds, yellows</summary>
+    Warm,
+    /// <summary>Cool mint/purple tones</summary>
+    Cool
+}
+
+/// <summary>
 /// Manages user settings with persistence to JSON file
 /// </summary>
 public sealed class SettingsService : ISettingsService
@@ -33,6 +61,8 @@ public sealed class SettingsService : ISettingsService
     private readonly string _scanCachePath;
     private readonly string _appDataPath;
     private UserSettings _settings;
+
+    public event EventHandler? SettingsChanged;
 
     public SettingsService()
     {
@@ -56,6 +86,63 @@ public sealed class SettingsService : ISettingsService
         {
             _settings.Theme = value;
             Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Font size preset
+    /// </summary>
+    public FontSizePreset FontSize
+    {
+        get => _settings.FontSize;
+        set
+        {
+            _settings.FontSize = value;
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Treemap color scheme
+    /// </summary>
+    public TreemapColorScheme TreemapColors
+    {
+        get => _settings.TreemapColors;
+        set
+        {
+            _settings.TreemapColors = value;
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Show file extensions in treemap labels
+    /// </summary>
+    public bool ShowExtensionsInTreemap
+    {
+        get => _settings.ShowExtensionsInTreemap;
+        set
+        {
+            _settings.ShowExtensionsInTreemap = value;
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Treemap max depth (1-5)
+    /// </summary>
+    public int TreemapMaxDepth
+    {
+        get => _settings.TreemapMaxDepth;
+        set
+        {
+            _settings.TreemapMaxDepth = Math.Clamp(value, 1, 5);
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -68,6 +155,18 @@ public sealed class SettingsService : ISettingsService
             Save();
         }
     }
+
+    /// <summary>
+    /// Get the base font size in pixels for the current preset
+    /// </summary>
+    public double GetBaseFontSize() => FontSize switch
+    {
+        FontSizePreset.Small => 11,
+        FontSizePreset.Medium => 13,
+        FontSizePreset.Large => 15,
+        FontSizePreset.ExtraLarge => 17,
+        _ => 13
+    };
 
     private UserSettings Load()
     {
@@ -159,13 +258,58 @@ public sealed class SettingsService : ISettingsService
                     PotentialSavings = s.PotentialSavings,
                     SavingsFormatted = s.SavingsFormatted,
                     RiskLevel = s.RiskLevel.ToString()
-                }).ToList()
+                }).ToList(),
+                // Cache developer tools from scan results
+                DevTools = result.DevTools.Take(100).Select(d => new CachedDevToolItem
+                {
+                    Name = d.Name,
+                    Path = d.Path,
+                    SizeBytes = d.SizeBytes,
+                    Category = d.Category,
+                    Recommendation = d.Recommendation,
+                    Risk = d.Risk.ToString()
+                }).ToList(),
+                // Cache tree for treemap (limited depth)
+                RootTree = result.RootItem != null ? CacheTreeNode(result.RootItem, 0, 4) : null
             };
 
             var json = JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_scanCachePath, json);
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Recursively cache tree nodes up to maxDepth
+    /// </summary>
+    private CachedTreeNode? CacheTreeNode(FileSystemItem item, int depth, int maxDepth)
+    {
+        if (depth > maxDepth) return null;
+        
+        var node = new CachedTreeNode
+        {
+            Name = item.Name,
+            FullPath = item.FullPath,
+            Size = item.Size,
+            IsFolder = item.IsFolder,
+            Category = item.Category.ToString()
+        };
+
+        if (item.IsFolder && depth < maxDepth)
+        {
+            // Only cache children sorted by size (top 50 per level to limit size)
+            var topChildren = item.Children
+                .OrderByDescending(c => c.Size)
+                .Take(50)
+                .Select(c => CacheTreeNode(c, depth + 1, maxDepth))
+                .Where(c => c != null)
+                .Cast<CachedTreeNode>()
+                .ToList();
+            
+            node.Children = topChildren;
+        }
+
+        return node;
     }
 
     /// <summary>
@@ -208,11 +352,17 @@ public sealed class SettingsService : ISettingsService
 public interface ISettingsService
 {
     AppTheme Theme { get; set; }
+    FontSizePreset FontSize { get; set; }
+    TreemapColorScheme TreemapColors { get; set; }
+    bool ShowExtensionsInTreemap { get; set; }
+    int TreemapMaxDepth { get; set; }
     string? LastScanPath { get; set; }
+    double GetBaseFontSize();
     void SaveScanCache(ScanResult result);
     ScanCache? LoadScanCache();
     bool HasCachedScan { get; }
     void ClearScanCache();
+    event EventHandler? SettingsChanged;
 }
 
 public class UserSettings
@@ -221,7 +371,29 @@ public class UserSettings
     /// Current application theme (default: Tech/Blade Runner style)
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public AppTheme Theme { get; set; } = AppTheme.Tech;
+    public AppTheme Theme { get; set; } = AppTheme.Default;
+    
+    /// <summary>
+    /// Font size preset
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public FontSizePreset FontSize { get; set; } = FontSizePreset.Medium;
+    
+    /// <summary>
+    /// Treemap color scheme
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public TreemapColorScheme TreemapColors { get; set; } = TreemapColorScheme.Vivid;
+    
+    /// <summary>
+    /// Show file extensions in treemap
+    /// </summary>
+    public bool ShowExtensionsInTreemap { get; set; } = true;
+    
+    /// <summary>
+    /// Treemap depth (1-5)
+    /// </summary>
+    public int TreemapMaxDepth { get; set; } = 3;
     
     /// <summary>
     /// Last scanned path for quick restore

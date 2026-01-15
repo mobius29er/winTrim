@@ -30,6 +30,11 @@ public class ScanResult
     public Dictionary<ItemCategory, CategoryStats> CategoryBreakdown { get; set; } = new();
     public List<CleanupSuggestion> CleanupSuggestions { get; set; } = new();
     
+    /// <summary>
+    /// Developer tool caches and cleanable items (npm, NuGet, pip, etc.)
+    /// </summary>
+    public List<CleanupItem> DevTools { get; set; } = new();
+    
     public FileSystemItem? RootItem { get; set; }
 }
 

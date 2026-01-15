@@ -106,7 +106,19 @@ public partial class MainViewModel : ObservableObject
     private string _statusText = "Select a drive or folder to begin scanning";
 
     [ObservableProperty]
-    private AppTheme _selectedTheme = AppTheme.Tech;
+    private AppTheme _selectedTheme = AppTheme.Default;
+
+    [ObservableProperty]
+    private FontSizePreset _selectedFontSize = FontSizePreset.Medium;
+
+    [ObservableProperty]
+    private TreemapColorScheme _selectedTreemapColors = TreemapColorScheme.Vivid;
+
+    [ObservableProperty]
+    private int _treemapMaxDepth = 3;
+
+    [ObservableProperty]
+    private bool _isSettingsOpen;
 
     [ObservableProperty]
     private bool _canExport;
@@ -159,9 +171,14 @@ public partial class MainViewModel : ObservableObject
         _cleanupAdvisor = new CleanupAdvisor();
         _fileScanner = new FileScanner(_gameDetector, _cleanupAdvisor, _categoryClassifier);
 
-        // Load theme from settings
+        // Load settings
         SelectedTheme = _settingsService.Theme;
+        SelectedFontSize = _settingsService.FontSize;
+        SelectedTreemapColors = _settingsService.TreemapColors;
+        TreemapMaxDepth = _settingsService.TreemapMaxDepth;
+        
         ApplyTheme();
+        ApplyFontSize();
 
         // Load available drives
         LoadDrives();
@@ -169,6 +186,42 @@ public partial class MainViewModel : ObservableObject
         // Check for cached scan from previous session
         CheckForCachedScan();
     }
+
+    // Settings change handlers
+    partial void OnSelectedFontSizeChanged(FontSizePreset value)
+    {
+        _settingsService.FontSize = value;
+        ApplyFontSize();
+    }
+
+    partial void OnSelectedTreemapColorsChanged(TreemapColorScheme value)
+    {
+        _settingsService.TreemapColors = value;
+    }
+
+    partial void OnTreemapMaxDepthChanged(int value)
+    {
+        _settingsService.TreemapMaxDepth = value;
+    }
+
+    private void ApplyFontSize()
+    {
+        var baseFontSize = _settingsService.GetBaseFontSize();
+        Application.Current.Resources["BaseFontSize"] = baseFontSize;
+        Application.Current.Resources["SmallFontSize"] = baseFontSize - 2;
+        Application.Current.Resources["LargeFontSize"] = baseFontSize + 2;
+        Application.Current.Resources["HeaderFontSize"] = baseFontSize + 6;
+        Application.Current.Resources["TitleFontSize"] = baseFontSize + 4;
+    }
+
+    [RelayCommand]
+    private void ToggleSettings()
+    {
+        IsSettingsOpen = !IsSettingsOpen;
+    }
+
+    public FontSizePreset[] AvailableFontSizes { get; } = Enum.GetValues<FontSizePreset>();
+    public TreemapColorScheme[] AvailableTreemapColors { get; } = Enum.GetValues<TreemapColorScheme>();
 
     private void CheckForCachedScan()
     {
@@ -257,8 +310,38 @@ public partial class MainViewModel : ObservableObject
             });
         }
 
-        // Scan for dev tools (always fresh, not cached)
-        _ = UpdateDevToolItemsAsync();
+        // Restore developer tools from cache
+        DevToolItems.Clear();
+        foreach (var d in cache.DevTools)
+        {
+            DevToolItems.Add(new CleanupItem
+            {
+                Name = d.Name,
+                Path = d.Path,
+                SizeBytes = d.SizeBytes,
+                Category = d.Category,
+                Recommendation = d.Recommendation,
+                Risk = Enum.TryParse<CleanupRisk>(d.Risk, out var devRisk) ? devRisk : CleanupRisk.Medium
+            });
+        }
+
+        // Restore RootItem for treemap from cached tree
+        if (cache.RootTree != null)
+        {
+            var rootItem = RestoreTreeNode(cache.RootTree);
+            // Create a minimal ScanResult for treemap binding
+            ScanResult = new ScanResult
+            {
+                RootPath = cache.RootPath,
+                RootItem = rootItem,
+                TotalSize = cache.TotalSize,
+                TotalFiles = cache.TotalFiles,
+                TotalFolders = cache.TotalFolders
+            };
+            
+            RootItems.Clear();
+            RootItems.Add(rootItem);
+        }
 
         // Update quick clean availability
         UpdateQuickCleanStatus();
@@ -270,6 +353,30 @@ public partial class MainViewModel : ObservableObject
         HasCachedScan = false;
         CanExport = true;
         StatusText = $"Restored scan from {cache.ScanDate:g} • {cache.TotalFiles:N0} files, {cache.TotalSizeFormatted}";
+    }
+
+    /// <summary>
+    /// Restore a FileSystemItem tree from cached tree node
+    /// </summary>
+    private FileSystemItem RestoreTreeNode(CachedTreeNode node)
+    {
+        var item = new FileSystemItem
+        {
+            Name = node.Name,
+            FullPath = node.FullPath,
+            Size = node.Size,
+            IsFolder = node.IsFolder,
+            Category = Enum.TryParse<ItemCategory>(node.Category, out var cat) ? cat : ItemCategory.Other
+        };
+
+        foreach (var child in node.Children)
+        {
+            var childItem = RestoreTreeNode(child);
+            childItem.Parent = item;
+            item.Children.Add(childItem);
+        }
+
+        return item;
     }
 
     private void UpdateChartsFromCache(ScanCache cache)
@@ -406,9 +513,6 @@ public partial class MainViewModel : ObservableObject
         ScanProgress.Reset();
         _cancellationTokenSource = new CancellationTokenSource();
 
-        // Start DevTool scanning in parallel with main scan for unified experience
-        var devToolTask = UpdateDevToolItemsAsync();
-
         try
         {
             StatusText = "Scanning...";
@@ -424,9 +528,6 @@ public partial class MainViewModel : ObservableObject
             });
 
             ScanResult = await _fileScanner.ScanAsync(SelectedPath, progress, _cancellationTokenSource.Token);
-
-            // Wait for DevTool scan to complete before updating UI
-            await devToolTask;
 
             // Update UI with results (works for both complete and partial results)
             UpdateResults();
@@ -770,7 +871,12 @@ public partial class MainViewModel : ObservableObject
             Games.Add(game);
         }
 
-        // DevTool items are already populated from parallel scan - no need to scan again
+        // Update developer tools from scan results
+        DevToolItems.Clear();
+        foreach (var devTool in ScanResult.DevTools)
+        {
+            DevToolItems.Add(devTool);
+        }
 
         // Update cleanup suggestions
         CleanupSuggestions.Clear();
@@ -1104,31 +1210,6 @@ public partial class MainViewModel : ObservableObject
     public void UpdateSelectedItemChildren()
     {
         ApplyFileExplorerFilters();
-    }
-
-    /// <summary>
-    /// Scans for developer tools and caches asynchronously
-    /// </summary>
-    private async Task UpdateDevToolItemsAsync()
-    {
-        try
-        {
-            var detector = new Services.DevToolDetector();
-            var items = await detector.ScanAllAsync();
-
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                DevToolItems.Clear();
-                foreach (var item in items.OrderByDescending(i => i.SizeBytes))
-                {
-                    DevToolItems.Add(item);
-                }
-            });
-        }
-        catch
-        {
-            // Dev tool scan is optional - don't show errors
-        }
     }
 
     [RelayCommand]

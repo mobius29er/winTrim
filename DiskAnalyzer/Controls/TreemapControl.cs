@@ -35,7 +35,11 @@ public class TreemapControl : SKElement
 
     public static readonly DependencyProperty SelectedThemeProperty =
         DependencyProperty.Register(nameof(SelectedTheme), typeof(AppTheme), typeof(TreemapControl),
-            new PropertyMetadata(AppTheme.Tech, OnThemeChanged));
+            new PropertyMetadata(AppTheme.Default, OnThemeChanged));
+
+    public static readonly DependencyProperty ColorSchemeProperty =
+        DependencyProperty.Register(nameof(ColorScheme), typeof(TreemapColorScheme), typeof(TreemapControl),
+            new PropertyMetadata(TreemapColorScheme.Vivid, OnColorSchemeChanged));
 
     public FileSystemItem? SourceItem
     {
@@ -47,6 +51,12 @@ public class TreemapControl : SKElement
     {
         get => (int)GetValue(MaxDepthProperty);
         set => SetValue(MaxDepthProperty, value);
+    }
+
+    public TreemapColorScheme ColorScheme
+    {
+        get => (TreemapColorScheme)GetValue(ColorSchemeProperty);
+        set => SetValue(ColorSchemeProperty, value);
     }
 
     public AppTheme SelectedTheme
@@ -166,6 +176,15 @@ public class TreemapControl : SKElement
         }
     }
 
+    private static void OnColorSchemeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is TreemapControl control)
+        {
+            control._layoutService.SetColorScheme((TreemapColorScheme)e.NewValue);
+            control.RebuildTreemap();
+        }
+    }
+
     public void RebuildTreemap()
     {
         if (SourceItem == null || ActualWidth <= 0 || ActualHeight <= 0)
@@ -177,6 +196,7 @@ public class TreemapControl : SKElement
             return;
         }
 
+        _layoutService.SetColorScheme(ColorScheme);
         _rootTile = _layoutService.BuildTreemap(SourceItem, (float)ActualWidth, (float)ActualHeight, MaxDepth);
         _currentRoot = _rootTile;
         _navigationHistory.Clear();

@@ -15,34 +15,150 @@ namespace DiskAnalyzer.Services;
 /// </summary>
 public sealed class TreemapLayoutService : ITreemapLayoutService
 {
-    // Color palette for different depths and categories
-    private static readonly SKColor[] DepthColors = new[]
+    private TreemapColorScheme _colorScheme = TreemapColorScheme.Vivid;
+
+    // Color palettes for different schemes - designed for high contrast and readability
+    private static readonly Dictionary<TreemapColorScheme, SKColor[]> DepthColorSchemes = new()
     {
-        SKColor.Parse("#3B82F6"), // Blue
-        SKColor.Parse("#10B981"), // Green
-        SKColor.Parse("#F59E0B"), // Amber
-        SKColor.Parse("#EF4444"), // Red
-        SKColor.Parse("#8B5CF6"), // Purple
-        SKColor.Parse("#EC4899"), // Pink
-        SKColor.Parse("#06B6D4"), // Cyan
-        SKColor.Parse("#84CC16"), // Lime
-        SKColor.Parse("#F97316"), // Orange
-        SKColor.Parse("#6366F1"), // Indigo
+        [TreemapColorScheme.Vivid] = new[]
+        {
+            SKColor.Parse("#2563EB"), // Strong Blue
+            SKColor.Parse("#059669"), // Emerald Green
+            SKColor.Parse("#D97706"), // Amber
+            SKColor.Parse("#7C3AED"), // Violet
+            SKColor.Parse("#0891B2"), // Cyan
+            SKColor.Parse("#4F46E5"), // Indigo
+            SKColor.Parse("#0D9488"), // Teal
+            SKColor.Parse("#9333EA"), // Purple
+            SKColor.Parse("#0284C7"), // Light Blue
+            SKColor.Parse("#65A30D"), // Lime
+        },
+        [TreemapColorScheme.Pastel] = new[]
+        {
+            SKColor.Parse("#93C5FD"), // Light Blue
+            SKColor.Parse("#86EFAC"), // Light Green
+            SKColor.Parse("#FCD34D"), // Light Yellow
+            SKColor.Parse("#C4B5FD"), // Light Purple
+            SKColor.Parse("#A5F3FC"), // Light Cyan
+            SKColor.Parse("#FBCFE8"), // Light Pink
+            SKColor.Parse("#FED7AA"), // Light Orange
+            SKColor.Parse("#D9F99D"), // Light Lime
+            SKColor.Parse("#E9D5FF"), // Light Violet
+            SKColor.Parse("#99F6E4"), // Light Teal
+        },
+        [TreemapColorScheme.Ocean] = new[]
+        {
+            SKColor.Parse("#0077B6"), // Ocean Blue
+            SKColor.Parse("#0096C7"), // Sky Blue
+            SKColor.Parse("#00B4D8"), // Bright Cyan
+            SKColor.Parse("#48CAE4"), // Light Cyan
+            SKColor.Parse("#90E0EF"), // Pale Cyan
+            SKColor.Parse("#023E8A"), // Deep Blue
+            SKColor.Parse("#0369A1"), // Steel Blue
+            SKColor.Parse("#0EA5E9"), // Vivid Blue
+            SKColor.Parse("#06B6D4"), // Teal
+            SKColor.Parse("#14B8A6"), // Teal Green
+        },
+        [TreemapColorScheme.Warm] = new[]
+        {
+            SKColor.Parse("#EA580C"), // Orange
+            SKColor.Parse("#DC2626"), // Red
+            SKColor.Parse("#D97706"), // Amber
+            SKColor.Parse("#CA8A04"), // Yellow
+            SKColor.Parse("#F59E0B"), // Light Amber
+            SKColor.Parse("#B45309"), // Dark Orange
+            SKColor.Parse("#C2410C"), // Deep Orange
+            SKColor.Parse("#EF4444"), // Bright Red
+            SKColor.Parse("#FBBF24"), // Gold
+            SKColor.Parse("#F97316"), // Tangerine
+        },
+        [TreemapColorScheme.Cool] = new[]
+        {
+            SKColor.Parse("#7C3AED"), // Violet
+            SKColor.Parse("#8B5CF6"), // Purple
+            SKColor.Parse("#6366F1"), // Indigo
+            SKColor.Parse("#0EA5E9"), // Sky Blue
+            SKColor.Parse("#14B8A6"), // Teal
+            SKColor.Parse("#A855F7"), // Light Purple
+            SKColor.Parse("#818CF8"), // Light Indigo
+            SKColor.Parse("#22D3EE"), // Cyan
+            SKColor.Parse("#2DD4BF"), // Light Teal
+            SKColor.Parse("#C084FC"), // Light Violet
+        }
     };
 
-    private static readonly Dictionary<ItemCategory, SKColor> CategoryColors = new()
+    private static readonly Dictionary<TreemapColorScheme, Dictionary<ItemCategory, SKColor>> CategoryColorSchemes = new()
     {
-        { ItemCategory.Document, SKColor.Parse("#3B82F6") },
-        { ItemCategory.Image, SKColor.Parse("#EC4899") },
-        { ItemCategory.Video, SKColor.Parse("#EF4444") },
-        { ItemCategory.Audio, SKColor.Parse("#F59E0B") },
-        { ItemCategory.Archive, SKColor.Parse("#6366F1") },
-        { ItemCategory.Code, SKColor.Parse("#10B981") },
-        { ItemCategory.Executable, SKColor.Parse("#8B5CF6") },
-        { ItemCategory.Game, SKColor.Parse("#F97316") },
-        { ItemCategory.System, SKColor.Parse("#64748B") },
-        { ItemCategory.Temporary, SKColor.Parse("#94A3B8") },
-        { ItemCategory.Other, SKColor.Parse("#CBD5E1") },
+        [TreemapColorScheme.Vivid] = new()
+        {
+            { ItemCategory.Document, SKColor.Parse("#2563EB") },   // Blue
+            { ItemCategory.Image, SKColor.Parse("#DB2777") },      // Pink
+            { ItemCategory.Video, SKColor.Parse("#DC2626") },      // Red
+            { ItemCategory.Audio, SKColor.Parse("#D97706") },      // Amber
+            { ItemCategory.Archive, SKColor.Parse("#7C3AED") },    // Violet
+            { ItemCategory.Code, SKColor.Parse("#059669") },       // Green
+            { ItemCategory.Executable, SKColor.Parse("#6366F1") }, // Indigo
+            { ItemCategory.Game, SKColor.Parse("#EA580C") },       // Orange
+            { ItemCategory.System, SKColor.Parse("#475569") },     // Slate
+            { ItemCategory.Temporary, SKColor.Parse("#64748B") },  // Gray
+            { ItemCategory.Other, SKColor.Parse("#78716C") },      // Stone
+        },
+        [TreemapColorScheme.Pastel] = new()
+        {
+            { ItemCategory.Document, SKColor.Parse("#93C5FD") },
+            { ItemCategory.Image, SKColor.Parse("#F9A8D4") },
+            { ItemCategory.Video, SKColor.Parse("#FCA5A5") },
+            { ItemCategory.Audio, SKColor.Parse("#FCD34D") },
+            { ItemCategory.Archive, SKColor.Parse("#C4B5FD") },
+            { ItemCategory.Code, SKColor.Parse("#86EFAC") },
+            { ItemCategory.Executable, SKColor.Parse("#A5B4FC") },
+            { ItemCategory.Game, SKColor.Parse("#FDBA74") },
+            { ItemCategory.System, SKColor.Parse("#94A3B8") },
+            { ItemCategory.Temporary, SKColor.Parse("#CBD5E1") },
+            { ItemCategory.Other, SKColor.Parse("#D6D3D1") },
+        },
+        [TreemapColorScheme.Ocean] = new()
+        {
+            { ItemCategory.Document, SKColor.Parse("#0077B6") },
+            { ItemCategory.Image, SKColor.Parse("#48CAE4") },
+            { ItemCategory.Video, SKColor.Parse("#023E8A") },
+            { ItemCategory.Audio, SKColor.Parse("#00B4D8") },
+            { ItemCategory.Archive, SKColor.Parse("#0096C7") },
+            { ItemCategory.Code, SKColor.Parse("#14B8A6") },
+            { ItemCategory.Executable, SKColor.Parse("#0369A1") },
+            { ItemCategory.Game, SKColor.Parse("#06B6D4") },
+            { ItemCategory.System, SKColor.Parse("#334155") },
+            { ItemCategory.Temporary, SKColor.Parse("#64748B") },
+            { ItemCategory.Other, SKColor.Parse("#475569") },
+        },
+        [TreemapColorScheme.Warm] = new()
+        {
+            { ItemCategory.Document, SKColor.Parse("#D97706") },
+            { ItemCategory.Image, SKColor.Parse("#F59E0B") },
+            { ItemCategory.Video, SKColor.Parse("#DC2626") },
+            { ItemCategory.Audio, SKColor.Parse("#FBBF24") },
+            { ItemCategory.Archive, SKColor.Parse("#B45309") },
+            { ItemCategory.Code, SKColor.Parse("#CA8A04") },
+            { ItemCategory.Executable, SKColor.Parse("#EA580C") },
+            { ItemCategory.Game, SKColor.Parse("#EF4444") },
+            { ItemCategory.System, SKColor.Parse("#78716C") },
+            { ItemCategory.Temporary, SKColor.Parse("#A8A29E") },
+            { ItemCategory.Other, SKColor.Parse("#D6D3D1") },
+        },
+        [TreemapColorScheme.Cool] = new()
+        {
+            { ItemCategory.Document, SKColor.Parse("#6366F1") },
+            { ItemCategory.Image, SKColor.Parse("#A855F7") },
+            { ItemCategory.Video, SKColor.Parse("#7C3AED") },
+            { ItemCategory.Audio, SKColor.Parse("#22D3EE") },
+            { ItemCategory.Archive, SKColor.Parse("#8B5CF6") },
+            { ItemCategory.Code, SKColor.Parse("#14B8A6") },
+            { ItemCategory.Executable, SKColor.Parse("#818CF8") },
+            { ItemCategory.Game, SKColor.Parse("#C084FC") },
+            { ItemCategory.System, SKColor.Parse("#475569") },
+            { ItemCategory.Temporary, SKColor.Parse("#64748B") },
+            { ItemCategory.Other, SKColor.Parse("#78716C") },
+        }
     };
 
     /// <summary>
@@ -54,8 +170,15 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
         public double Area { get; set; }  // Calculated pixel area (NOT file size)
     }
 
+    public void SetColorScheme(TreemapColorScheme scheme)
+    {
+        _colorScheme = scheme;
+    }
+
     public TreemapTile BuildTreemap(FileSystemItem root, float width, float height, int maxDepth = 3)
     {
+        var depthColors = DepthColorSchemes[_colorScheme];
+        
         var rootTile = new TreemapTile
         {
             Name = root.Name,
@@ -65,7 +188,7 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
             IsFolder = root.IsFolder,
             Depth = 0,
             Bounds = new SKRect(0, 0, width, height),
-            Color = DepthColors[0],
+            Color = depthColors[0],
             SourceItem = root
         };
 
@@ -117,8 +240,8 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
             Area = (t.Size / totalSize) * totalArea  // Area for layout, Size stays intact
         }).ToList();
 
-        // Apply squarified layout algorithm
-        SquarifyRecursive(elements, new List<LayoutElement>(), layoutBounds, Math.Min(layoutBounds.Width, layoutBounds.Height));
+        // Apply squarified layout algorithm (iterative to avoid stack overflow)
+        Squarify(elements, layoutBounds);
 
         // Recursively layout grandchildren for folders
         foreach (var childTile in childTiles.Where(t => t.IsFolder && t.SourceItem != null))
@@ -144,45 +267,71 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
         }
     }
 
-    private void SquarifyRecursive(List<LayoutElement> remaining, List<LayoutElement> row, SKRect bounds, double shortestSide)
+    /// <summary>
+    /// Iterative squarify algorithm - avoids stack overflow on large datasets
+    /// </summary>
+    private void Squarify(List<LayoutElement> elements, SKRect bounds)
     {
-        if (!remaining.Any())
-        {
-            LayoutRow(row, bounds, shortestSide);
+        if (!elements.Any() || bounds.Width <= 0 || bounds.Height <= 0)
             return;
-        }
 
-        var next = remaining[0];
-        var rowWithNext = new List<LayoutElement>(row) { next };
+        var remaining = new List<LayoutElement>(elements);
+        var currentBounds = bounds;
 
-        if (row.Count == 0 || WorstRatio(row, shortestSide) >= WorstRatio(rowWithNext, shortestSide))
+        while (remaining.Count > 0)
         {
-            // Add to current row - improves or maintains aspect ratio
-            remaining.RemoveAt(0);
-            SquarifyRecursive(remaining, rowWithNext, bounds, shortestSide);
-        }
-        else
-        {
-            // Row is complete - layout and start new row with remaining bounds
-            var newBounds = LayoutRow(row, bounds, shortestSide);
-            SquarifyRecursive(remaining, new List<LayoutElement>(), newBounds, Math.Min(newBounds.Width, newBounds.Height));
+            double shortestSide = Math.Min(currentBounds.Width, currentBounds.Height);
+            if (shortestSide <= 0) break;
+
+            var row = new List<LayoutElement>();
+            
+            // Build up the current row
+            while (remaining.Count > 0)
+            {
+                var next = remaining[0];
+                var rowWithNext = new List<LayoutElement>(row) { next };
+
+                if (row.Count == 0 || WorstRatio(row, shortestSide) >= WorstRatio(rowWithNext, shortestSide))
+                {
+                    // Add to current row - improves or maintains aspect ratio
+                    row.Add(next);
+                    remaining.RemoveAt(0);
+                }
+                else
+                {
+                    // Row is complete, break to layout it
+                    break;
+                }
+            }
+
+            // Layout the completed row and get remaining bounds
+            if (row.Count > 0)
+            {
+                currentBounds = LayoutRow(row, currentBounds, shortestSide);
+            }
         }
     }
 
     private SKRect LayoutRow(List<LayoutElement> row, SKRect bounds, double shortestSide)
     {
-        if (!row.Any())
+        if (!row.Any() || shortestSide <= 0)
             return bounds;
 
         double totalArea = row.Sum(e => e.Area);
+        if (totalArea <= 0)
+            return bounds;
+            
         double rowThickness = totalArea / shortestSide;  // Width of the strip we're laying out
+        if (rowThickness <= 0)
+            return bounds;
 
         bool layoutVertically = bounds.Width >= bounds.Height;  // Stack items in the shorter dimension
         double offset = 0;
 
         foreach (var element in row)
         {
-            double itemLength = element.Area / rowThickness;
+            double itemLength = rowThickness > 0 ? element.Area / rowThickness : 0;
+            if (itemLength <= 0) continue;
 
             if (layoutVertically)
             {
@@ -238,18 +387,22 @@ public sealed class TreemapLayoutService : ITreemapLayoutService
 
     private SKColor GetColorForItem(FileSystemItem item, int depth)
     {
+        var categoryColors = CategoryColorSchemes[_colorScheme];
+        var depthColors = DepthColorSchemes[_colorScheme];
+        
         if (!item.IsFolder)
         {
             // Use category color for files
-            return CategoryColors.GetValueOrDefault(item.Category, CategoryColors[ItemCategory.Other]);
+            return categoryColors.GetValueOrDefault(item.Category, categoryColors[ItemCategory.Other]);
         }
 
         // Use depth-based color for folders
-        return DepthColors[depth % DepthColors.Length];
+        return depthColors[depth % depthColors.Length];
     }
 }
 
 public interface ITreemapLayoutService
 {
     TreemapTile BuildTreemap(FileSystemItem root, float width, float height, int maxDepth = 3);
+    void SetColorScheme(TreemapColorScheme scheme);
 }

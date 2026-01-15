@@ -124,6 +124,12 @@
                 
                 <!-- Scan Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Settings Button -->
+                    <Button Content="⚙" Command="{Binding ToggleSettingsCommand}"
+                            Style="{StaticResource OutlineButton}" 
+                            ToolTip="Settings" Padding="10,8" Margin="0,0,8,0"
+                            FontSize="16"/>
+                    
                     <!-- Theme Selector -->
                     <ComboBox ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding SelectedTheme}"
@@ -656,8 +662,9 @@
                         <Border Background="Transparent">
                             <ctrl:TreemapControl x:Name="TreemapView"
                                                  SourceItem="{Binding ScanResult.RootItem}"
-                                                 MaxDepth="5"
+                                                 MaxDepth="{Binding TreemapMaxDepth}"
                                                  SelectedTheme="{Binding SelectedTheme}"
+                                                 ColorScheme="{Binding SelectedTreemapColors}"
                                                  TileClicked="TreemapView_TileClicked"/>
                         </Border>
                     </Border>
@@ -875,6 +882,53 @@
                            HorizontalAlignment="Right" Foreground="{DynamicResource TextMutedBrush}"
                            Visibility="{Binding ScanResult, Converter={StaticResource BoolToVisibility}}"/>
             </Grid>
+        </Border>
+        
+        <!-- Settings Popup Overlay -->
+        <Border Grid.RowSpan="4" Background="#80000000" 
+                Visibility="{Binding IsSettingsOpen, Converter={StaticResource BoolToVisibility}}"
+                MouseLeftButtonDown="SettingsOverlay_MouseDown">
+            <Border Background="{DynamicResource SurfaceBrush}" 
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="24" Margin="0,80,0,0"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    MinWidth="320" MaxWidth="400">
+                <StackPanel>
+                    <TextBlock Text="⚙ Settings" FontSize="18" FontWeight="SemiBold" 
+                               Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,16"/>
+                    
+                    <!-- Font Size -->
+                    <TextBlock Text="Font Size" Foreground="{DynamicResource TextSecondaryBrush}" 
+                               Margin="0,0,0,4" FontSize="{DynamicResource BaseFontSize}"/>
+                    <ComboBox ItemsSource="{Binding AvailableFontSizes}"
+                              SelectedItem="{Binding SelectedFontSize}"
+                              Margin="0,0,0,16" MinWidth="200"/>
+                    
+                    <!-- Treemap Color Scheme -->
+                    <TextBlock Text="Treemap Color Scheme" Foreground="{DynamicResource TextSecondaryBrush}" 
+                               Margin="0,0,0,4" FontSize="{DynamicResource BaseFontSize}"/>
+                    <ComboBox ItemsSource="{Binding AvailableTreemapColors}"
+                              SelectedItem="{Binding SelectedTreemapColors}"
+                              Margin="0,0,0,16" MinWidth="200"/>
+                    
+                    <!-- Treemap Depth -->
+                    <TextBlock Text="Treemap Depth" Foreground="{DynamicResource TextSecondaryBrush}" 
+                               Margin="0,0,0,4" FontSize="{DynamicResource BaseFontSize}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Slider Minimum="1" Maximum="5" 
+                                Value="{Binding TreemapMaxDepth}" 
+                                Width="180" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding TreemapMaxDepth}" 
+                                   Foreground="{DynamicResource TextPrimaryBrush}" 
+                                   Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    
+                    <!-- Close Button -->
+                    <Button Content="Close" Command="{Binding ToggleSettingsCommand}"
+                            Style="{StaticResource OutlineButton}" 
+                            HorizontalAlignment="Right" Padding="16,8"/>
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </Window>

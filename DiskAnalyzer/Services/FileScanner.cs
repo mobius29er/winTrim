@@ -17,6 +17,7 @@ public sealed class FileScanner : IFileScanner
     private readonly IGameDetector _gameDetector;
     private readonly ICleanupAdvisor _cleanupAdvisor;
     private readonly ICategoryClassifier _categoryClassifier;
+    private readonly DevToolDetector _devToolDetector;
     
     // Thread-safe collections for parallel processing results
     private readonly ConcurrentBag<FileSystemItem> _largestFiles = new();
@@ -43,6 +44,7 @@ public sealed class FileScanner : IFileScanner
         _gameDetector = gameDetector;
         _cleanupAdvisor = cleanupAdvisor;
         _categoryClassifier = categoryClassifier;
+        _devToolDetector = new DevToolDetector();
     }
     
     /// <summary>
@@ -123,8 +125,14 @@ public sealed class FileScanner : IFileScanner
             // Detect games
             result.GameInstallations = await _gameDetector.DetectGamesAsync(path, cancellationToken);
 
+            // Scan for developer tools (parallel with cleanup suggestions)
+            var devToolTask = _devToolDetector.ScanAllAsync();
+
             // Get cleanup suggestions
             result.CleanupSuggestions = await _cleanupAdvisor.GetSuggestionsAsync(rootItem, cancellationToken);
+
+            // Wait for dev tools scan
+            result.DevTools = (await devToolTask).OrderByDescending(d => d.SizeBytes).ToList();
 
             // Category breakdown
             result.CategoryBreakdown = new Dictionary<ItemCategory, CategoryStats>(_categoryStats);

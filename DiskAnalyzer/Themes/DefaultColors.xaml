@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
     
     <!-- 
     ══════════════════════════════════════════════════════════════════════════════
@@ -123,5 +124,14 @@
         <GradientStop Color="#FF7B00" Offset="0"/>
         <GradientStop Color="#CC6200" Offset="1"/>
     </LinearGradientBrush>
+    
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FONT SIZES - Dynamic resources that can be updated at runtime -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <sys:Double x:Key="BaseFontSize">13</sys:Double>
+    <sys:Double x:Key="SmallFontSize">11</sys:Double>
+    <sys:Double x:Key="LargeFontSize">15</sys:Double>
+    <sys:Double x:Key="HeaderFontSize">19</sys:Double>
+    <sys:Double x:Key="TitleFontSize">17</sys:Double>
     
 </ResourceDictionary>
