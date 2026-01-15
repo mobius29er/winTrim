@@ -117,6 +117,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string? _cachedScanInfo;
 
+    [ObservableProperty]
+    private bool _hasQuickCleanItems;
+
+    [ObservableProperty]
+    private string? _quickCleanInfo;
+
     #endregion
 
     public MainViewModel()
@@ -226,6 +232,9 @@ public partial class MainViewModel : ObservableObject
                 RiskLevel = Enum.TryParse<CleanupRisk>(s.RiskLevel, out var risk) ? risk : CleanupRisk.Medium
             });
         }
+
+        // Update quick clean availability
+        UpdateQuickCleanStatus();
 
         // Update charts from cached data
         UpdateChartsFromCache(cache);
@@ -568,6 +577,95 @@ public partial class MainViewModel : ObservableObject
         IsRedAccent = !IsRedAccent;
     }
 
+    [RelayCommand]
+    private async Task QuickCleanAsync()
+    {
+        // Get safe/low risk cleanup suggestions
+        var safeItems = CleanupSuggestions.Where(s => s.RiskLevel <= CleanupRisk.Low).ToList();
+        
+        if (!safeItems.Any())
+        {
+            MessageBox.Show(
+                "No safe cleanup items available.\n\nAll suggested cleanups require manual review due to higher risk levels.",
+                "Quick Clean",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        // Calculate total potential savings
+        var totalSavings = safeItems.Sum(s => s.PotentialSavings);
+        var savingsFormatted = FormatBytes(totalSavings);
+
+        // Build confirmation message
+        var itemList = string.Join("\n", safeItems.Take(10).Select(s => $"  • {s.Description}"));
+        if (safeItems.Count > 10)
+        {
+            itemList += $"\n  ... and {safeItems.Count - 10} more items";
+        }
+
+        var message = $"Quick Clean will remove the following safe items:\n\n{itemList}\n\nEstimated space to recover: {savingsFormatted}\n\nProceed with cleanup?";
+
+        var result = MessageBox.Show(
+            message,
+            "Quick Clean - Confirm",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        // Execute cleanup
+        StatusText = "🧹 Cleaning up...";
+        
+        var cleanupService = new CleanupService();
+        var cleanupResult = await cleanupService.ExecuteCleanupAsync(safeItems, CleanupRisk.Low);
+
+        // Show results
+        var resultMessage = $"Cleanup complete!\n\n" +
+            $"Items cleaned: {cleanupResult.ItemsCleaned}\n" +
+            $"Space recovered: {cleanupResult.BytesRecoveredFormatted}";
+
+        if (cleanupResult.HasErrors)
+        {
+            resultMessage += $"\n\nSome items could not be cleaned:\n" +
+                string.Join("\n", cleanupResult.Errors.Take(5));
+        }
+
+        MessageBox.Show(resultMessage, "Quick Clean - Complete", MessageBoxButton.OK, 
+            cleanupResult.HasErrors ? MessageBoxImage.Warning : MessageBoxImage.Information);
+
+        // Remove cleaned items from the suggestions list
+        foreach (var cleaned in cleanupResult.CleanedItems)
+        {
+            var item = CleanupSuggestions.FirstOrDefault(s => s.Description == cleaned);
+            if (item != null)
+            {
+                CleanupSuggestions.Remove(item);
+            }
+        }
+
+        // Update quick clean availability
+        UpdateQuickCleanStatus();
+
+        StatusText = $"✅ Cleanup complete - recovered {cleanupResult.BytesRecoveredFormatted}";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int suffixIndex = 0;
+        double size = bytes;
+
+        while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+        {
+            size /= 1024;
+            suffixIndex++;
+        }
+
+        return $"{size:N2} {suffixes[suffixIndex]}";
+    }
+
     #endregion
 
     #region Private Methods
@@ -628,6 +726,9 @@ public partial class MainViewModel : ObservableObject
         {
             CleanupSuggestions.Add(suggestion);
         }
+
+        // Update quick clean availability
+        UpdateQuickCleanStatus();
 
         // Build category-to-files mapping
         BuildCategoryFilesMap();
@@ -787,6 +888,22 @@ public partial class MainViewModel : ObservableObject
                 .ToArray();
 
             TopFoldersSeries = folderData;
+        }
+    }
+
+    private void UpdateQuickCleanStatus()
+    {
+        var safeItems = CleanupSuggestions.Where(s => s.RiskLevel <= CleanupRisk.Low).ToList();
+        HasQuickCleanItems = safeItems.Any();
+        
+        if (HasQuickCleanItems)
+        {
+            var totalSavings = safeItems.Sum(s => s.PotentialSavings);
+            QuickCleanInfo = $"🧹 {safeItems.Count} items • {FormatBytes(totalSavings)}";
+        }
+        else
+        {
+            QuickCleanInfo = null;
         }
     }
 

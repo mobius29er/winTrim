@@ -377,7 +377,25 @@
                     <!-- Cleanup Suggestions -->
                     <Border Grid.Column="1" Grid.Row="1" Style="{StaticResource CardStyle}" Margin="8,8,0,0">
                         <StackPanel>
-                            <TextBlock Text="🧹 Cleanup Suggestions" Style="{StaticResource SectionHeader}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="🧹 Cleanup Suggestions" Style="{StaticResource SectionHeader}"/>
+                                <Button Grid.Column="1" 
+                                        Command="{Binding QuickCleanCommand}"
+                                        Visibility="{Binding HasQuickCleanItems, Converter={StaticResource BoolToVisibility}}"
+                                        Style="{StaticResource ModernButton}"
+                                        Background="#4CAF50"
+                                        Padding="12,6"
+                                        ToolTip="Clean all safe/low-risk items with one click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="⚡ Quick Clean" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding QuickCleanInfo}" Margin="8,0,0,0" Opacity="0.9"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
                             <DataGrid ItemsSource="{Binding CleanupSuggestions}" 
                                       Style="{StaticResource DataGridStyle}"
                                       MaxHeight="200">
