@@ -34,4 +34,12 @@ public partial class MainWindow : Window
             vm.StatusText = $"{tile.Name} - {tile.SizeFormatted} ({tile.FullPath})";
         }
     }
+
+    private void CleanupSuggestions_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && sender is DataGrid dg && dg.SelectedItem is CleanupSuggestion suggestion)
+        {
+            vm.ViewCleanupDetailsCommand.Execute(suggestion);
+        }
+    }
 }

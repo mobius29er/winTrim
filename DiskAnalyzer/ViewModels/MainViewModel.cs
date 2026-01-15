@@ -123,6 +123,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string? _quickCleanInfo;
 
+    [ObservableProperty]
+    private CleanupSuggestion? _selectedCleanupSuggestion;
+
+    [ObservableProperty]
+    private ObservableCollection<CleanupFileItem> _cleanupFiles = new();
+
     #endregion
 
     public MainViewModel()
@@ -932,5 +938,111 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    private void ViewCleanupDetails(CleanupSuggestion? suggestion)
+    {
+        if (suggestion == null) return;
+
+        SelectedCleanupSuggestion = suggestion;
+        CleanupFiles.Clear();
+
+        foreach (var filePath in suggestion.AffectedFiles.Take(100)) // Limit to 100 files
+        {
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.Exists)
+                {
+                    CleanupFiles.Add(new CleanupFileItem
+                    {
+                        Name = fileInfo.Name,
+                        FullPath = filePath,
+                        Size = fileInfo.Length,
+                        LastAccessed = fileInfo.LastAccessTime
+                    });
+                }
+                else if (Directory.Exists(filePath))
+                {
+                    var dirInfo = new DirectoryInfo(filePath);
+                    CleanupFiles.Add(new CleanupFileItem
+                    {
+                        Name = dirInfo.Name,
+                        FullPath = filePath,
+                        Size = 0,
+                        IsFolder = true,
+                        LastAccessed = dirInfo.LastAccessTime
+                    });
+                }
+            }
+            catch
+            {
+                // Skip files we can't access
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void OpenCleanupFile(CleanupFileItem? item)
+    {
+        if (item == null) return;
+
+        try
+        {
+            if (item.IsFolder)
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"\"{item.FullPath}\"");
+            }
+            else
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{item.FullPath}\"");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open location: {ex.Message}", "Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void CopyCleanupPath(CleanupFileItem? item)
+    {
+        if (item != null)
+        {
+            Clipboard.SetText(item.FullPath);
+        }
+    }
+
     #endregion
+}
+
+/// <summary>
+/// Represents a file in the cleanup details view
+/// </summary>
+public class CleanupFileItem
+{
+    public string Name { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty;
+    public long Size { get; set; }
+    public bool IsFolder { get; set; }
+    public DateTime LastAccessed { get; set; }
+
+    public string SizeFormatted
+    {
+        get
+        {
+            if (IsFolder) return "Folder";
+            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+            int suffixIndex = 0;
+            double size = Size;
+
+            while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+            {
+                size /= 1024;
+                suffixIndex++;
+            }
+
+            return $"{size:N2} {suffixes[suffixIndex]}";
+        }
+    }
 }

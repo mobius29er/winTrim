@@ -345,9 +345,9 @@
                                                         HorizontalContentAlignment="Stretch" Padding="4,2">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="📁" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource ForegroundBrush}" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{Binding SizeFormatted, StringFormat=' ({0})'}" 
-                                                                   Foreground="{DynamicResource SecondaryTextBrush}" 
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}" 
                                                                    VerticalAlignment="Center" Margin="4,0,0,0"/>
                                                     </StackPanel>
                                                 </Button>
@@ -410,8 +410,15 @@
                     
                     <!-- Cleanup Suggestions -->
                     <Border Grid.Column="1" Grid.Row="1" Style="{StaticResource CardStyle}" Margin="8,8,0,0">
-                        <StackPanel>
-                            <Grid>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Header -->
+                            <Grid Grid.Row="0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
@@ -431,9 +438,13 @@
                                     </StackPanel>
                                 </Button>
                             </Grid>
-                            <DataGrid ItemsSource="{Binding CleanupSuggestions}" 
+                            
+                            <!-- Suggestions List -->
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding CleanupSuggestions}" 
+                                      SelectedItem="{Binding SelectedCleanupSuggestion}"
                                       Style="{StaticResource DataGridStyle}"
-                                      MaxHeight="200">
+                                      MaxHeight="120"
+                                      SelectionChanged="CleanupSuggestions_SelectionChanged">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
                                     <DataGridTextColumn Header="Savings" Binding="{Binding SavingsFormatted}" Width="80"/>
@@ -448,7 +459,63 @@
                                     </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
-                        </StackPanel>
+                            
+                            <!-- Affected Files Details -->
+                            <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource BorderBrush}" 
+                                    Margin="0,8,0,0" Padding="0,8,0,0"
+                                    Visibility="{Binding SelectedCleanupSuggestion, Converter={StaticResource BoolToVisibility}}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="📄 Files in: " Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding SelectedCleanupSuggestion.Description}" 
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Medium"/>
+                                        <TextBlock Text="{Binding CleanupFiles.Count, StringFormat=' ({0} files)'}" 
+                                                   Foreground="{DynamicResource TextMutedBrush}"/>
+                                    </StackPanel>
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding CleanupFiles}" 
+                                              Style="{StaticResource DataGridStyle}"
+                                              MaxHeight="100">
+                                        <DataGrid.RowStyle>
+                                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                                <Setter Property="ContextMenu">
+                                                    <Setter.Value>
+                                                        <ContextMenu Background="{DynamicResource SurfaceBrush}" 
+                                                                     Foreground="{DynamicResource TextPrimaryBrush}">
+                                                            <MenuItem Header="📂 Open Location" 
+                                                                      Command="{Binding DataContext.OpenCleanupFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                      CommandParameter="{Binding}"/>
+                                                            <MenuItem Header="📋 Copy Path" 
+                                                                      Command="{Binding DataContext.CopyCleanupPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                      CommandParameter="{Binding}"/>
+                                                        </ContextMenu>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </DataGrid.RowStyle>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="70"/>
+                                            <DataGridTemplateColumn Header="" Width="35">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="📂" 
+                                                                Command="{Binding DataContext.OpenCleanupFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource OutlineButton}" 
+                                                                Padding="2" Cursor="Hand"
+                                                                ToolTip="Open file location"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </Border>
                 </Grid>
             </TabItem>
@@ -503,8 +570,8 @@
                                     <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding IsFolder, Converter={StaticResource BoolToVisibility}, ConverterParameter=📁}" 
-                                                       Margin="0,0,6,0"/>
-                                            <TextBlock Text="{Binding Name}" FontWeight="Medium"/>
+                                                       Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <TextBlock Text=" - " Foreground="{DynamicResource TextMutedBrush}"/>
                                             <TextBlock Text="{Binding SizeFormatted}" 
                                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
