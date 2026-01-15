@@ -1,8 +1,8 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     
-    <!-- Terminal Theme - Green Accent (Default Dark) -->
-    <!-- Pure black background with high-contrast green text -->
+    <!-- Terminal Green Theme - Classic Green on Black -->
+    <!-- Retro terminal aesthetic with high-contrast green text -->
     
     <!-- Main Colors - Green Terminal -->
     <Color x:Key="PrimaryColor">#00FF00</Color>

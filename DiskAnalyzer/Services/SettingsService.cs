@@ -2,17 +2,24 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DiskAnalyzer.Models;
 
 namespace DiskAnalyzer.Services;
 
 /// <summary>
-/// Theme accent color options for terminal theme
+/// Available application themes
 /// </summary>
-public enum ThemeAccent
+public enum AppTheme
 {
-    Green,
-    Red
+    /// <summary>Blade Runner 2049 inspired - Cyan/Pink neon on void black</summary>
+    Tech,
+    /// <summary>Professional Windows-style - Clean blues and grays</summary>
+    Enterprise,
+    /// <summary>Classic terminal - Green on black</summary>
+    TerminalGreen,
+    /// <summary>Alert terminal - Red on black</summary>
+    TerminalRed
 }
 
 /// <summary>
@@ -37,22 +44,15 @@ public sealed class SettingsService : ISettingsService
         _settings = Load();
     }
 
-    public bool IsDarkMode
+    /// <summary>
+    /// Current application theme
+    /// </summary>
+    public AppTheme Theme
     {
-        get => _settings.IsDarkMode;
+        get => _settings.Theme;
         set
         {
-            _settings.IsDarkMode = value;
-            Save();
-        }
-    }
-
-    public ThemeAccent Accent
-    {
-        get => _settings.Accent;
-        set
-        {
-            _settings.Accent = value;
+            _settings.Theme = value;
             Save();
         }
     }
@@ -205,8 +205,7 @@ public sealed class SettingsService : ISettingsService
 
 public interface ISettingsService
 {
-    bool IsDarkMode { get; set; }
-    ThemeAccent Accent { get; set; }
+    AppTheme Theme { get; set; }
     string? LastScanPath { get; set; }
     void SaveScanCache(ScanResult result);
     ScanCache? LoadScanCache();
@@ -216,7 +215,14 @@ public interface ISettingsService
 
 public class UserSettings
 {
-    public bool IsDarkMode { get; set; } = false;
-    public ThemeAccent Accent { get; set; } = ThemeAccent.Green;
+    /// <summary>
+    /// Current application theme (default: Tech/Blade Runner style)
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public AppTheme Theme { get; set; } = AppTheme.Tech;
+    
+    /// <summary>
+    /// Last scanned path for quick restore
+    /// </summary>
     public string? LastScanPath { get; set; }
 }

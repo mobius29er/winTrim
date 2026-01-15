@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -19,6 +20,9 @@ public class TreemapControl : SKElement
     private TreemapTile? _currentRoot;
     private TreemapTile? _hoveredTile;
     private readonly ITreemapLayoutService _layoutService;
+    
+    // Navigation history stack for drill-down/back functionality
+    private readonly Stack<FileSystemItem> _navigationHistory = new();
 
     // Dependency Properties
     public static readonly DependencyProperty SourceItemProperty =
@@ -29,9 +33,9 @@ public class TreemapControl : SKElement
         DependencyProperty.Register(nameof(MaxDepth), typeof(int), typeof(TreemapControl),
             new PropertyMetadata(3, OnSourceItemChanged));
 
-    public static readonly DependencyProperty IsDarkModeProperty =
-        DependencyProperty.Register(nameof(IsDarkMode), typeof(bool), typeof(TreemapControl),
-            new PropertyMetadata(false, OnThemeChanged));
+    public static readonly DependencyProperty SelectedThemeProperty =
+        DependencyProperty.Register(nameof(SelectedTheme), typeof(AppTheme), typeof(TreemapControl),
+            new PropertyMetadata(AppTheme.Tech, OnThemeChanged));
 
     public FileSystemItem? SourceItem
     {
@@ -45,17 +49,43 @@ public class TreemapControl : SKElement
         set => SetValue(MaxDepthProperty, value);
     }
 
-    public bool IsDarkMode
+    public AppTheme SelectedTheme
     {
-        get => (bool)GetValue(IsDarkModeProperty);
-        set => SetValue(IsDarkModeProperty, value);
+        get => (AppTheme)GetValue(SelectedThemeProperty);
+        set => SetValue(SelectedThemeProperty, value);
     }
 
-    // Theme colors
-    private SKColor BackgroundColor => IsDarkMode ? SKColors.Black : SKColors.White;
-    private SKColor BorderColor => IsDarkMode ? SKColor.Parse("#1A1A1A") : SKColors.White;
-    private SKColor TextColor => IsDarkMode ? SKColor.Parse("#00FF00") : SKColors.White;
-    private SKColor TextShadowColor => IsDarkMode ? SKColors.Black : SKColors.Black.WithAlpha(100);
+    // Theme colors - now based on SelectedTheme
+    private bool IsDarkTheme => SelectedTheme != AppTheme.Enterprise;
+    
+    private SKColor BackgroundColor => SelectedTheme switch
+    {
+        AppTheme.Tech => SKColor.Parse("#050505"),          // Void Black
+        AppTheme.Enterprise => SKColors.White,
+        AppTheme.TerminalGreen => SKColors.Black,
+        AppTheme.TerminalRed => SKColors.Black,
+        _ => SKColor.Parse("#050505")
+    };
+    
+    private SKColor BorderColor => SelectedTheme switch
+    {
+        AppTheme.Tech => SKColor.Parse("#1F2937"),          // Off-World Gray
+        AppTheme.Enterprise => SKColors.White,
+        AppTheme.TerminalGreen => SKColor.Parse("#1A1A1A"),
+        AppTheme.TerminalRed => SKColor.Parse("#1A1A1A"),
+        _ => SKColor.Parse("#1F2937")
+    };
+    
+    private SKColor TextColor => SelectedTheme switch
+    {
+        AppTheme.Tech => SKColor.Parse("#00F3FF"),          // K Teal
+        AppTheme.Enterprise => SKColors.White,
+        AppTheme.TerminalGreen => SKColor.Parse("#00FF00"),
+        AppTheme.TerminalRed => SKColor.Parse("#FF3333"),
+        _ => SKColor.Parse("#00F3FF")
+    };
+    
+    private SKColor TextShadowColor => IsDarkTheme ? SKColors.Black : SKColors.Black.WithAlpha(100);
 
     // Events
     public event EventHandler<TreemapTile>? TileClicked;
@@ -139,18 +169,26 @@ public class TreemapControl : SKElement
         {
             _rootTile = null;
             _currentRoot = null;
+            _navigationHistory.Clear();
             InvalidateVisual();
             return;
         }
 
         _rootTile = _layoutService.BuildTreemap(SourceItem, (float)ActualWidth, (float)ActualHeight, MaxDepth);
         _currentRoot = _rootTile;
+        _navigationHistory.Clear();
         InvalidateVisual();
     }
 
     public void NavigateToTile(TreemapTile tile)
     {
         if (tile.SourceItem == null || !tile.IsFolder) return;
+        
+        // Push current root to history before navigating
+        if (_currentRoot?.SourceItem != null)
+        {
+            _navigationHistory.Push(_currentRoot.SourceItem);
+        }
 
         _currentRoot = _layoutService.BuildTreemap(tile.SourceItem, (float)ActualWidth, (float)ActualHeight, MaxDepth);
         InvalidateVisual();
@@ -158,18 +196,32 @@ public class TreemapControl : SKElement
 
     public void NavigateUp()
     {
-        if (_currentRoot?.Parent != null)
+        if (_navigationHistory.Count > 0)
         {
-            _currentRoot = _currentRoot.Parent;
+            // Pop from history and rebuild
+            var previousItem = _navigationHistory.Pop();
+            _currentRoot = _layoutService.BuildTreemap(previousItem, (float)ActualWidth, (float)ActualHeight, MaxDepth);
             InvalidateVisual();
+            NavigateBack?.Invoke(this, EventArgs.Empty);
         }
-        else if (_rootTile != null)
+        else if (_rootTile != null && _currentRoot != _rootTile)
         {
+            // Go back to original root
             _currentRoot = _rootTile;
             InvalidateVisual();
+            NavigateBack?.Invoke(this, EventArgs.Empty);
         }
-        NavigateBack?.Invoke(this, EventArgs.Empty);
     }
+    
+    /// <summary>
+    /// Returns true if we can navigate back (have history or not at root)
+    /// </summary>
+    public bool CanNavigateUp => _navigationHistory.Count > 0 || (_currentRoot != _rootTile && _rootTile != null);
+    
+    /// <summary>
+    /// Get the current navigation depth
+    /// </summary>
+    public int NavigationDepth => _navigationHistory.Count;
 
     protected override void OnPaintSurface(SKPaintSurfaceEventArgs e)
     {
@@ -201,7 +253,7 @@ public class TreemapControl : SKElement
     {
         using var paint = new SKPaint
         {
-            Color = IsDarkMode ? SKColor.Parse("#00FF00") : SKColor.Parse("#64748B"),
+            Color = TextColor,
             TextSize = 16,
             IsAntialias = true,
             TextAlign = SKTextAlign.Center

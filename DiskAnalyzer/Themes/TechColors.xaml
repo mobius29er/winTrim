@@ -1,0 +1,56 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- Tech Theme - Blade Runner "Tech-Noir" Style -->
+    <!-- Inspired by: K Teal, Joi Pink, Wallace Amber on Void Black -->
+    <!-- Default theme: Futuristic, cyberpunk aesthetic -->
+    
+    <!-- Main Colors - K Teal Primary -->
+    <Color x:Key="PrimaryColor">#00F3FF</Color>
+    <Color x:Key="PrimaryDarkColor">#00C4CC</Color>
+    <Color x:Key="PrimaryLightColor">#66F8FF</Color>
+    
+    <!-- Joi Pink Secondary, Wallace Amber Accent -->
+    <Color x:Key="SecondaryColor">#FF00FF</Color>
+    <Color x:Key="AccentColor">#FF9900</Color>
+    <Color x:Key="DangerColor">#FF3366</Color>
+    <Color x:Key="WarningColor">#FF9900</Color>
+    
+    <!-- Void Black Background with Off-World Gray surfaces -->
+    <Color x:Key="BackgroundColor">#050505</Color>
+    <Color x:Key="SurfaceColor">#0D1117</Color>
+    <Color x:Key="BorderColor">#1F2937</Color>
+    
+    <!-- High Contrast Teal/White Text -->
+    <Color x:Key="TextPrimaryColor">#F0F6FC</Color>
+    <Color x:Key="TextSecondaryColor">#8B949E</Color>
+    <Color x:Key="TextMutedColor">#484F58</Color>
+    
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDarkColor}"/>
+    <SolidColorBrush x:Key="PrimaryLightBrush" Color="{StaticResource PrimaryLightColor}"/>
+    
+    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource SecondaryColor}"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+    
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
+    
+    <!-- Risk Level Colors - Cyberpunk Style -->
+    <SolidColorBrush x:Key="RiskSafeBrush" Color="#00F3FF"/>
+    <SolidColorBrush x:Key="RiskLowBrush" Color="#00CC88"/>
+    <SolidColorBrush x:Key="RiskMediumBrush" Color="#FF9900"/>
+    <SolidColorBrush x:Key="RiskHighBrush" Color="#FF3366"/>
+    
+    <!-- Button Text - Dark for contrast on bright cyber colors -->
+    <SolidColorBrush x:Key="ButtonTextBrush" Color="#050505"/>
+    
+</ResourceDictionary>

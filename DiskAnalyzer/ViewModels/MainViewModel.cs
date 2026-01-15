@@ -106,10 +106,7 @@ public partial class MainViewModel : ObservableObject
     private string _statusText = "Select a drive or folder to begin scanning";
 
     [ObservableProperty]
-    private bool _isDarkMode;
-
-    [ObservableProperty]
-    private bool _isRedAccent;
+    private AppTheme _selectedTheme = AppTheme.Tech;
 
     [ObservableProperty]
     private bool _canExport;
@@ -162,9 +159,9 @@ public partial class MainViewModel : ObservableObject
         _cleanupAdvisor = new CleanupAdvisor();
         _fileScanner = new FileScanner(_gameDetector, _cleanupAdvisor, _categoryClassifier);
 
-        // Load settings
-        IsDarkMode = _settingsService.IsDarkMode;
-        IsRedAccent = _settingsService.Accent == ThemeAccent.Red;
+        // Load theme from settings
+        SelectedTheme = _settingsService.Theme;
+        ApplyTheme();
 
         // Load available drives
         LoadDrives();
@@ -313,15 +310,9 @@ public partial class MainViewModel : ObservableObject
         TopFoldersSeries = folderData;
     }
 
-    partial void OnIsDarkModeChanged(bool value)
+    partial void OnSelectedThemeChanged(AppTheme value)
     {
-        _settingsService.IsDarkMode = value;
-        ApplyTheme();
-    }
-
-    partial void OnIsRedAccentChanged(bool value)
-    {
-        _settingsService.Accent = value ? ThemeAccent.Red : ThemeAccent.Green;
+        _settingsService.Theme = value;
         ApplyTheme();
     }
 
@@ -339,16 +330,15 @@ public partial class MainViewModel : ObservableObject
             if (existingColors != null)
                 resources.Remove(existingColors);
 
-            // Determine theme file based on dark mode and accent
-            string themeFile;
-            if (!IsDarkMode)
+            // Select theme file based on current theme
+            string themeFile = SelectedTheme switch
             {
-                themeFile = "Themes/Colors.xaml";
-            }
-            else
-            {
-                themeFile = IsRedAccent ? "Themes/TerminalRedColors.xaml" : "Themes/DarkColors.xaml";
-            }
+                AppTheme.Tech => "Themes/TechColors.xaml",
+                AppTheme.Enterprise => "Themes/EnterpriseColors.xaml",
+                AppTheme.TerminalGreen => "Themes/TerminalGreenColors.xaml",
+                AppTheme.TerminalRed => "Themes/TerminalRedColors.xaml",
+                _ => "Themes/TechColors.xaml"  // Default to Tech theme
+            };
             
             resources.Insert(0, new ResourceDictionary { Source = new Uri(themeFile, UriKind.Relative) });
         }
@@ -620,16 +610,23 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private void ToggleDarkMode()
-    {
-        IsDarkMode = !IsDarkMode;
-    }
+    /// <summary>
+    /// Available theme options for the UI
+    /// </summary>
+    public AppTheme[] AvailableThemes { get; } = Enum.GetValues<AppTheme>();
 
     [RelayCommand]
-    private void ToggleRedAccent()
+    private void CycleTheme()
     {
-        IsRedAccent = !IsRedAccent;
+        // Cycle through themes: Tech -> Enterprise -> TerminalGreen -> TerminalRed -> Tech
+        SelectedTheme = SelectedTheme switch
+        {
+            AppTheme.Tech => AppTheme.Enterprise,
+            AppTheme.Enterprise => AppTheme.TerminalGreen,
+            AppTheme.TerminalGreen => AppTheme.TerminalRed,
+            AppTheme.TerminalRed => AppTheme.Tech,
+            _ => AppTheme.Tech
+        };
     }
 
     [RelayCommand]
@@ -1148,6 +1145,15 @@ public partial class MainViewModel : ObservableObject
         {
             MessageBox.Show($"Could not open location: {ex.Message}", "Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void CopyDevToolPath(CleanupItem? item)
+    {
+        if (item != null)
+        {
+            Clipboard.SetText(item.Path);
         }
     }
 

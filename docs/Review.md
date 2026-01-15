@@ -1,8 +1,5 @@
-Game Installations still shows doubled and doesn't have ability to open to file location
-Cleanup Suggestions should be clickable each of those should open it up where the user can see which is in those groups so they cna organize it.
 The chart for Largest Folders isn't legible and looks messy instead of a seperate chart have the bar graph appear behind the name with a transperany to it in the actual list so users can see that way
 Treemap still isn't funcitoning i click on it and nothing happens it doesn't go down a level or anything
 Folder structure should have the option to open to file location for the usere to delete/address as needed
 all throughout the app users should be able to right click and copyy the file path an dnames of different items
-still having issues with the dark mode having white sections and black text on black background
-look in screenshots folder for different screenshots showing some of the issues
+OVerview tab is cutting off some cards and isn't responsive to different window sizes. should maybe add a scroll feature or maybe som esort of vertical layout when it gets too narrow and horizontal it should go to a horiztonal layout 
