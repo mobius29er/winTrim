@@ -13,9 +13,14 @@ public interface IPlatformService
     OperatingSystemType CurrentOS { get; }
     
     /// <summary>
-    /// Gets the user's home/profile folder
+    /// Gets the user's home/profile folder (alias: GetUserProfilePath)
     /// </summary>
     string GetUserFolder();
+    
+    /// <summary>
+    /// Gets the user's home/profile folder
+    /// </summary>
+    string GetUserProfilePath() => GetUserFolder();
     
     /// <summary>
     /// Gets the application data folder (roaming)
@@ -23,14 +28,29 @@ public interface IPlatformService
     string GetAppDataFolder();
     
     /// <summary>
+    /// Gets the roaming app data folder (alias)
+    /// </summary>
+    string GetAppDataRoamingPath() => GetAppDataFolder();
+    
+    /// <summary>
     /// Gets the local application data folder
     /// </summary>
     string GetLocalAppDataFolder();
     
     /// <summary>
+    /// Gets the local application data folder (alias)
+    /// </summary>
+    string GetAppDataLocalPath() => GetLocalAppDataFolder();
+    
+    /// <summary>
     /// Gets the system temp folder
     /// </summary>
     string GetTempFolder();
+    
+    /// <summary>
+    /// Gets the system temp folder (alias)
+    /// </summary>
+    string GetTempPath() => GetTempFolder();
     
     /// <summary>
     /// Gets available drives/volumes

@@ -1,0 +1,40 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="WinTrim.Avalonia.App"
+             xmlns:local="using:WinTrim.Avalonia"
+             xmlns:conv="using:WinTrim.Avalonia.Converters"
+             RequestedThemeVariant="Dark">
+             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.DataTemplates>
+        <local:ViewLocator/>
+    </Application.DataTemplates>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Default theme colors - can be swapped at runtime by ThemeService -->
+                <ResourceInclude Source="avares://WinTrim/Themes/DefaultColors.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            
+            <!-- Base font size - can be changed at runtime -->
+            <x:Double x:Key="BaseFontSize">14</x:Double>
+            
+            <!-- Converters as static resources -->
+            <conv:FileSizeConverter x:Key="FileSizeConverter"/>
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+            <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+            <conv:RiskLevelToBrushConverter x:Key="RiskToBrush"/>
+            <conv:PercentageToWidthConverter x:Key="PercentageToWidth"/>
+            <conv:DateTimeToRelativeConverter x:Key="RelativeTime"/>
+            <conv:ThemeToIconConverter x:Key="ThemeToIcon"/>
+            <conv:NullToBoolConverter x:Key="NullToBool"/>
+        </ResourceDictionary>
+    </Application.Resources>
+  
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <StyleInclude Source="avares://WinTrim/Themes/Styles.axaml"/>
+    </Application.Styles>
+</Application>

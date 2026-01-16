@@ -1,0 +1,76 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- Tech Theme - Blade Runner "Tech-Noir" Style -->
+    
+    <!-- Main Colors - K Teal Primary -->
+    <Color x:Key="PrimaryColor">#00F3FF</Color>
+    <Color x:Key="PrimaryHoverColor">#66F8FF</Color>
+    <Color x:Key="PrimaryDimColor">#00C4CC</Color>
+    
+    <!-- Joi Pink Secondary, Wallace Amber Accent -->
+    <Color x:Key="SecondaryColor">#FF00FF</Color>
+    <Color x:Key="SecondaryHoverColor">#FF66FF</Color>
+    <Color x:Key="AccentColor">#FF9900</Color>
+    <Color x:Key="AccentHoverColor">#FFAA33</Color>
+    <Color x:Key="AccentDimColor">#CC7700</Color>
+    
+    <!-- Void Black Background -->
+    <Color x:Key="BackgroundColor">#050505</Color>
+    <Color x:Key="SurfaceColor">#0D1117</Color>
+    <Color x:Key="SurfaceHoverColor">#161B22</Color>
+    <Color x:Key="CardColor">#0D1117</Color>
+    <Color x:Key="BorderColor">#1F2937</Color>
+    <Color x:Key="BorderHoverColor">#00F3FF</Color>
+    <Color x:Key="GridLineColor">#161B22</Color>
+    
+    <!-- High Contrast Text -->
+    <Color x:Key="TextPrimaryColor">#F0F6FC</Color>
+    <Color x:Key="TextSecondaryColor">#8B949E</Color>
+    <Color x:Key="TextMutedColor">#484F58</Color>
+    <Color x:Key="TextDisabledColor">#30363D</Color>
+    
+    <!-- Status Colors -->
+    <Color x:Key="SuccessColor">#00CC88</Color>
+    <Color x:Key="WarningColor">#FF9900</Color>
+    <Color x:Key="DangerColor">#FF3366</Color>
+    <Color x:Key="InfoColor">#00F3FF</Color>
+    
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{DynamicResource SurfaceHoverColor}"/>
+    <SolidColorBrush x:Key="CardBrush" Color="{DynamicResource CardColor}"/>
+    
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{DynamicResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{DynamicResource PrimaryHoverColor}"/>
+    <SolidColorBrush x:Key="PrimaryDimBrush" Color="{DynamicResource PrimaryDimColor}"/>
+    
+    <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{DynamicResource AccentHoverColor}"/>
+    <SolidColorBrush x:Key="AccentDimBrush" Color="{DynamicResource AccentDimColor}"/>
+    
+    <SolidColorBrush x:Key="SecondaryBrush" Color="{DynamicResource SecondaryColor}"/>
+    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="{DynamicResource SecondaryHoverColor}"/>
+    
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{DynamicResource TextMutedColor}"/>
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextDisabledColor}"/>
+    
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderHoverBrush" Color="{DynamicResource BorderHoverColor}"/>
+    <SolidColorBrush x:Key="GridLineBrush" Color="{DynamicResource GridLineColor}"/>
+    
+    <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{DynamicResource DangerColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}"/>
+    
+    <!-- Risk Brushes -->
+    <SolidColorBrush x:Key="RiskSafeBrush" Color="#00F3FF"/>
+    <SolidColorBrush x:Key="RiskLowBrush" Color="#00CC88"/>
+    <SolidColorBrush x:Key="RiskMediumBrush" Color="#FF9900"/>
+    <SolidColorBrush x:Key="RiskHighBrush" Color="#FF3366"/>
+    
+</ResourceDictionary>

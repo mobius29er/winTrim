@@ -1,0 +1,75 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- Terminal Red Theme - Red on Black -->
+    
+    <!-- Main Colors - Red Terminal -->
+    <Color x:Key="PrimaryColor">#FF3333</Color>
+    <Color x:Key="PrimaryHoverColor">#FF6666</Color>
+    <Color x:Key="PrimaryDimColor">#CC0000</Color>
+    
+    <Color x:Key="SecondaryColor">#FF3333</Color>
+    <Color x:Key="SecondaryHoverColor">#FF6666</Color>
+    <Color x:Key="AccentColor">#FF3333</Color>
+    <Color x:Key="AccentHoverColor">#FF6666</Color>
+    <Color x:Key="AccentDimColor">#CC0000</Color>
+    
+    <!-- Pure Black Background -->
+    <Color x:Key="BackgroundColor">#000000</Color>
+    <Color x:Key="SurfaceColor">#0A0A0A</Color>
+    <Color x:Key="SurfaceHoverColor">#111111</Color>
+    <Color x:Key="CardColor">#0A0A0A</Color>
+    <Color x:Key="BorderColor">#1A1A1A</Color>
+    <Color x:Key="BorderHoverColor">#FF3333</Color>
+    <Color x:Key="GridLineColor">#0F0F0F</Color>
+    
+    <!-- High Contrast Red Text -->
+    <Color x:Key="TextPrimaryColor">#FF3333</Color>
+    <Color x:Key="TextSecondaryColor">#CC2222</Color>
+    <Color x:Key="TextMutedColor">#881111</Color>
+    <Color x:Key="TextDisabledColor">#440000</Color>
+    
+    <!-- Status Colors -->
+    <Color x:Key="SuccessColor">#00FF00</Color>
+    <Color x:Key="WarningColor">#FFFF00</Color>
+    <Color x:Key="DangerColor">#FF0000</Color>
+    <Color x:Key="InfoColor">#00CCFF</Color>
+    
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{DynamicResource SurfaceHoverColor}"/>
+    <SolidColorBrush x:Key="CardBrush" Color="{DynamicResource CardColor}"/>
+    
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{DynamicResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{DynamicResource PrimaryHoverColor}"/>
+    <SolidColorBrush x:Key="PrimaryDimBrush" Color="{DynamicResource PrimaryDimColor}"/>
+    
+    <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{DynamicResource AccentHoverColor}"/>
+    <SolidColorBrush x:Key="AccentDimBrush" Color="{DynamicResource AccentDimColor}"/>
+    
+    <SolidColorBrush x:Key="SecondaryBrush" Color="{DynamicResource SecondaryColor}"/>
+    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="{DynamicResource SecondaryHoverColor}"/>
+    
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{DynamicResource TextMutedColor}"/>
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextDisabledColor}"/>
+    
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderHoverBrush" Color="{DynamicResource BorderHoverColor}"/>
+    <SolidColorBrush x:Key="GridLineBrush" Color="{DynamicResource GridLineColor}"/>
+    
+    <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{DynamicResource DangerColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}"/>
+    
+    <!-- Risk Brushes -->
+    <SolidColorBrush x:Key="RiskSafeBrush" Color="#00FF00"/>
+    <SolidColorBrush x:Key="RiskLowBrush" Color="#00CCFF"/>
+    <SolidColorBrush x:Key="RiskMediumBrush" Color="#FFFF00"/>
+    <SolidColorBrush x:Key="RiskHighBrush" Color="#FF0000"/>
+    
+</ResourceDictionary>

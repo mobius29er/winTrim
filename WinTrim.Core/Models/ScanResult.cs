@@ -40,12 +40,16 @@ public class ScanResult
 
 /// <summary>
 /// Statistics for a file category
+/// Thread-safe for concurrent updates
 /// </summary>
 public class CategoryStats
 {
     public ItemCategory Category { get; set; }
-    public long TotalSize { get; set; }
-    public int FileCount { get; set; }
+    
+    // Public fields for thread-safe Interlocked operations
+    public long TotalSize;
+    public int FileCount;
+    
     public double Percentage { get; set; }
     
     public string SizeFormatted => FormatSize(TotalSize);
@@ -150,6 +154,7 @@ public enum CleanupType
 {
     TempFiles,
     BrowserCache,
+    SystemCache,       // Cross-platform
     WindowsUpdate,
     RecycleBin,
     OldDownloads,
