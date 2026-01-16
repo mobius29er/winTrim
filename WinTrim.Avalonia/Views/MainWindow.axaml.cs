@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -114,6 +118,98 @@ public partial class MainWindow : Window
     {
         var treemapControl = this.FindControl<TreemapControl>("TreemapView");
         treemapControl?.NavigateUp();
+    }
+
+    /// <summary>
+    /// Shows the Quick Clean dialog
+    /// </summary>
+    private async void QuickCleanButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not ViewModels.MainWindowViewModel vm) return;
+        
+        // Get safe/low risk suggestions
+        var safeItems = vm.CleanupSuggestions
+            .Where(s => s.RiskLevel <= WinTrim.Core.Models.CleanupRisk.Low)
+            .ToList();
+        
+        if (!safeItems.Any())
+        {
+            // Show message that there's nothing to clean
+            return;
+        }
+        
+        var dialog = new QuickCleanDialog(safeItems);
+        var result = await dialog.ShowDialog<bool>(this);
+        
+        if (result && dialog.Confirmed)
+        {
+            var selectedItems = dialog.GetSelectedItems().ToList();
+            if (selectedItems.Any())
+            {
+                // Perform the cleanup
+                await PerformCleanup(selectedItems);
+            }
+        }
+    }
+
+    private async Task PerformCleanup(List<WinTrim.Core.Models.CleanupSuggestion> items)
+    {
+        var totalDeleted = 0L;
+        var filesDeleted = 0;
+        
+        foreach (var item in items)
+        {
+            foreach (var filePath in item.AffectedFiles)
+            {
+                try
+                {
+                    if (File.Exists(filePath))
+                    {
+                        var fileInfo = new FileInfo(filePath);
+                        var size = fileInfo.Length;
+                        File.Delete(filePath);
+                        totalDeleted += size;
+                        filesDeleted++;
+                    }
+                    else if (Directory.Exists(filePath))
+                    {
+                        var dirInfo = new DirectoryInfo(filePath);
+                        var size = dirInfo.EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
+                        Directory.Delete(filePath, true);
+                        totalDeleted += size;
+                        filesDeleted++;
+                    }
+                }
+                catch
+                {
+                    // Skip files that can't be deleted
+                }
+            }
+        }
+        
+        // Show completion message (could use a dialog or status bar)
+        Console.WriteLine($"[QuickClean] Deleted {filesDeleted} items, freed {FormatBytes(totalDeleted)}");
+        
+        // Refresh the scan to update the UI
+        if (DataContext is ViewModels.MainWindowViewModel vm && vm.CanStart)
+        {
+            // Optionally trigger a rescan
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int suffixIndex = 0;
+        double size = bytes;
+
+        while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+        {
+            size /= 1024;
+            suffixIndex++;
+        }
+
+        return $"{size:N2} {suffixes[suffixIndex]}";
     }
 
     /// <summary>

@@ -385,7 +385,8 @@
                                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                                     <TextBlock Text="🧹 Cleanup Suggestions" Classes="SectionHeader"/>
                                     <Button Grid.Column="1" 
-                                            Command="{Binding QuickCleanCommand}"
+                                            x:Name="QuickCleanButton"
+                                            Click="QuickCleanButton_Click"
                                             IsVisible="{Binding HasQuickCleanItems}"
                                             Background="#4CAF50"
                                             Foreground="White"
