@@ -542,10 +542,75 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void SelectFolder(string? folderName)
+    private void SelectFolder(FileSystemItem? folder)
     {
-        SelectedFolderName = folderName;
-        // TODO: Populate FolderContents from scan result
+        if (folder == null) return;
+        
+        SelectedFolderName = folder.Name;
+        
+        // Clear and populate FolderContents with the folder's children
+        FolderContents.Clear();
+        
+        // If the folder has children already loaded, use them
+        if (folder.Children.Any())
+        {
+            foreach (var child in folder.Children.OrderByDescending(c => c.Size).Take(50))
+            {
+                FolderContents.Add(child);
+            }
+        }
+        else if (folder.IsFolder && System.IO.Directory.Exists(folder.FullPath))
+        {
+            // Otherwise, enumerate the folder contents directly
+            try
+            {
+                var dirInfo = new System.IO.DirectoryInfo(folder.FullPath);
+                var items = new List<FileSystemItem>();
+                
+                // Get top files and folders
+                foreach (var subDir in dirInfo.EnumerateDirectories().Take(25))
+                {
+                    try
+                    {
+                        items.Add(new FileSystemItem
+                        {
+                            Name = subDir.Name,
+                            FullPath = subDir.FullName,
+                            IsFolder = true,
+                            LastModified = subDir.LastWriteTime,
+                            Size = 0 // Would need to calculate
+                        });
+                    }
+                    catch { /* Skip inaccessible directories */ }
+                }
+                
+                foreach (var file in dirInfo.EnumerateFiles().Take(25))
+                {
+                    try
+                    {
+                        items.Add(new FileSystemItem
+                        {
+                            Name = file.Name,
+                            FullPath = file.FullName,
+                            IsFolder = false,
+                            Size = file.Length,
+                            LastModified = file.LastWriteTime,
+                            Extension = file.Extension
+                        });
+                    }
+                    catch { /* Skip inaccessible files */ }
+                }
+                
+                foreach (var item in items.OrderByDescending(i => i.Size).Take(50))
+                {
+                    FolderContents.Add(item);
+                }
+            }
+            catch
+            {
+                // Handle access denied or other errors silently
+            }
+        }
     }
 
     [RelayCommand]

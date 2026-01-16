@@ -260,7 +260,7 @@
                                                             
                                                             <Button Grid.Column="0" 
                                                                     Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectFolderCommand}"
-                                                                    CommandParameter="{Binding Name}"
+                                                                    CommandParameter="{Binding}"
                                                                     Background="Transparent" BorderThickness="0" Cursor="Hand"
                                                                     HorizontalContentAlignment="Left" Padding="0">
                                                                 <StackPanel Orientation="Horizontal">
