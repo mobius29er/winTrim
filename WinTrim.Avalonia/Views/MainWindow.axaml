@@ -58,6 +58,16 @@
             <Separator/>
             <MenuItem Header="⬆️ Navigate Back (Up)" Click="TreemapNavigateBack_Click"/>
         </MenuFlyout>
+        
+        <!-- Cleanup File Context Menu -->
+        <MenuFlyout x:Key="CleanupFileContextMenu">
+            <MenuItem Header="📂 Open File Location" 
+                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenCleanupFilePathCommand}"
+                      CommandParameter="{Binding}"/>
+            <MenuItem Header="📋 Copy Path" 
+                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyCleanupFilePathCommand}"
+                      CommandParameter="{Binding}"/>
+        </MenuFlyout>
     </Window.Resources>
 
     <Grid RowDefinitions="Auto,Auto,*,Auto">
@@ -228,7 +238,8 @@
                                               MaxHeight="200"
                                               CanUserSortColumns="True"
                                               CanUserResizeColumns="True"
-                                              HorizontalScrollBarVisibility="Auto">
+                                              HorizontalScrollBarVisibility="Auto"
+                                              DoubleTapped="DataGrid_DoubleTapped">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                                             <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65"/>
@@ -263,7 +274,9 @@
                                               HorizontalScrollBarVisibility="Auto"
                                               HeadersVisibility="Column"
                                               GridLinesVisibility="None"
-                                              Background="Transparent">
+                                              Background="Transparent"
+                                              DoubleTapped="DataGrid_DoubleTapped"
+                                              SelectionChanged="LargestFolders_SelectionChanged">
                                         <DataGrid.Columns>
                                             <DataGridTemplateColumn Header="Name" Width="*" SortMemberPath="Name">
                                                 <DataGridTemplateColumn.CellTemplate>
@@ -304,7 +317,8 @@
                                     <DataGrid Grid.Row="1" ItemsSource="{Binding FolderContents}" 
                                               MaxHeight="200" Margin="0,8,0,0"
                                               CanUserResizeColumns="True"
-                                              HorizontalScrollBarVisibility="Auto">
+                                              HorizontalScrollBarVisibility="Auto"
+                                              DoubleTapped="DataGrid_DoubleTapped">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                                             <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65"/>
@@ -323,7 +337,8 @@
                                           IsReadOnly="True"
                                           CanUserSortColumns="True"
                                           CanUserResizeColumns="True"
-                                          HorizontalScrollBarVisibility="Auto">
+                                          HorizontalScrollBarVisibility="Auto"
+                                          DoubleTapped="DataGrid_DoubleTapped">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
                                         <DataGridTextColumn Header="Plat" Binding="{Binding Platform}" Width="45" SortMemberPath="Platform"/>
@@ -362,7 +377,8 @@
                                           CanUserResizeColumns="True"
                                           HeadersVisibility="Column"
                                           HorizontalScrollBarVisibility="Disabled"
-                                          VerticalScrollBarVisibility="Auto">
+                                          VerticalScrollBarVisibility="Auto"
+                                          DoubleTapped="DataGrid_DoubleTapped">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
                                         <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65" SortMemberPath="SizeBytes"/>
@@ -409,43 +425,47 @@
                                     </Button>
                                 </Grid>
                                 
-                                <!-- Suggestions TreeView -->
-                                <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" 
-                                        BorderThickness="1" CornerRadius="4" Background="{DynamicResource SurfaceBrush}">
-                                    <TreeView ItemsSource="{Binding CleanupSuggestions}">
-                                        <TreeView.ItemTemplate>
-                                            <TreeDataTemplate ItemsSource="{Binding AffectedFiles}">
-                                                <Grid Margin="0,4" ColumnDefinitions="*,Auto,Auto,Auto">
-                                                    
-                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding Description}" 
-                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                                   FontWeight="SemiBold" FontSize="13"/>
-                                                        <TextBlock Text="{Binding Path}" 
-                                                                   Foreground="{DynamicResource TextMutedBrush}"
-                                                                   FontSize="11" TextTrimming="CharacterEllipsis"
-                                                                   MaxWidth="300"/>
-                                                    </StackPanel>
-                                                    
-                                                    <TextBlock Grid.Column="1" Text="{Binding AffectedFiles.Count, StringFormat='{}{0} files'}" 
-                                                               Foreground="{DynamicResource TextMutedBrush}"
-                                                               VerticalAlignment="Center" Margin="12,0"
-                                                               FontSize="11"/>
-                                                    
-                                                    <TextBlock Grid.Column="2" Text="{Binding SavingsFormatted}" 
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                                               VerticalAlignment="Center" Margin="8,0"
-                                                               FontWeight="Medium"/>
-                                                    
-                                                    <TextBlock Grid.Column="3" Text="{Binding RiskLevel}" 
-                                                               Foreground="{Binding RiskLevel, Converter={StaticResource RiskToBrush}}"
-                                                               VerticalAlignment="Center" Width="40"
-                                                               FontWeight="Medium" FontSize="11"/>
-                                                </Grid>
-                                            </TreeDataTemplate>
-                                        </TreeView.ItemTemplate>
-                                    </TreeView>
-                                </Border>
+                                <!-- Suggestions Left/Right Panel -->
+                                <Grid Grid.Row="1" ColumnDefinitions="*,*">
+                                    <!-- Left: Suggestions List -->
+                                    <DataGrid Grid.Column="0" ItemsSource="{Binding CleanupSuggestions}"
+                                              SelectionChanged="CleanupSuggestions_SelectionChanged"
+                                              IsReadOnly="True"
+                                              CanUserResizeColumns="True"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              DoubleTapped="DataGrid_DoubleTapped">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="100"/>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SavingsFormatted}" Width="70" MinWidth="50"/>
+                                            <DataGridTextColumn Header="Files" Binding="{Binding AffectedFiles.Count}" Width="45" MinWidth="40"/>
+                                            <DataGridTextColumn Header="Risk" Binding="{Binding RiskLevel}" Width="50" MinWidth="40"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    
+                                    <!-- Right: Affected Files -->
+                                    <Grid Grid.Column="1" Margin="16,0,0,0" RowDefinitions="Auto,*">
+                                        <TextBlock Grid.Row="0" Text="{Binding SelectedCleanupDescription, FallbackValue='Click a suggestion to see files'}" 
+                                                   Classes="SectionHeader" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                        <DataGrid Grid.Row="1" ItemsSource="{Binding CleanupFiles}" 
+                                                  MaxHeight="200" Margin="0,8,0,0"
+                                                  CanUserResizeColumns="True"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                            <DataGrid.Columns>
+                                                <DataGridTemplateColumn Header="File Path" Width="*" MinWidth="100">
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding}" 
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       VerticalAlignment="Center"
+                                                                       Padding="4,2"
+                                                                       ContextFlyout="{StaticResource CleanupFileContextMenu}"/>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Grid>
+                                </Grid>
                             </Grid>
                         </Border>
                     </Grid>
@@ -652,7 +672,9 @@
                         <DataGrid ItemsSource="{Binding LargestFiles}" 
                                   IsReadOnly="True"
                                   CanUserSortColumns="True"
-                                  MaxHeight="500">
+                                  CanUserResizeColumns="True"
+                                  MaxHeight="500"
+                                  DoubleTapped="DataGrid_DoubleTapped">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
                                 <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="100" SortMemberPath="Size"/>

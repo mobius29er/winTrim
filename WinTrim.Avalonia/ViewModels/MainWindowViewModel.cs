@@ -97,6 +97,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private string? _selectedFolderName;
 
     [ObservableProperty]
+    private ObservableCollection<string> _cleanupFiles = new();
+
+    [ObservableProperty]
+    private string? _selectedCleanupDescription;
+
+    [ObservableProperty]
     private ObservableCollection<FileSystemItem> _filteredChildren = new();
 
     [ObservableProperty]
@@ -577,6 +583,20 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void SelectCleanup(CleanupSuggestion? suggestion)
+    {
+        if (suggestion == null) return;
+        
+        SelectedCleanupDescription = suggestion.Description;
+        
+        CleanupFiles.Clear();
+        foreach (var file in suggestion.AffectedFiles)
+        {
+            CleanupFiles.Add(file);
+        }
+    }
+
+    [RelayCommand]
     private void SelectFolder(FileSystemItem? folder)
     {
         if (folder == null) return;
@@ -688,6 +708,25 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (item == null) return;
         await CopyTextToClipboard(item.Path);
+    }
+
+    [RelayCommand]
+    private void OpenCleanupFilePath(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+        // Open the folder containing the file
+        var folder = System.IO.Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+        {
+            _platformService.OpenInExplorer(folder);
+        }
+    }
+
+    [RelayCommand]
+    private async Task CopyCleanupFilePath(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+        await CopyTextToClipboard(filePath);
     }
 
     private async Task CopyTextToClipboard(string text)

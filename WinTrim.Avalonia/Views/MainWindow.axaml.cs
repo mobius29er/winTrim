@@ -6,9 +6,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using WinTrim.Avalonia.Controls;
 using WinTrim.Core.Models;
 
@@ -166,5 +169,118 @@ public partial class MainWindow : Window
         {
             vm.ToggleSettingsCommand.Execute(null);
         }
+    }
+
+    /// <summary>
+    /// Handles row selection in the Largest Folders DataGrid to populate folder contents
+    /// </summary>
+    private void LargestFolders_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is DataGrid dataGrid && 
+            dataGrid.SelectedItem is WinTrim.Core.Models.FileSystemItem folder &&
+            DataContext is ViewModels.MainWindowViewModel vm)
+        {
+            vm.SelectFolderCommand.Execute(folder);
+        }
+    }
+
+    /// <summary>
+    /// Handles row selection in the Cleanup Suggestions DataGrid to populate affected files
+    /// </summary>
+    private void CleanupSuggestions_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is DataGrid dataGrid && 
+            dataGrid.SelectedItem is WinTrim.Core.Models.CleanupSuggestion suggestion &&
+            DataContext is ViewModels.MainWindowViewModel vm)
+        {
+            vm.SelectCleanupCommand.Execute(suggestion);
+        }
+    }
+
+    /// <summary>
+    /// Handles double-click on DataGrid column headers to auto-size columns
+    /// </summary>
+    private void DataGrid_DoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not DataGrid dataGrid) return;
+        
+        // Check if double-click was on a column header
+        if (e.Source is Control source)
+        {
+            var columnHeader = source.FindAncestorOfType<DataGridColumnHeader>();
+            if (columnHeader != null)
+            {
+                // Find the column by matching the header content
+                var column = dataGrid.Columns.FirstOrDefault(c => 
+                    c.Header?.ToString() == columnHeader.Content?.ToString());
+                
+                if (column != null)
+                {
+                    AutoSizeColumn(dataGrid, column);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Auto-sizes a column to fit its content
+    /// </summary>
+    private void AutoSizeColumn(DataGrid dataGrid, DataGridColumn column)
+    {
+        // Calculate the maximum width needed for this column
+        double maxWidth = 50; // Minimum width
+        
+        // Measure header
+        if (column.Header is string headerText)
+        {
+            var formattedText = new FormattedText(
+                headerText,
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(FontFamily.Default),
+                12,
+                Brushes.Black);
+            maxWidth = Math.Max(maxWidth, formattedText.Width + 20); // Add padding
+        }
+
+        // Measure cell content by iterating through visible rows
+        if (dataGrid.ItemsSource != null)
+        {
+            foreach (var item in dataGrid.ItemsSource)
+            {
+                // Get the cell value for this column
+                string? cellText = null;
+                
+                if (column is DataGridTextColumn textColumn && textColumn.Binding is Binding binding)
+                {
+                    var propertyPath = binding.Path;
+                    if (!string.IsNullOrEmpty(propertyPath))
+                    {
+                        var property = item.GetType().GetProperty(propertyPath);
+                        if (property != null)
+                        {
+                            var value = property.GetValue(item);
+                            cellText = value?.ToString();
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(cellText))
+                {
+                    var formattedText = new FormattedText(
+                        cellText,
+                        System.Globalization.CultureInfo.CurrentCulture,
+                        FlowDirection.LeftToRight,
+                        new Typeface(FontFamily.Default),
+                        12,
+                        Brushes.Black);
+                    maxWidth = Math.Max(maxWidth, formattedText.Width + 16); // Add cell padding
+                }
+            }
+        }
+
+        // Set the column width (cap at reasonable max)
+        maxWidth = Math.Min(maxWidth, 400);
+        column.Width = new DataGridLength(maxWidth);
     }
 }

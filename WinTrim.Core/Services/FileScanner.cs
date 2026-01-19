@@ -342,6 +342,11 @@ public sealed class FileScanner : IFileScanner
                     {
                         Interlocked.Increment(ref scanProgress._errorCount);
                     }
+                    catch (IOException)
+                    {
+                        // File/folder locked by another process - skip it
+                        Interlocked.Increment(ref scanProgress._errorCount);
+                    }
                 });
             }
             else
@@ -381,6 +386,11 @@ public sealed class FileScanner : IFileScanner
                     {
                         scanProgress.ErrorCount++;
                     }
+                    catch (IOException)
+                    {
+                        // File/folder locked by another process - skip it
+                        scanProgress.ErrorCount++;
+                    }
                 }
             }
         }
@@ -390,6 +400,11 @@ public sealed class FileScanner : IFileScanner
         }
         catch (DirectoryNotFoundException)
         {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        catch (IOException)
+        {
+            // Directory locked by another process - skip it
             Interlocked.Increment(ref scanProgress._errorCount);
         }
     }
@@ -452,6 +467,11 @@ public sealed class FileScanner : IFileScanner
         }
         catch (UnauthorizedAccessException)
         {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        catch (IOException)
+        {
+            // Directory or files locked by another process
             Interlocked.Increment(ref scanProgress._errorCount);
         }
     }
