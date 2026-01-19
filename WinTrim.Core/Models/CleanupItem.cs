@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace WinTrim.Core.Models;
@@ -14,6 +15,7 @@ public class CleanupItem
     public required string Category { get; init; }
     public required string Recommendation { get; init; }
     public CleanupRisk Risk { get; init; } = CleanupRisk.Medium;
+    public DateTime LastAccessed { get; set; } = DateTime.MinValue;
 
     /// <summary>
     /// Formatted size for UI display
@@ -33,6 +35,23 @@ public class CleanupItem
             }
 
             return $"{size:N2} {suffixes[suffixIndex]}";
+        }
+    }
+
+    /// <summary>
+    /// Last accessed formatted for UI display
+    /// </summary>
+    public string LastAccessedFormatted
+    {
+        get
+        {
+            if (LastAccessed == DateTime.MinValue) return "Unknown";
+            var days = (DateTime.Now - LastAccessed).Days;
+            if (days == 0) return "Today";
+            if (days == 1) return "Yesterday";
+            if (days < 30) return $"{days} days ago";
+            if (days < 365) return $"{days / 30} months ago";
+            return $"{days / 365} years ago";
         }
     }
 

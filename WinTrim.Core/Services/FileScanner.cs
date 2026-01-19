@@ -28,9 +28,16 @@ public sealed class FileScanner : IFileScanner
     private readonly ManualResetEventSlim _pauseEvent = new(true); // Initially signaled (not paused)
     private volatile bool _isPaused;
     
+    // Progress tracking
+    private long _totalExpectedBytes;
+    private IProgress<ScanProgress>? _progressReporter;
+    private ScanProgress? _currentScanProgress;
+    private int _lastReportedFileCount;
+    
     // Performance tuning
     private const int LargestFilesLimit = 100;
     private const int MaxParallelism = 4; // Limit parallel directory scans to prevent disk thrashing
+    private const int ProgressReportInterval = 100; // Report every N files
     private static readonly EnumerationOptions FastEnumerationOptions = new()
     {
         IgnoreInaccessible = true,
@@ -77,6 +84,7 @@ public sealed class FileScanner : IFileScanner
         _categoryStats.Clear();
         _isPaused = false;
         _pauseEvent.Set();
+        _lastReportedFileCount = 0;
         
         var result = new ScanResult
         {
@@ -84,11 +92,25 @@ public sealed class FileScanner : IFileScanner
             ScanStarted = DateTime.Now
         };
 
+        // Get total drive size for progress estimation
+        long totalDriveBytes = 0;
+        try
+        {
+            var driveInfo = new DriveInfo(Path.GetPathRoot(path) ?? path);
+            totalDriveBytes = driveInfo.TotalSize - driveInfo.AvailableFreeSpace; // Used space
+        }
+        catch { /* Ignore if can't get drive info */ }
+
         var scanProgress = new ScanProgress
         {
             State = ScanState.Scanning,
             StatusMessage = "Starting scan..."
         };
+
+        // Store for progress calculation
+        _totalExpectedBytes = totalDriveBytes > 0 ? totalDriveBytes : 100L * 1024 * 1024 * 1024; // Default 100GB
+        _progressReporter = progress;
+        _currentScanProgress = scanProgress;
 
         try
         {
@@ -115,6 +137,11 @@ public sealed class FileScanner : IFileScanner
             await ScanDirectoryAsync(rootItem, scanProgress, progress, cancellationToken);
             Console.WriteLine($"[FileScanner] Recursive scan complete. Total files in bag: {_largestFiles.Count}");
 
+            // Post-scan analysis phase
+            scanProgress.ProgressPercentage = 96;
+            scanProgress.StatusMessage = "Analyzing file structure...";
+            progress.Report(scanProgress);
+
             // Calculate percentages and finalize
             CalculatePercentages(rootItem);
 
@@ -140,21 +167,36 @@ public sealed class FileScanner : IFileScanner
                 .Take(50)
                 .ToList();
 
-            // Detect games
+            // Detect games and dev tools in parallel for speed
+            scanProgress.ProgressPercentage = 97;
+            scanProgress.StatusMessage = "Detecting games and dev tools...";
+            progress.Report(scanProgress);
+            
             Console.WriteLine($"[FileScanner] Starting game detection...");
-            result.GameInstallations = await _gameDetector.DetectGamesAsync(path, cancellationToken);
-            Console.WriteLine($"[FileScanner] Games found: {result.GameInstallations.Count}");
-
-            // Scan for developer tools (parallel with cleanup suggestions)
+            var gameTask = _gameDetector.DetectGamesAsync(path, cancellationToken);
             Console.WriteLine($"[FileScanner] Starting dev tools detection...");
             var devToolTask = _devToolDetector.ScanAllAsync();
+            
+            // Wait for both to complete
+            await Task.WhenAll(gameTask, devToolTask);
+            result.GameInstallations = await gameTask;
+            Console.WriteLine($"[FileScanner] Games found: {result.GameInstallations.Count}");
 
             // Get cleanup suggestions
+            scanProgress.ProgressPercentage = 98;
+            scanProgress.StatusMessage = "Generating cleanup suggestions...";
+            progress.Report(scanProgress);
+            
             result.CleanupSuggestions = await _cleanupAdvisor.GetSuggestionsAsync(rootItem, cancellationToken);
 
-            // Wait for dev tools scan
+            // Dev tools result (already completed from Task.WhenAll above)
             result.DevTools = (await devToolTask).OrderByDescending(d => d.SizeBytes).ToList();
             Console.WriteLine($"[FileScanner] DevTools found: {result.DevTools.Count}");
+
+            // Finalizing
+            scanProgress.ProgressPercentage = 99;
+            scanProgress.StatusMessage = "Finalizing results...";
+            progress.Report(scanProgress);
 
             // Category breakdown
             result.CategoryBreakdown = new Dictionary<ItemCategory, CategoryStats>(_categoryStats);
@@ -168,7 +210,7 @@ public sealed class FileScanner : IFileScanner
             Console.WriteLine($"[FileScanner] Scan completed. Files: {result.TotalFiles}, Folders: {result.TotalFolders}");
 
             scanProgress.State = ScanState.Completed;
-            scanProgress.StatusMessage = "Scan completed";
+            scanProgress.StatusMessage = "Scan complete!";
             scanProgress.ProgressPercentage = 100;
             progress.Report(scanProgress);
         }
@@ -341,12 +383,6 @@ public sealed class FileScanner : IFileScanner
                     }
                 }
             }
-
-            // Report progress periodically
-            if (scanProgress.FoldersScanned % 20 == 0)
-            {
-                progress.Report(scanProgress);
-            }
         }
         catch (UnauthorizedAccessException)
         {
@@ -404,6 +440,9 @@ public sealed class FileScanner : IFileScanner
 
                     Interlocked.Increment(ref scanProgress._filesScanned);
                     Interlocked.Add(ref scanProgress._bytesScanned, fileItem.Size);
+                    
+                    // Report progress periodically
+                    ReportProgressIfNeeded(scanProgress);
                 }
                 catch (Exception)
                 {
@@ -414,6 +453,29 @@ public sealed class FileScanner : IFileScanner
         catch (UnauthorizedAccessException)
         {
             Interlocked.Increment(ref scanProgress._errorCount);
+        }
+    }
+
+    /// <summary>
+    /// Reports progress to the UI if enough files have been scanned since last report
+    /// </summary>
+    private void ReportProgressIfNeeded(ScanProgress scanProgress)
+    {
+        var currentFiles = scanProgress._filesScanned;
+        if (currentFiles - _lastReportedFileCount >= ProgressReportInterval)
+        {
+            _lastReportedFileCount = currentFiles;
+            
+            // Calculate progress percentage based on bytes scanned vs expected
+            if (_totalExpectedBytes > 0)
+            {
+                var rawPercentage = (double)scanProgress._bytesScanned / _totalExpectedBytes * 100;
+                // Cap at 95% during file scan - leave 5% for post-processing
+                scanProgress.ProgressPercentage = Math.Min(95, rawPercentage);
+            }
+            
+            scanProgress.StatusMessage = $"Scanning: {scanProgress._filesScanned:N0} files, {scanProgress._foldersScanned:N0} folders";
+            _progressReporter?.Report(scanProgress);
         }
     }
 

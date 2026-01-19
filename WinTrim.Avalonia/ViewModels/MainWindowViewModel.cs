@@ -449,8 +449,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
             CategoryLegendItems.Add(new CategoryLegendItem
             {
-                Name = $"{category} ({stats.SizeFormatted})",
-                Color = color.ToString()
+                Name = category.ToString(),
+                CategoryKey = category.ToString(),
+                Color = color.ToString(),
+                FileCount = stats.FileCount,
+                SizeFormatted = stats.SizeFormatted
             });
         }
 
@@ -538,7 +541,39 @@ public partial class MainWindowViewModel : ViewModelBase
     private void SelectCategory(string? categoryName)
     {
         SelectedCategoryName = categoryName;
-        // TODO: Populate CategoryFiles from scan result
+        CategoryFiles.Clear();
+        
+        if (string.IsNullOrEmpty(categoryName) || !RootItems.Any()) return;
+        
+        // Parse the category name to enum
+        if (!Enum.TryParse<ItemCategory>(categoryName, out var category)) return;
+        
+        // Recursively find files matching this category from the root item
+        var matchingFiles = new List<FileSystemItem>();
+        CollectFilesByCategory(RootItems.First(), category, matchingFiles, 100);
+        
+        foreach (var file in matchingFiles.OrderByDescending(f => f.Size))
+        {
+            CategoryFiles.Add(file);
+        }
+    }
+
+    private void CollectFilesByCategory(FileSystemItem item, ItemCategory category, List<FileSystemItem> results, int maxFiles)
+    {
+        if (results.Count >= maxFiles) return;
+        
+        // Check files (not folders)
+        if (!item.IsFolder && item.Category == category)
+        {
+            results.Add(item);
+        }
+        
+        // Recurse into children
+        foreach (var child in item.Children)
+        {
+            if (results.Count >= maxFiles) break;
+            CollectFilesByCategory(child, category, results, maxFiles);
+        }
     }
 
     [RelayCommand]
@@ -695,4 +730,9 @@ public class CategoryLegendItem
 {
     public string Name { get; set; } = string.Empty;
     public string Color { get; set; } = "#808080";
+    public int FileCount { get; set; }
+    public string CategoryKey { get; set; } = string.Empty;
+    public string SizeFormatted { get; set; } = string.Empty;
+    public string DisplayText => $"{Name} ({SizeFormatted})";
+    public string FileCountText => $"({FileCount} files)";
 }

@@ -233,7 +233,8 @@ public abstract class DevToolDetectorBase : IDevToolDetector
         {
             if (Directory.Exists(path))
             {
-                long size = GetDirectorySize(new DirectoryInfo(path));
+                var dirInfo = new DirectoryInfo(path);
+                long size = GetDirectorySize(dirInfo);
                 
                 if (size > minSizeMb * 1024L * 1024)
                 {
@@ -244,7 +245,8 @@ public abstract class DevToolDetectorBase : IDevToolDetector
                         SizeBytes = size,
                         Category = category,
                         Recommendation = recommendation,
-                        Risk = risk
+                        Risk = risk,
+                        LastAccessed = dirInfo.LastAccessTime
                     });
                 }
             }

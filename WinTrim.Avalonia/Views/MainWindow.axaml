@@ -189,19 +189,22 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate x:DataType="vm:CategoryLegendItem">
                                                     <Button Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectCategoryCommand}"
-                                                            CommandParameter="{Binding Name}"
+                                                            CommandParameter="{Binding CategoryKey}"
                                                             HorizontalContentAlignment="Left"
                                                             Padding="4,3" Margin="0,1"
                                                             Background="Transparent"
                                                             BorderThickness="0"
                                                             Cursor="Hand">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                                            <Ellipse Grid.Column="0" Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,8,0"
                                                                      Fill="{Binding Color}"/>
-                                                            <TextBlock Text="{Binding Name}" FontSize="11"
+                                                            <TextBlock Grid.Column="1" Text="{Binding DisplayText}" FontSize="11"
                                                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                                                       TextTrimming="CharacterEllipsis" MaxWidth="175"/>
-                                                        </StackPanel>
+                                                                       TextTrimming="CharacterEllipsis" MaxWidth="130"/>
+                                                            <TextBlock Grid.Column="2" Text="{Binding FileCountText}" FontSize="10"
+                                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                                       VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                                        </Grid>
                                                     </Button>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -223,11 +226,13 @@
                                     
                                     <DataGrid Grid.Row="1" ItemsSource="{Binding CategoryFiles}" 
                                               MaxHeight="200"
-                                              CanUserSortColumns="True">
+                                              CanUserSortColumns="True"
+                                              CanUserResizeColumns="True"
+                                              HorizontalScrollBarVisibility="Auto">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="70"/>
-                                            <DataGridTemplateColumn Header="" Width="35">
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65"/>
+                                            <DataGridTemplateColumn Header="" Width="28">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <Button Content="📂" 
@@ -250,58 +255,59 @@
                             <Grid ColumnDefinitions="*,*">
                                 <Grid Grid.Column="0" RowDefinitions="Auto,*">
                                     <TextBlock Grid.Row="0" Text="Largest Folders" Classes="SectionHeader"/>
-                                    <ScrollViewer Grid.Row="1" MaxHeight="260" Margin="0,8,0,0">
-                                        <ItemsControl ItemsSource="{Binding LargestFolders}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Padding="6,4" Margin="0,2" CornerRadius="4"
-                                                            Background="Transparent">
-                                                        <Grid ColumnDefinitions="*,Auto,Auto">
-                                                            
-                                                            <Button Grid.Column="0" 
-                                                                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectFolderCommand}"
-                                                                    CommandParameter="{Binding}"
-                                                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                                                    HorizontalContentAlignment="Left" Padding="0">
-                                                                <StackPanel Orientation="Horizontal">
-                                                                    <TextBlock Text="📁" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                                    <TextBlock Text="{Binding Name}" 
-                                                                               Foreground="{DynamicResource TextPrimaryBrush}" 
-                                                                               VerticalAlignment="Center"
-                                                                               TextTrimming="CharacterEllipsis"
-                                                                               MaxWidth="140"/>
-                                                                </StackPanel>
-                                                            </Button>
-                                                            
-                                                            <TextBlock Grid.Column="1" 
-                                                                       Text="{Binding SizeFormatted}" 
-                                                                       Foreground="{DynamicResource TextSecondaryBrush}" 
-                                                                       VerticalAlignment="Center" 
-                                                                       Margin="8,0"
-                                                                       FontWeight="Medium"
-                                                                       MinWidth="60"
-                                                                       TextAlignment="Right"/>
-                                                            
-                                                            <Button Grid.Column="2" Content="📂" ToolTip.Tip="Open in Explorer"
-                                                                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenInExplorerCommand}"
-                                                                    CommandParameter="{Binding}"
-                                                                    Classes="Outline"
-                                                                    Padding="4,2" FontSize="12"/>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </ScrollViewer>
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding LargestFolders}" 
+                                              MaxHeight="260" Margin="0,8,0,0"
+                                              IsReadOnly="True"
+                                              CanUserSortColumns="True"
+                                              CanUserResizeColumns="True"
+                                              HorizontalScrollBarVisibility="Auto"
+                                              HeadersVisibility="Column"
+                                              GridLinesVisibility="None"
+                                              Background="Transparent">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Name" Width="*" SortMemberPath="Name">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Button Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectFolderCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                                                HorizontalContentAlignment="Left" Padding="4,2">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="📁" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Name}" 
+                                                                           Foreground="{DynamicResource TextPrimaryBrush}" 
+                                                                           VerticalAlignment="Center"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65" SortMemberPath="Size"/>
+                                            <DataGridTemplateColumn Header="" Width="28">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="📂" ToolTip.Tip="Open in Explorer"
+                                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenInExplorerCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Background="Transparent" BorderThickness="0"
+                                                                Padding="4,2" Cursor="Hand"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
                                 </Grid>
                                 <Grid Grid.Column="1" Margin="16,0,0,0" RowDefinitions="Auto,*">
                                     <TextBlock Grid.Row="0" Text="{Binding SelectedFolderName, FallbackValue='Click a folder to see contents'}" 
                                                Classes="SectionHeader" FontSize="14"/>
                                     <DataGrid Grid.Row="1" ItemsSource="{Binding FolderContents}" 
-                                              MaxHeight="200" Margin="0,8,0,0">
+                                              MaxHeight="200" Margin="0,8,0,0"
+                                              CanUserResizeColumns="True"
+                                              HorizontalScrollBarVisibility="Auto">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="80"/>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
                                 </Grid>
@@ -315,13 +321,15 @@
                                 <DataGrid ItemsSource="{Binding Games}" 
                                           MaxHeight="200"
                                           IsReadOnly="True"
-                                          CanUserSortColumns="True">
+                                          CanUserSortColumns="True"
+                                          CanUserResizeColumns="True"
+                                          HorizontalScrollBarVisibility="Auto">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
-                                        <DataGridTextColumn Header="Platform" Binding="{Binding Platform}" Width="80" SortMemberPath="Platform"/>
-                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="80" SortMemberPath="Size"/>
-                                        <DataGridTextColumn Header="Last Played" Binding="{Binding LastPlayed, Converter={StaticResource RelativeTime}}" Width="100" SortMemberPath="LastPlayed"/>
-                                        <DataGridTemplateColumn Header="" Width="40">
+                                        <DataGridTextColumn Header="Plat" Binding="{Binding Platform}" Width="45" SortMemberPath="Platform"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65" SortMemberPath="Size"/>
+                                        <DataGridTextColumn Header="Last Played" Binding="{Binding LastPlayed, Converter={StaticResource RelativeTime}}" Width="70" SortMemberPath="LastPlayed"/>
+                                        <DataGridTemplateColumn Header="" Width="28">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Button Content="📂" 
@@ -348,32 +356,33 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            FontSize="11"
                                            Margin="0,0,0,8"/>
-                                <ScrollViewer Grid.Row="2">
-                                    <DataGrid ItemsSource="{Binding DevToolItems}" 
-                                              IsReadOnly="True"
-                                              CanUserSortColumns="True">
-                                        <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
-                                            <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="100" SortMemberPath="Category"/>
-                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="80" SortMemberPath="SizeBytes"/>
-                                            <DataGridTextColumn Header="Risk" Binding="{Binding Risk}" Width="60" SortMemberPath="Risk"/>
-                                            <DataGridTemplateColumn Header="" Width="40">
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <Button Content="📂" 
-                                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenDevToolPathCommand}"
-                                                                CommandParameter="{Binding}"
-                                                                ToolTip.Tip="Open in Explorer"
-                                                                Background="Transparent"
-                                                                BorderThickness="0"
-                                                                Padding="4,2"
-                                                                Cursor="Hand"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
-                                            </DataGridTemplateColumn>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-                                </ScrollViewer>
+                                <DataGrid Grid.Row="2" ItemsSource="{Binding DevToolItems}" 
+                                          IsReadOnly="True"
+                                          CanUserSortColumns="True"
+                                          CanUserResizeColumns="True"
+                                          HeadersVisibility="Column"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65" SortMemberPath="SizeBytes"/>
+                                        <DataGridTextColumn Header="Last Used" Binding="{Binding LastAccessedFormatted}" Width="70"/>
+                                        <DataGridTemplateColumn Header="" Width="28">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="📂" 
+                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenDevToolPathCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip.Tip="Open in Explorer"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Padding="4,2"
+                                                            Cursor="Hand"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
                             </Grid>
                         </Border>
                         
