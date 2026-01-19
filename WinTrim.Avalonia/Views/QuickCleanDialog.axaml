@@ -56,40 +56,68 @@
         <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" 
                 BorderThickness="1" CornerRadius="4" Background="{DynamicResource SurfaceBrush}">
             <ScrollViewer>
-                <ItemsControl x:Name="ItemsContainer" Margin="8">
+                <ItemsControl x:Name="ItemsContainer" ItemsSource="{Binding Items}" Margin="8">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="local:SelectableCleanupCategory">
-                            <Border Margin="0,4" Padding="8" CornerRadius="4"
+                            <Border Margin="0,4" CornerRadius="4"
                                     Background="{DynamicResource BackgroundBrush}">
-                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
-                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" 
-                                              VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <Expander IsExpanded="{Binding IsExpanded}" Padding="0">
+                                    <Expander.Header>
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="4,0">
+                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" 
+                                                      VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Description}" 
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           FontWeight="SemiBold" FontSize="13"/>
+                                                <TextBlock Text="{Binding Path}" 
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           FontSize="11" TextTrimming="CharacterEllipsis"
+                                                           MaxWidth="300"/>
+                                            </StackPanel>
+                                            
+                                            <TextBlock Grid.Column="2" Text="{Binding FileCountText}" 
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       VerticalAlignment="Center" Margin="12,0"
+                                                       FontSize="11"/>
+                                            
+                                            <TextBlock Grid.Column="3" Text="{Binding SavingsFormatted}" 
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" Margin="8,0"
+                                                       FontWeight="Medium"/>
+                                            
+                                            <TextBlock Grid.Column="4" Text="{Binding RiskLevelText}" 
+                                                       VerticalAlignment="Center" Width="40"
+                                                       FontWeight="Medium" FontSize="11"
+                                                       Foreground="{Binding RiskLevelColor}"/>
+                                        </Grid>
+                                    </Expander.Header>
                                     
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Description}" 
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                   FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="{Binding Path}" 
-                                                   Foreground="{DynamicResource TextMutedBrush}"
-                                                   FontSize="11" TextTrimming="CharacterEllipsis"
-                                                   MaxWidth="350"/>
-                                    </StackPanel>
-                                    
-                                    <TextBlock Grid.Column="2" Text="{Binding FileCountText}" 
-                                               Foreground="{DynamicResource TextMutedBrush}"
-                                               VerticalAlignment="Center" Margin="12,0"
-                                               FontSize="11"/>
-                                    
-                                    <TextBlock Grid.Column="3" Text="{Binding SavingsFormatted}" 
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               VerticalAlignment="Center" Margin="8,0"
-                                               FontWeight="Medium"/>
-                                    
-                                    <TextBlock Grid.Column="4" Text="{Binding RiskLevelText}" 
-                                               VerticalAlignment="Center" Width="40"
-                                               FontWeight="Medium" FontSize="11"
-                                               Foreground="{Binding RiskLevelColor}"/>
-                                </Grid>
+                                    <!-- Nested files list -->
+                                    <ItemsControl ItemsSource="{Binding Files}" Margin="32,4,8,8">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="local:SelectableFile">
+                                                <Border Padding="4,2" Margin="0,1" CornerRadius="2"
+                                                        Background="{DynamicResource SurfaceBrush}">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}"
+                                                                  VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding DisplayName}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   FontSize="12"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding SizeFormatted}"
+                                                                   Foreground="{DynamicResource TextMutedBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="11" Margin="8,0,0,0"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Expander>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

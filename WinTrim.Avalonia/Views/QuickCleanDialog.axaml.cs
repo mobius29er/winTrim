@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -108,10 +109,238 @@ public partial class QuickCleanDialog : Window
         Close(false);
     }
 
-    private void Clean_Click(object? sender, RoutedEventArgs e)
+    private async void Clean_Click(object? sender, RoutedEventArgs e)
     {
-        Confirmed = true;
-        Close(true);
+        // Get ONLY the selected files BEFORE we do anything
+        var selectedFiles = new List<(string path, long size, string categoryName)>();
+        
+        foreach (var category in Items)
+        {
+            foreach (var file in category.Files.Where(f => f.IsSelected))
+            {
+                selectedFiles.Add((file.FullPath, file.Size, category.Description));
+            }
+        }
+        
+        if (!selectedFiles.Any())
+        {
+            await ShowMessageAsync("Nothing Selected", "Please select files to clean first.");
+            return;
+        }
+        
+        // Show confirmation BEFORE deleting
+        var confirmResult = await ShowConfirmAsync(
+            "Confirm Deletion", 
+            $"Are you sure you want to delete {selectedFiles.Count} files?\n\nThis will free approximately {FormatBytes(selectedFiles.Sum(f => f.size))}.\n\nThis action cannot be undone!");
+        
+        if (!confirmResult)
+            return;
+        
+        // NOW perform the actual deletion - ONLY the files we captured above
+        var deletedCount = 0;
+        var deletedSize = 0L;
+        var errors = new List<string>();
+        var deletedPaths = new HashSet<string>();
+        
+        foreach (var (path, size, categoryName) in selectedFiles)
+        {
+            try
+            {
+                Console.WriteLine($"[QuickClean] Attempting to delete: {path}");
+                
+                if (System.IO.File.Exists(path))
+                {
+                    System.IO.File.Delete(path);
+                    deletedCount++;
+                    deletedSize += size;
+                    deletedPaths.Add(path);
+                    Console.WriteLine($"[QuickClean] Successfully deleted file: {path}");
+                }
+                else if (System.IO.Directory.Exists(path))
+                {
+                    System.IO.Directory.Delete(path, true);
+                    deletedCount++;
+                    deletedSize += size;
+                    deletedPaths.Add(path);
+                    Console.WriteLine($"[QuickClean] Successfully deleted directory: {path}");
+                }
+                else
+                {
+                    Console.WriteLine($"[QuickClean] Path does not exist: {path}");
+                    errors.Add($"{System.IO.Path.GetFileName(path)}: File not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[QuickClean] Error deleting {path}: {ex.Message}");
+                errors.Add($"{System.IO.Path.GetFileName(path)}: {ex.Message}");
+            }
+        }
+        
+        // Remove deleted files from the UI (only the ones that were actually deleted)
+        foreach (var category in Items.ToList())
+        {
+            var filesToRemove = category.Files.Where(f => deletedPaths.Contains(f.FullPath)).ToList();
+            
+            foreach (var file in filesToRemove)
+            {
+                category.Files.Remove(file);
+            }
+            
+            // Remove empty categories
+            if (!category.Files.Any())
+            {
+                Items.Remove(category);
+            }
+            else
+            {
+                category.UpdateSelectionState();
+            }
+        }
+        
+        UpdateSummary();
+        
+        // Show result popup (dialog stays open!)
+        string message;
+        if (deletedCount == 0 && errors.Any())
+        {
+            message = $"⚠ No files were deleted.\n\n{errors.Count} errors occurred:\n" + 
+                      string.Join("\n", errors.Take(8));
+            if (errors.Count > 8)
+                message += $"\n...and {errors.Count - 8} more";
+        }
+        else if (deletedCount == 0)
+        {
+            message = "⚠ No files were deleted.\nFiles may have already been removed.";
+        }
+        else
+        {
+            message = $"✓ Deleted {deletedCount} files\n✓ Freed {FormatBytes(deletedSize)}";
+            if (errors.Any())
+            {
+                message += $"\n\n⚠ {errors.Count} files could not be deleted:\n" + 
+                           string.Join("\n", errors.Take(5));
+                if (errors.Count > 5)
+                    message += $"\n...and {errors.Count - 5} more";
+            }
+        }
+        
+        await ShowMessageAsync("Cleanup Complete", message);
+        
+        // If all items are cleaned, close the dialog
+        if (!Items.Any())
+        {
+            Confirmed = true;
+            Close(true);
+        }
+    }
+    
+    private async Task ShowMessageAsync(string title, string message)
+    {
+        var msgBox = new Window
+        {
+            Title = title,
+            Width = 400,
+            Height = 220,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = Brush.Parse("#1E1E2E")
+        };
+        
+        var grid = new Grid { Margin = new Thickness(20) };
+        grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+        grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        
+        var text = new TextBlock
+        {
+            Text = message,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Center,
+            Foreground = Brush.Parse("#CDD6F4"),
+            FontSize = 14
+        };
+        Grid.SetRow(text, 0);
+        grid.Children.Add(text);
+        
+        var okButton = new Button
+        {
+            Content = "OK",
+            HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Center,
+            Padding = new Thickness(24, 10),
+            Margin = new Thickness(0, 16, 0, 0),
+            Background = Brush.Parse("#4CAF50"),
+            Foreground = Brushes.White
+        };
+        okButton.Click += (s, e) => msgBox.Close();
+        Grid.SetRow(okButton, 1);
+        grid.Children.Add(okButton);
+        
+        msgBox.Content = grid;
+        await msgBox.ShowDialog(this);
+    }
+    
+    private async Task<bool> ShowConfirmAsync(string title, string message)
+    {
+        var result = false;
+        var msgBox = new Window
+        {
+            Title = title,
+            Width = 450,
+            Height = 250,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = Brush.Parse("#1E1E2E")
+        };
+        
+        var grid = new Grid { Margin = new Thickness(20) };
+        grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+        grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        
+        var text = new TextBlock
+        {
+            Text = message,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Center,
+            Foreground = Brush.Parse("#CDD6F4"),
+            FontSize = 14
+        };
+        Grid.SetRow(text, 0);
+        grid.Children.Add(text);
+        
+        var buttonPanel = new StackPanel
+        {
+            Orientation = global::Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Center,
+            Margin = new Thickness(0, 16, 0, 0)
+        };
+        
+        var cancelButton = new Button
+        {
+            Content = "Cancel",
+            Padding = new Thickness(24, 10),
+            Margin = new Thickness(0, 0, 12, 0),
+            Background = Brush.Parse("#45475A"),
+            Foreground = Brushes.White
+        };
+        cancelButton.Click += (s, e) => { result = false; msgBox.Close(); };
+        buttonPanel.Children.Add(cancelButton);
+        
+        var confirmButton = new Button
+        {
+            Content = "Delete Files",
+            Padding = new Thickness(24, 10),
+            Background = Brush.Parse("#EF4444"),
+            Foreground = Brushes.White
+        };
+        confirmButton.Click += (s, e) => { result = true; msgBox.Close(); };
+        buttonPanel.Children.Add(confirmButton);
+        
+        Grid.SetRow(buttonPanel, 1);
+        grid.Children.Add(buttonPanel);
+        
+        msgBox.Content = grid;
+        await msgBox.ShowDialog(this);
+        return result;
     }
 
     /// <summary>
@@ -145,6 +374,7 @@ public class SelectableCleanupCategory : INotifyPropertyChanged
 {
     private bool _isSelected;
     private bool _isExpanded;
+    private bool _isUpdatingInternally; // Prevent cascade during internal updates
     
     public string Description { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
@@ -175,9 +405,14 @@ public class SelectableCleanupCategory : INotifyPropertyChanged
             {
                 _isSelected = value;
                 OnPropertyChanged();
-                // When category selection changes, update all files
-                foreach (var file in Files)
-                    file.IsSelected = value;
+                
+                // Only cascade to files if this was a user-initiated change (not internal update)
+                if (!_isUpdatingInternally)
+                {
+                    foreach (var file in Files)
+                        file.IsSelected = value;
+                }
+                
                 OnPropertyChanged(nameof(SelectedSize));
                 OnPropertyChanged(nameof(SelectedFileCount));
                 OnPropertyChanged(nameof(SavingsFormatted));
@@ -286,13 +521,21 @@ public class SelectableCleanupCategory : INotifyPropertyChanged
 
     public void UpdateSelectionState()
     {
-        _isSelected = Files.Any() && Files.All(f => f.IsSelected);
-        OnPropertyChanged(nameof(IsSelected));
-        OnPropertyChanged(nameof(HasPartialSelection));
-        OnPropertyChanged(nameof(SelectedSize));
-        OnPropertyChanged(nameof(SelectedFileCount));
-        OnPropertyChanged(nameof(SavingsFormatted));
-        OnPropertyChanged(nameof(FileCountText));
+        _isUpdatingInternally = true;
+        try
+        {
+            _isSelected = Files.Any() && Files.All(f => f.IsSelected);
+            OnPropertyChanged(nameof(IsSelected));
+            OnPropertyChanged(nameof(HasPartialSelection));
+            OnPropertyChanged(nameof(SelectedSize));
+            OnPropertyChanged(nameof(SelectedFileCount));
+            OnPropertyChanged(nameof(SavingsFormatted));
+            OnPropertyChanged(nameof(FileCountText));
+        }
+        finally
+        {
+            _isUpdatingInternally = false;
+        }
     }
 
     private static string FormatBytes(long bytes)
