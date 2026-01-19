@@ -23,32 +23,20 @@
     <Window.Resources>
         <!-- File/Folder Context Menu -->
         <MenuFlyout x:Key="FileItemContextMenu">
-            <MenuItem Header="📂 Open File Location" 
-                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenInExplorerCommand}"
-                      CommandParameter="{Binding}"/>
-            <MenuItem Header="📋 Copy Path" 
-                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyPathCommand}"
-                      CommandParameter="{Binding}"/>
+            <MenuItem Header="📂 Open File Location" Click="FileItemOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="FileItemCopyPath_Click"/>
         </MenuFlyout>
         
         <!-- Game Context Menu -->
         <MenuFlyout x:Key="GameContextMenu">
-            <MenuItem Header="📂 Open Game Folder" 
-                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenGameFolderCommand}"
-                      CommandParameter="{Binding}"/>
-            <MenuItem Header="📋 Copy Path" 
-                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyGamePathCommand}"
-                      CommandParameter="{Binding}"/>
+            <MenuItem Header="📂 Open Game Folder" Click="GameOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="GameCopyPath_Click"/>
         </MenuFlyout>
         
         <!-- Developer Tool Context Menu -->
         <MenuFlyout x:Key="DevToolContextMenu">
-            <MenuItem Header="📂 Open Location" 
-                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenDevToolPathCommand}"
-                      CommandParameter="{Binding}"/>
-            <MenuItem Header="📋 Copy Path" 
-                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyDevToolPathCommand}"
-                      CommandParameter="{Binding}"/>
+            <MenuItem Header="📂 Open Location" Click="DevToolOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="DevToolCopyPath_Click"/>
         </MenuFlyout>
         
         <!-- Treemap Context Menu -->
@@ -61,12 +49,14 @@
         
         <!-- Cleanup File Context Menu -->
         <MenuFlyout x:Key="CleanupFileContextMenu">
-            <MenuItem Header="📂 Open File Location" 
-                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenCleanupFilePathCommand}"
-                      CommandParameter="{Binding}"/>
-            <MenuItem Header="📋 Copy Path" 
-                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyCleanupFilePathCommand}"
-                      CommandParameter="{Binding}"/>
+            <MenuItem Header="📂 Open File Location" Click="CleanupFileOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="CleanupFileCopyPath_Click"/>
+        </MenuFlyout>
+        
+        <!-- Cleanup Suggestion Context Menu -->
+        <MenuFlyout x:Key="CleanupSuggestionContextMenu">
+            <MenuItem Header="📂 Open Location" Click="CleanupSuggestionOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="CleanupSuggestionCopyPath_Click"/>
         </MenuFlyout>
     </Window.Resources>
 
@@ -239,7 +229,9 @@
                                               CanUserSortColumns="True"
                                               CanUserResizeColumns="True"
                                               HorizontalScrollBarVisibility="Auto"
-                                              DoubleTapped="DataGrid_DoubleTapped">
+                                              DoubleTapped="DataGrid_DoubleTapped"
+                                              SelectionChanged="FileItem_SelectionChanged"
+                                              ContextFlyout="{StaticResource FileItemContextMenu}">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                                             <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65"/>
@@ -276,7 +268,8 @@
                                               GridLinesVisibility="None"
                                               Background="Transparent"
                                               DoubleTapped="DataGrid_DoubleTapped"
-                                              SelectionChanged="LargestFolders_SelectionChanged">
+                                              SelectionChanged="LargestFolders_SelectionChanged"
+                                              ContextFlyout="{StaticResource FileItemContextMenu}">
                                         <DataGrid.Columns>
                                             <DataGridTemplateColumn Header="Name" Width="*" SortMemberPath="Name">
                                                 <DataGridTemplateColumn.CellTemplate>
@@ -318,7 +311,9 @@
                                               MaxHeight="200" Margin="0,8,0,0"
                                               CanUserResizeColumns="True"
                                               HorizontalScrollBarVisibility="Auto"
-                                              DoubleTapped="DataGrid_DoubleTapped">
+                                              DoubleTapped="DataGrid_DoubleTapped"
+                                              SelectionChanged="FileItem_SelectionChanged"
+                                              ContextFlyout="{StaticResource FileItemContextMenu}">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                                             <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65"/>
@@ -338,7 +333,9 @@
                                           CanUserSortColumns="True"
                                           CanUserResizeColumns="True"
                                           HorizontalScrollBarVisibility="Auto"
-                                          DoubleTapped="DataGrid_DoubleTapped">
+                                          DoubleTapped="DataGrid_DoubleTapped"
+                                          SelectionChanged="Game_SelectionChanged"
+                                          ContextFlyout="{StaticResource GameContextMenu}">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
                                         <DataGridTextColumn Header="Plat" Binding="{Binding Platform}" Width="45" SortMemberPath="Platform"/>
@@ -378,7 +375,9 @@
                                           HeadersVisibility="Column"
                                           HorizontalScrollBarVisibility="Disabled"
                                           VerticalScrollBarVisibility="Auto"
-                                          DoubleTapped="DataGrid_DoubleTapped">
+                                          DoubleTapped="DataGrid_DoubleTapped"
+                                          SelectionChanged="DevTool_SelectionChanged"
+                                          ContextFlyout="{StaticResource DevToolContextMenu}">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
                                         <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="65" SortMemberPath="SizeBytes"/>
@@ -433,7 +432,8 @@
                                               IsReadOnly="True"
                                               CanUserResizeColumns="True"
                                               HorizontalScrollBarVisibility="Disabled"
-                                              DoubleTapped="DataGrid_DoubleTapped">
+                                              DoubleTapped="DataGrid_DoubleTapped"
+                                              ContextFlyout="{StaticResource CleanupSuggestionContextMenu}">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="100"/>
                                             <DataGridTextColumn Header="Size" Binding="{Binding SavingsFormatted}" Width="70" MinWidth="50"/>
@@ -446,22 +446,15 @@
                                     <Grid Grid.Column="1" Margin="16,0,0,0" RowDefinitions="Auto,*">
                                         <TextBlock Grid.Row="0" Text="{Binding SelectedCleanupDescription, FallbackValue='Click a suggestion to see files'}" 
                                                    Classes="SectionHeader" FontSize="14" TextTrimming="CharacterEllipsis"/>
-                                        <DataGrid Grid.Row="1" ItemsSource="{Binding CleanupFiles}" 
+                                        <DataGrid x:Name="CleanupFilesGrid"
+                                                  Grid.Row="1" ItemsSource="{Binding CleanupFiles}" 
                                                   MaxHeight="200" Margin="0,8,0,0"
                                                   CanUserResizeColumns="True"
-                                                  HorizontalScrollBarVisibility="Disabled">
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  SelectionChanged="CleanupFilesGrid_SelectionChanged"
+                                                  ContextFlyout="{StaticResource CleanupFileContextMenu}">
                                             <DataGrid.Columns>
-                                                <DataGridTemplateColumn Header="File Path" Width="*" MinWidth="100">
-                                                    <DataGridTemplateColumn.CellTemplate>
-                                                        <DataTemplate>
-                                                            <TextBlock Text="{Binding}" 
-                                                                       TextTrimming="CharacterEllipsis"
-                                                                       VerticalAlignment="Center"
-                                                                       Padding="4,2"
-                                                                       ContextFlyout="{StaticResource CleanupFileContextMenu}"/>
-                                                        </DataTemplate>
-                                                    </DataGridTemplateColumn.CellTemplate>
-                                                </DataGridTemplateColumn>
+                                                <DataGridTextColumn Header="File Path" Binding="{Binding}" Width="*" MinWidth="100"/>
                                             </DataGrid.Columns>
                                         </DataGrid>
                                     </Grid>
@@ -637,7 +630,9 @@
                             <!-- Children List -->
                             <DataGrid Grid.Row="2" ItemsSource="{Binding FilteredChildren}" 
                                       IsReadOnly="True"
-                                      CanUserSortColumns="True">
+                                      CanUserSortColumns="True"
+                                      SelectionChanged="FileItem_SelectionChanged"
+                                      ContextFlyout="{StaticResource FileItemContextMenu}">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
                                     <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="100" SortMemberPath="Size"/>
@@ -674,7 +669,9 @@
                                   CanUserSortColumns="True"
                                   CanUserResizeColumns="True"
                                   MaxHeight="500"
-                                  DoubleTapped="DataGrid_DoubleTapped">
+                                  DoubleTapped="DataGrid_DoubleTapped"
+                                  SelectionChanged="FileItem_SelectionChanged"
+                                  ContextFlyout="{StaticResource FileItemContextMenu}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" SortMemberPath="Name"/>
                                 <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="100" SortMemberPath="Size"/>

@@ -324,19 +324,21 @@ public partial class MainWindowViewModel : ViewModelBase
                 progress, 
                 _cancellationTokenSource.Token);
 
-            // Update UI with results
+            // Update UI with results (includes partial results if cancelled)
             ScanResult = result;
             
             // Populate collections for UI binding
             PopulateResultsFromScan(result);
             
             StatusText = result.WasCancelled 
-                ? "Scan cancelled - showing partial results" 
+                ? $"Scan stopped - showing partial results: {result.TotalFiles:N0} files, {result.TotalFolders:N0} folders" 
                 : $"Scan complete: {result.TotalFiles:N0} files, {result.TotalFolders:N0} folders";
         }
         catch (OperationCanceledException)
         {
-            StatusText = "Scan cancelled";
+            // FileScanner handles cancellation internally and returns partial results
+            // This catch is a fallback in case something else throws
+            StatusText = "Scan stopped";
         }
         catch (Exception ex)
         {

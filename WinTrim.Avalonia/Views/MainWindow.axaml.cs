@@ -171,6 +171,122 @@ public partial class MainWindow : Window
         }
     }
 
+    #region Context Menu Support - Track selected items for right-click actions
+    
+    private FileSystemItem? _rightClickedFileItem;
+    private GameInstallation? _rightClickedGame;
+    private CleanupItem? _rightClickedDevTool;
+
+    /// <summary>
+    /// Tracks selection for FileSystemItem DataGrids (CategoryFiles, FolderContents, FilteredChildren, LargestFiles)
+    /// </summary>
+    private void FileItem_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is DataGrid dataGrid && dataGrid.SelectedItem is FileSystemItem item)
+        {
+            _rightClickedFileItem = item;
+        }
+    }
+
+    private void FileItemOpenFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedFileItem?.FullPath != null)
+        {
+            try
+            {
+                var folder = _rightClickedFileItem.IsFolder 
+                    ? _rightClickedFileItem.FullPath 
+                    : System.IO.Path.GetDirectoryName(_rightClickedFileItem.FullPath);
+                if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+                {
+                    Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+                }
+            }
+            catch { /* Ignore errors */ }
+        }
+    }
+
+    private void FileItemCopyPath_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedFileItem?.FullPath != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            clipboard.SetTextAsync(_rightClickedFileItem.FullPath);
+        }
+    }
+
+    /// <summary>
+    /// Tracks selection for Game DataGrid
+    /// </summary>
+    private void Game_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is DataGrid dataGrid && dataGrid.SelectedItem is GameInstallation game)
+        {
+            _rightClickedGame = game;
+        }
+    }
+
+    private void GameOpenFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedGame?.Path != null)
+        {
+            try
+            {
+                if (System.IO.Directory.Exists(_rightClickedGame.Path))
+                {
+                    Process.Start(new ProcessStartInfo { FileName = _rightClickedGame.Path, UseShellExecute = true });
+                }
+            }
+            catch { /* Ignore errors */ }
+        }
+    }
+
+    private void GameCopyPath_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedGame?.Path != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            clipboard.SetTextAsync(_rightClickedGame.Path);
+        }
+    }
+
+    /// <summary>
+    /// Tracks selection for DevTool DataGrid
+    /// </summary>
+    private void DevTool_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is DataGrid dataGrid && dataGrid.SelectedItem is CleanupItem item)
+        {
+            _rightClickedDevTool = item;
+        }
+    }
+
+    private void DevToolOpenFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedDevTool?.Path != null)
+        {
+            try
+            {
+                var folder = System.IO.Directory.Exists(_rightClickedDevTool.Path) 
+                    ? _rightClickedDevTool.Path 
+                    : System.IO.Path.GetDirectoryName(_rightClickedDevTool.Path);
+                if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+                {
+                    Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+                }
+            }
+            catch { /* Ignore errors */ }
+        }
+    }
+
+    private void DevToolCopyPath_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedDevTool?.Path != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            clipboard.SetTextAsync(_rightClickedDevTool.Path);
+        }
+    }
+
+    #endregion
+
     /// <summary>
     /// Handles row selection in the Largest Folders DataGrid to populate folder contents
     /// </summary>
@@ -181,6 +297,7 @@ public partial class MainWindow : Window
             DataContext is ViewModels.MainWindowViewModel vm)
         {
             vm.SelectFolderCommand.Execute(folder);
+            _rightClickedFileItem = folder;  // Track for context menu
         }
     }
 
@@ -194,6 +311,80 @@ public partial class MainWindow : Window
             DataContext is ViewModels.MainWindowViewModel vm)
         {
             vm.SelectCleanupCommand.Execute(suggestion);
+            _rightClickedSuggestion = suggestion;  // Track for context menu
+        }
+    }
+
+    private string? _rightClickedFilePath;
+
+    /// <summary>
+    /// Tracks selection in the Cleanup Files DataGrid for context menu actions
+    /// </summary>
+    private void CleanupFilesGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is DataGrid dataGrid && dataGrid.SelectedItem is string filePath)
+        {
+            _rightClickedFilePath = filePath;
+        }
+    }
+
+    private void CleanupFileCopyPath_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedFilePath != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            clipboard.SetTextAsync(_rightClickedFilePath);
+        }
+    }
+
+    private void CleanupFileOpenFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedFilePath != null)
+        {
+            try
+            {
+                var folder = System.IO.Path.GetDirectoryName(_rightClickedFilePath);
+                if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = folder,
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch { /* Ignore errors */ }
+        }
+    }
+
+    private WinTrim.Core.Models.CleanupSuggestion? _rightClickedSuggestion;
+
+    private void CleanupSuggestionCopyPath_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedSuggestion?.Path != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            clipboard.SetTextAsync(_rightClickedSuggestion.Path);
+        }
+    }
+
+    private void CleanupSuggestionOpenFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedSuggestion?.Path != null)
+        {
+            try
+            {
+                var folder = System.IO.Directory.Exists(_rightClickedSuggestion.Path) 
+                    ? _rightClickedSuggestion.Path 
+                    : System.IO.Path.GetDirectoryName(_rightClickedSuggestion.Path);
+                if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = folder,
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch { /* Ignore errors */ }
         }
     }
 
