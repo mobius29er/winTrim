@@ -66,26 +66,22 @@ export default function Home() {
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
             <a 
-              href="https://github.com/mobius29er/winTrim/releases"
+              href="https://github.com/mobius29er/winTrim"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-cyber px-8 py-4 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold rounded-lg tracking-wider uppercase hover:shadow-[0_0_30px_rgba(255,153,0,0.5)] transition-all duration-300"
               style={{ fontFamily: 'Rajdhani, sans-serif' }}
             >
-              Download Now — $4.99
-            </a>
-            <a 
-              href="https://github.com/mobius29er/winTrim"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-4 border border-[#00F3FF]/30 text-[#00F3FF] font-bold rounded-lg tracking-wider uppercase hover:bg-[#00F3FF]/10 hover:border-[#00F3FF]/60 transition-all duration-300"
-              style={{ fontFamily: 'Rajdhani, sans-serif' }}
-            >
-              View Source
+              Get It Free on GitHub
             </a>
           </div>
+
+          {/* App Store Coming Soon */}
+          <p className="text-sm text-gray-500 mb-8">
+            🍎 Mac App Store & Microsoft Store — <span className="text-[#00F3FF]">Coming Soon</span>
+          </p>
 
           {/* Platform Badges */}
           <div className="flex items-center justify-center gap-6 mb-16">
@@ -267,7 +263,7 @@ export default function Home() {
 
           {/* Status Bar */}
           <div className="mt-16 text-center text-xs text-gray-600 uppercase tracking-[0.2em]">
-            // Cross_Platform // One_Time_Purchase // No_Subscription // Open_Source
+            // Cross_Platform // Free_Download // Open_Source // No_Telemetry
           </div>
         </div>
       </section>
@@ -317,16 +313,16 @@ export default function Home() {
             </span>
           </h2>
           <p className="text-gray-400 mb-8">
-            One-time purchase. No subscription. No account required.
+            Free &amp; open source. No account required.
           </p>
           <a 
-            href="https://github.com/mobius29er/winTrim/releases"
+            href="https://github.com/mobius29er/winTrim"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-cyber inline-block px-12 py-5 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold text-lg rounded-lg tracking-wider uppercase hover:shadow-[0_0_40px_rgba(255,153,0,0.6)] transition-all duration-300"
             style={{ fontFamily: 'Rajdhani, sans-serif' }}
           >
-            Get WinTrim — $4.99
+            Get It Free on GitHub
           </a>
         </div>
       </section>
