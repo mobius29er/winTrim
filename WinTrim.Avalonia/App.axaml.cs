@@ -6,6 +6,8 @@ using System;
 using System.Linq;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
+using WinTrim.Avalonia.Services;
+using WinTrim.Avalonia.Themes;
 using WinTrim.Avalonia.ViewModels;
 using WinTrim.Avalonia.Views;
 
@@ -23,6 +25,7 @@ public partial class App : Application
         Console.WriteLine("[App] Initializing Avalonia XAML...");
         AvaloniaXamlLoader.Load(this);
         Console.WriteLine("[App] Avalonia XAML loaded.");
+        Console.WriteLine($"[App] Current RequestedThemeVariant: {this.RequestedThemeVariant}");
     }
 
     public override void OnFrameworkInitializationCompleted()

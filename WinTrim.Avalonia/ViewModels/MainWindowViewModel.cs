@@ -204,10 +204,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private ObservableCollection<string> _fileExplorerFilterOptions = new() { "All Files", "Large Files", "Old Files" };
 
     [ObservableProperty]
-    private ObservableCollection<string> _availableThemes = new() { "Default", "Tech", "Enterprise", "TerminalGreen", "TerminalRed" };
+    private ObservableCollection<string> _availableThemes = new() { "Retrofuturistic", "Tech", "Enterprise", "TerminalGreen", "TerminalRed" };
 
     [ObservableProperty]
-    private string _selectedTheme = "Default";
+    private string _selectedTheme = "Retrofuturistic";
 
     [ObservableProperty]
     private ObservableCollection<int> _availableFontSizes = new() { 12, 14, 16, 18, 20 };
@@ -244,7 +244,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _settingsService = settingsService;
         
         // Apply default theme on startup
-        _themeService.ApplyTheme("Default");
+        _themeService.ApplyTheme("Retrofuturistic");
         
         // Load settings
         ExpressScanEnabled = _settingsService.ExpressScanEnabled;

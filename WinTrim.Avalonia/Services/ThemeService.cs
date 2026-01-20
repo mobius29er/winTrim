@@ -1,9 +1,9 @@
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Styling;
+using WinTrim.Avalonia.Themes;
 
 namespace WinTrim.Avalonia.Services;
 
@@ -19,97 +19,80 @@ public interface IThemeService
 }
 
 /// <summary>
-/// Implementation of theme switching using Avalonia's ResourceDictionary
+/// Implementation of theme switching using Avalonia's ThemeVariant system.
+/// This is the official Avalonia approach - change RequestedThemeVariant and
+/// DynamicResource bindings automatically update.
+/// 
+/// Custom ThemeVariants are defined in ThemeVariants.cs and registered as keys
+/// in App.axaml's ThemeDictionaries. Each theme has its own color palette.
 /// </summary>
 public class ThemeService : IThemeService
 {
     private readonly Application _application;
     
-    public string CurrentTheme { get; private set; } = "Default";
+    // Map theme names to our custom ThemeVariant values
+    // Each maps to a unique ThemeDictionary in App.axaml
+    private static readonly Dictionary<string, ThemeVariant> ThemeVariantMap = new()
+    {
+        { "Retrofuturistic", ThemeVariants.Retrofuturistic },
+        { "Tech", ThemeVariants.Tech },
+        { "Enterprise", ThemeVariants.Enterprise },
+        { "TerminalGreen", ThemeVariants.TerminalGreen },
+        { "TerminalRed", ThemeVariants.TerminalRed }
+    };
+    
+    public string CurrentTheme { get; private set; } = "Retrofuturistic";
     public int CurrentFontSize { get; private set; } = 14;
 
     public ThemeService()
     {
         _application = Application.Current ?? throw new InvalidOperationException("Application.Current is null");
+        
+        // Debug: Print theme dictionary keys
+        if (_application.Resources is global::Avalonia.Controls.ResourceDictionary rd)
+        {
+            Console.WriteLine($"[ThemeService] ThemeDictionaries count: {rd.ThemeDictionaries.Count}");
+            foreach (var kvp in rd.ThemeDictionaries)
+            {
+                Console.WriteLine($"[ThemeService]   Key: {kvp.Key} (Type: {kvp.Key.GetType().Name}, HashCode: {kvp.Key.GetHashCode()})");
+            }
+            Console.WriteLine($"[ThemeService] ThemeVariants.Retrofuturistic: {ThemeVariants.Retrofuturistic} (HashCode: {ThemeVariants.Retrofuturistic.GetHashCode()})");
+        }
     }
 
     public void ApplyTheme(string themeName)
     {
         Console.WriteLine($"[ThemeService] ApplyTheme called with: {themeName}, current: {CurrentTheme}");
         
-        if (string.IsNullOrEmpty(themeName) || themeName == CurrentTheme)
+        if (string.IsNullOrEmpty(themeName))
         {
-            Console.WriteLine($"[ThemeService] Skipping - same theme or empty");
+            Console.WriteLine($"[ThemeService] Skipping - empty theme name");
+            return;
+        }
+        
+        if (themeName == CurrentTheme)
+        {
+            Console.WriteLine($"[ThemeService] Same theme requested, skipping");
             return;
         }
 
-        var themeUri = GetThemeUri(themeName);
-        Console.WriteLine($"[ThemeService] Theme URI: {themeUri}");
-
         try
         {
-            // In Avalonia, Application.Resources is a ResourceDictionary that can contain:
-            // 1. Direct resources (like BaseFontSize)
-            // 2. MergedDictionaries - which is where our theme ResourceInclude lives
-            
-            var appResources = _application.Resources;
-            Console.WriteLine($"[ThemeService] App.Resources type: {appResources.GetType().Name}");
-            Console.WriteLine($"[ThemeService] Direct MergedDictionaries count: {appResources.MergedDictionaries.Count}");
-            
-            // Get the MergedDictionaries collection
-            var mergedDicts = appResources.MergedDictionaries;
-            
-            // Log all current merged dictionaries
-            Console.WriteLine($"[ThemeService] Current merged dictionaries:");
-            for (int i = 0; i < mergedDicts.Count; i++)
+            // Get the ThemeVariant for this theme name
+            if (!ThemeVariantMap.TryGetValue(themeName, out var themeVariant))
             {
-                var dict = mergedDicts[i];
-                if (dict is ResourceInclude ri)
-                {
-                    Console.WriteLine($"[ThemeService]   [{i}] ResourceInclude: {ri.Source}");
-                }
-                else if (dict is ResourceDictionary rd)
-                {
-                    Console.WriteLine($"[ThemeService]   [{i}] ResourceDictionary with {rd.Count} items, {rd.MergedDictionaries.Count} merged");
-                }
-                else
-                {
-                    Console.WriteLine($"[ThemeService]   [{i}] {dict?.GetType().Name ?? "null"}");
-                }
+                Console.WriteLine($"[ThemeService] Unknown theme: {themeName}, defaulting to Dark");
+                themeVariant = ThemeVariant.Dark;
             }
             
-            // Find and remove existing theme (Colors.axaml files)
-            var existingThemes = mergedDicts
-                .OfType<ResourceInclude>()
-                .Where(r => r.Source?.ToString().Contains("Colors.axaml") == true)
-                .ToList();
+            Console.WriteLine($"[ThemeService] Setting RequestedThemeVariant to: {themeVariant}");
             
-            Console.WriteLine($"[ThemeService] Found {existingThemes.Count} existing color themes to remove");
-            
-            foreach (var oldTheme in existingThemes)
-            {
-                Console.WriteLine($"[ThemeService] Removing: {oldTheme.Source}");
-                mergedDicts.Remove(oldTheme);
-            }
-
-            // Create and add new theme resource at the beginning
-            var newThemeResource = new ResourceInclude(themeUri) { Source = themeUri };
-            mergedDicts.Insert(0, newThemeResource);
-            Console.WriteLine($"[ThemeService] Added new theme: {themeUri}");
+            // This is the key - changing RequestedThemeVariant causes all
+            // DynamicResource bindings to automatically re-evaluate
+            _application.RequestedThemeVariant = themeVariant;
             
             CurrentTheme = themeName;
-            Console.WriteLine($"[ThemeService] Theme successfully applied: {themeName}");
-            
-            // Force resource refresh by triggering property changed on resources
-            // This helps Avalonia recognize the resource changes
-            if (_application.Resources is ResourceDictionary rd2)
-            {
-                // Workaround: Force a refresh by temporarily modifying a resource
-                if (rd2.TryGetResource("BaseFontSize", null, out var fontSize))
-                {
-                    rd2["BaseFontSize"] = fontSize;
-                }
-            }
+            Console.WriteLine($"[ThemeService] Theme successfully applied: {themeName} -> {themeVariant}");
         }
         catch (Exception ex)
         {
@@ -140,14 +123,4 @@ public class ThemeService : IThemeService
             Console.WriteLine($"[ThemeService] Font size ERROR: {ex.Message}");
         }
     }
-    
-    private static Uri GetThemeUri(string themeName) => themeName switch
-    {
-        "Default" => new Uri("avares://WinTrim/Themes/DefaultColors.axaml"),
-        "Tech" => new Uri("avares://WinTrim/Themes/TechColors.axaml"),
-        "Enterprise" => new Uri("avares://WinTrim/Themes/EnterpriseColors.axaml"),
-        "TerminalGreen" => new Uri("avares://WinTrim/Themes/TerminalGreenColors.axaml"),
-        "TerminalRed" => new Uri("avares://WinTrim/Themes/TerminalRedColors.axaml"),
-        _ => new Uri("avares://WinTrim/Themes/DefaultColors.axaml")
-    };
 }

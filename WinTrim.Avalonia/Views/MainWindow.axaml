@@ -10,6 +10,7 @@
         x:Class="WinTrim.Avalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="WinTrim - Disk Analyzer"
+        Icon="/Assets/wintrim.png"
         Width="1280" Height="800"
         MinWidth="900" MinHeight="600"
         Background="{DynamicResource BackgroundBrush}"
