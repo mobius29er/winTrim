@@ -128,6 +128,16 @@
                     <Button Content="▶ Start Scan" Command="{Binding StartScanCommand}"
                             Classes="Primary" Margin="0,0,8,0"
                             IsEnabled="{Binding CanStart}"/>
+                    <Button Command="{Binding RecallLastScanCommand}"
+                            Classes="Outline" Margin="0,0,8,0"
+                            IsVisible="{Binding HasCachedScan}"
+                            IsEnabled="{Binding CanStart}"
+                            ToolTip.Tip="{Binding CachedScanInfo}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,4,0"/>
+                            <TextBlock Text="Recall"/>
+                        </StackPanel>
+                    </Button>
                     <Button Content="⏸ Pause" Command="{Binding PauseScanCommand}"
                             Classes="Outline" Margin="0,0,8,0"
                             IsVisible="{Binding CanPause}"/>

@@ -77,6 +77,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IFileScanner _fileScanner;
     private readonly IPlatformService _platformService;
     private readonly IThemeService _themeService;
+    private readonly ISettingsService _settingsService;
     private CancellationTokenSource? _cancellationTokenSource;
 
     #region Observable Properties
@@ -223,23 +224,70 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private int _treemapMaxDepth = 3;
 
+    [ObservableProperty]
+    private bool _hasCachedScan;
+
+    [ObservableProperty]
+    private string _cachedScanInfo = string.Empty;
+
     #endregion
 
     /// <summary>
     /// Constructor with DI-injected services
     /// </summary>
-    public MainWindowViewModel(IFileScanner fileScanner, IPlatformService platformService, IThemeService themeService)
+    public MainWindowViewModel(IFileScanner fileScanner, IPlatformService platformService, IThemeService themeService, ISettingsService settingsService)
     {
         Console.WriteLine("[ViewModel] Constructor called");
         _fileScanner = fileScanner;
         _platformService = platformService;
         _themeService = themeService;
+        _settingsService = settingsService;
         
         // Apply default theme on startup
         _themeService.ApplyTheme("Default");
         
+        // Load settings
+        ExpressScanEnabled = _settingsService.ExpressScanEnabled;
+        
         LoadAvailableDrives();
+        UpdateCachedScanInfo();
         Console.WriteLine($"[ViewModel] Constructor complete. AvailableDrives: {AvailableDrives.Count}, SelectedDrive: {SelectedDrive?.DisplayName ?? "null"}");
+    }
+    
+    /// <summary>
+    /// Updates the cached scan info for UI display
+    /// </summary>
+    private void UpdateCachedScanInfo()
+    {
+        HasCachedScan = _settingsService.HasCachedScan;
+        if (HasCachedScan)
+        {
+            var info = _settingsService.GetCacheInfo();
+            if (info.HasValue)
+            {
+                var (scanDate, rootPath, wasExpressMode) = info.Value;
+                var timeAgo = GetTimeAgo(scanDate);
+                var mode = wasExpressMode ? "Express" : "Full";
+                CachedScanInfo = $"Last scan: {timeAgo} ({mode})";
+            }
+        }
+        else
+        {
+            CachedScanInfo = string.Empty;
+        }
+    }
+    
+    /// <summary>
+    /// Gets a human-readable "time ago" string
+    /// </summary>
+    private static string GetTimeAgo(DateTime date)
+    {
+        var span = DateTime.Now - date;
+        if (span.TotalMinutes < 1) return "just now";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+        if (span.TotalDays < 7) return $"{(int)span.TotalDays}d ago";
+        return date.ToString("MMM d");
     }
     
     /// <summary>
@@ -500,6 +548,15 @@ public partial class MainWindowViewModel : ViewModelBase
             // Populate collections for UI binding
             PopulateResultsFromScan(result);
             
+            // Save to cache for recall (only if not cancelled and has real results)
+            if (!result.WasCancelled && result.TotalFiles > 0)
+            {
+                var wasExpressMode = scanModeLabel == "Express";
+                _settingsService.SaveScanCache(result, wasExpressMode);
+                _settingsService.ExpressScanEnabled = ExpressScanEnabled;
+                UpdateCachedScanInfo();
+            }
+            
             StatusText = result.WasCancelled 
                 ? $"Scan stopped - showing partial results: {result.TotalFiles:N0} files, {result.TotalFolders:N0} folders" 
                 : $"Scan complete: {result.TotalFiles:N0} files, {result.TotalFolders:N0} folders";
@@ -674,6 +731,161 @@ public partial class MainWindowViewModel : ViewModelBase
         CanPause = false;
         CanResume = false;
         StatusText = "Scan stopped";
+    }
+
+    [RelayCommand]
+    private void RecallLastScan()
+    {
+        if (!HasCachedScan) return;
+        
+        var cache = _settingsService.LoadScanCache();
+        if (cache == null)
+        {
+            StatusText = "No cached scan available";
+            return;
+        }
+        
+        Console.WriteLine($"[ViewModel] Recalling cached scan from {cache.ScanDate}");
+        
+        // Reconstruct a ScanResult from the cache
+        var result = ReconstructScanResultFromCache(cache);
+        
+        // Populate UI
+        ScanResult = result;
+        PopulateResultsFromScan(result);
+        
+        var timeAgo = GetTimeAgo(cache.ScanDate);
+        var mode = cache.WasExpressMode ? "Express" : "Full";
+        StatusText = $"Restored {mode} scan from {timeAgo}: {cache.TotalFiles:N0} files, {cache.TotalFolders:N0} folders";
+    }
+    
+    /// <summary>
+    /// Reconstructs a ScanResult from the cached data
+    /// </summary>
+    private ScanResult ReconstructScanResultFromCache(ScanCache cache)
+    {
+        // Reconstruct root tree from cache
+        FileSystemItem? rootItem = null;
+        if (cache.RootTree != null)
+        {
+            rootItem = ReconstructTreeNode(cache.RootTree);
+        }
+        
+        // Reconstruct largest files
+        var largestFiles = cache.LargestFiles.Select(f => new FileSystemItem
+        {
+            Name = f.Name,
+            FullPath = f.FullPath,
+            Size = f.Size,
+            IsFolder = false,
+            Category = Enum.TryParse<ItemCategory>(f.Category, out var cat) ? cat : ItemCategory.Other,
+            LastAccessed = f.LastAccessed,
+            LastModified = f.LastModified
+        }).ToList();
+        
+        // Reconstruct largest folders
+        var largestFolders = cache.LargestFolders.Select(f => 
+        {
+            var folder = new FileSystemItem
+            {
+                Name = f.Name,
+                FullPath = f.FullPath,
+                Size = f.Size,
+                IsFolder = true,
+                Category = ItemCategory.Other
+            };
+            foreach (var child in f.Children)
+            {
+                folder.Children.Add(new FileSystemItem
+                {
+                    Name = child.Name,
+                    FullPath = child.FullPath,
+                    Size = child.Size,
+                    IsFolder = child.IsFolder,
+                    Category = ItemCategory.Other
+                });
+            }
+            return folder;
+        }).ToList();
+        
+        // Reconstruct games
+        var games = cache.Games.Select(g => new GameInstallation
+        {
+            Name = g.Name,
+            Path = g.Path,
+            Size = g.Size,
+            Platform = Enum.TryParse<GamePlatform>(g.Platform, out var plat) ? plat : GamePlatform.Other,
+            LastPlayed = g.LastPlayed
+        }).ToList();
+        
+        // Reconstruct dev tools
+        var devTools = cache.DevTools.Select(d => new CleanupItem
+        {
+            Name = d.Name,
+            Path = d.Path,
+            SizeBytes = d.SizeBytes,
+            Category = d.Category,
+            Recommendation = d.Recommendation,
+            Risk = Enum.TryParse<CleanupRisk>(d.Risk, out var risk) ? risk : CleanupRisk.Low
+        }).ToList();
+        
+        // Reconstruct cleanup suggestions
+        var cleanupSuggestions = cache.CleanupSuggestions.Select(s => new CleanupSuggestion
+        {
+            Description = s.Description,
+            Path = s.Path,
+            PotentialSavings = s.PotentialSavings,
+            RiskLevel = Enum.TryParse<CleanupRisk>(s.RiskLevel, out var risk) ? risk : CleanupRisk.Low
+        }).ToList();
+        
+        // Reconstruct category breakdown
+        var categoryBreakdown = cache.CategoryBreakdown.ToDictionary(
+            c => Enum.TryParse<ItemCategory>(c.Category, out var cat) ? cat : ItemCategory.Other,
+            c => new CategoryStats
+            {
+                TotalSize = c.TotalSize,
+                FileCount = c.FileCount
+            });
+        
+        return new ScanResult
+        {
+            RootPath = cache.RootPath,
+            RootItem = rootItem,
+            TotalSize = cache.TotalSize,
+            TotalFiles = cache.TotalFiles,
+            TotalFolders = cache.TotalFolders,
+            ScanStarted = cache.ScanDate - cache.Duration,
+            ScanCompleted = cache.ScanDate,
+            LargestFiles = largestFiles,
+            LargestFolders = largestFolders,
+            GameInstallations = games,
+            DevTools = devTools,
+            CleanupSuggestions = cleanupSuggestions,
+            CategoryBreakdown = categoryBreakdown,
+            WasCancelled = false
+        };
+    }
+    
+    /// <summary>
+    /// Recursively reconstructs a FileSystemItem from a CachedTreeNode
+    /// </summary>
+    private FileSystemItem ReconstructTreeNode(CachedTreeNode node)
+    {
+        var item = new FileSystemItem
+        {
+            Name = node.Name,
+            FullPath = node.FullPath,
+            Size = node.Size,
+            IsFolder = node.IsFolder,
+            Category = Enum.TryParse<ItemCategory>(node.Category, out var cat) ? cat : ItemCategory.Other
+        };
+        
+        foreach (var childNode in node.Children)
+        {
+            item.Children.Add(ReconstructTreeNode(childNode));
+        }
+        
+        return item;
     }
 
     [RelayCommand]

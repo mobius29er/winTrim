@@ -120,9 +120,10 @@ public readonly struct FileSummary
 ---
 
 **My recommendation order:**
-1. **D first** (you approved - biggest win, optional feature)
-2. **B second** (one-line change, no risk)
-3. **A third** (if you want more speed after B)
+1. **D first** (you approved - biggest win, optional feature) < added>
+2. **B second** (one-line change, no risk) < didn't work made performance worse>
 4. **C later** (save for a future optimization pass)
 
-Should I implement **Option D (Express Mode)** now, and also add **Option B (Buffer Size)** since it's a trivial one-liner?
+
+> themes aren't loading
+

@@ -46,6 +46,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICleanupAdvisor, CleanupAdvisor>();
         services.AddSingleton<IFileScanner, FileScanner>();
         services.AddSingleton<TreemapLayoutService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
         
         // Register Avalonia-specific services
         services.AddSingleton<IThemeService, ThemeService>();
