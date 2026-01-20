@@ -1,0 +1,66 @@
+# WinTrim
+
+> A cross-platform disk analyzer for Windows, macOS, and Linux. Free, open source, no telemetry.
+
+## What is WinTrim?
+
+WinTrim is a fast, visual disk space analyzer that helps you find and reclaim wasted storage. It features:
+
+- **Lightning-fast scanning**: Scans 1TB+ drives in under 2 minutes
+- **Interactive treemap visualization**: See exactly what's eating your disk space
+- **Smart detection**: Automatically identifies games, developer tools, and caches
+- **Cross-platform**: Native performance on Windows, macOS, and Linux via Avalonia UI
+- **Privacy-first**: Zero telemetry, no data collection, fully offline
+
+## Key Features
+
+### File Categories
+Automatic classification of files into categories: Video, Image, Audio, Code, Documents, Archives, Executables, and Other.
+
+### Game Detection
+Detects installed games from Steam, Epic Games, GOG, Origin, Battle.net, and standalone installations. Shows game size and last played date.
+
+### Developer Tools Detection
+Finds development caches that can be safely cleaned:
+- Xcode DerivedData
+- npm/node_modules
+- CocoaPods cache
+- NuGet packages
+- Gradle cache
+- Maven repository
+- Cargo target folders
+- Python virtual environments
+
+### Quick Cleanup
+One-click cleanup of safe-to-delete files with size preview and undo protection.
+
+## Technical Details
+
+- Built with .NET 8 and Avalonia UI 11.2
+- MIT licensed open source
+- GitHub: https://github.com/mobius29er/winTrim
+- Website: https://wintrim.io
+
+## Pricing
+
+- **GitHub**: Free forever (MIT license)
+- **Mac App Store**: $4.99 (coming soon)
+- **Microsoft Store**: $4.99 (coming soon)
+
+## Contact
+
+- GitHub Issues: https://github.com/mobius29er/winTrim/issues
+- Developer: Foxxception
+
+## Comparison to Alternatives
+
+WinTrim combines the speed of WizTree, the cross-platform support of ncdu, the visual appeal of DaisyDisk, and adds smart game/dev tool detection that no other tool offers.
+
+| Feature | WinTrim | WinDirStat | TreeSize | DaisyDisk | WizTree |
+|---------|---------|------------|----------|-----------|---------|
+| Cross-platform | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Game detection | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Dev tools detection | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Open source | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Fast scanning | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Treemap view | ✅ | ✅ | ✅ | ❌ | ✅ |
