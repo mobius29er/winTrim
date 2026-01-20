@@ -254,8 +254,8 @@
                                               SelectionChanged="FileItem_SelectionChanged"
                                               ContextFlyout="{StaticResource FileItemContextMenu}">
                                         <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="80"/>
-                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="65"/>
+                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="80" SortMemberPath="Name"/>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="65" SortMemberPath="Size"/>
                                             <DataGridTemplateColumn Header="Open" Width="50">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
@@ -336,8 +336,8 @@
                                               SelectionChanged="FileItem_SelectionChanged"
                                               ContextFlyout="{StaticResource FileItemContextMenu}">
                                         <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="80"/>
-                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="60"/>
+                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="80" SortMemberPath="Name"/>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="60" SortMemberPath="Size"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
                                 </Grid>
@@ -471,10 +471,10 @@
                                           DoubleTapped="DataGrid_DoubleTapped"
                                           ContextFlyout="{StaticResource CleanupSuggestionContextMenu}">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="150"/>
-                                        <DataGridTextColumn Header="Size" Binding="{Binding SavingsFormatted}" Width="Auto" MinWidth="70"/>
+                                        <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="150" SortMemberPath="Description"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SavingsFormatted}" Width="Auto" MinWidth="70" SortMemberPath="PotentialSavings"/>
                                         <DataGridTextColumn Header="Files" Binding="{Binding AffectedFiles.Count}" Width="Auto" MinWidth="50"/>
-                                        <DataGridTextColumn Header="Risk" Binding="{Binding RiskLevel}" Width="Auto" MinWidth="55"/>
+                                        <DataGridTextColumn Header="Risk" Binding="{Binding RiskLevel}" Width="Auto" MinWidth="55" SortMemberPath="RiskLevel"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </Grid>
@@ -495,11 +495,11 @@
                                           DoubleTapped="DataGrid_DoubleTapped"
                                           ContextFlyout="{StaticResource CleanupFileContextMenu}">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="2*" MinWidth="150"/>
-                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="Auto" MinWidth="70"/>
-                                        <DataGridTextColumn Header="Last Accessed" Binding="{Binding LastAccessedFormatted}" Width="Auto" MinWidth="100"/>
-                                        <DataGridTextColumn Header="Risk" Binding="{Binding Risk}" Width="Auto" MinWidth="60"/>
-                                        <DataGridTextColumn Header="Full Path" Binding="{Binding FilePath}" Width="3*" MinWidth="200"/>
+                                        <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="2*" MinWidth="150" SortMemberPath="FileName"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="Auto" MinWidth="70" SortMemberPath="SizeBytes"/>
+                                        <DataGridTextColumn Header="Last Accessed" Binding="{Binding LastAccessedFormatted}" Width="Auto" MinWidth="100" SortMemberPath="LastAccessed"/>
+                                        <DataGridTextColumn Header="Risk" Binding="{Binding Risk}" Width="Auto" MinWidth="60" SortMemberPath="Risk"/>
+                                        <DataGridTextColumn Header="Full Path" Binding="{Binding FilePath}" Width="3*" MinWidth="200" SortMemberPath="FilePath"/>
                                         <DataGridTemplateColumn Header="Open" Width="50">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
