@@ -18,6 +18,58 @@ using WinTrim.Core.Services;
 namespace WinTrim.Avalonia.ViewModels;
 
 /// <summary>
+/// Wrapper for DriveInfo that provides better display names for macOS
+/// </summary>
+public class DriveDisplayInfo
+{
+    public DriveInfo DriveInfo { get; }
+    public string DisplayName { get; }
+    public string Path { get; }
+    public long TotalSize => DriveInfo.IsReady ? DriveInfo.TotalSize : 0;
+    public long AvailableFreeSpace => DriveInfo.IsReady ? DriveInfo.AvailableFreeSpace : 0;
+    public string DriveType { get; }
+    
+    public DriveDisplayInfo(DriveInfo driveInfo, string? displayName = null)
+    {
+        DriveInfo = driveInfo;
+        Path = driveInfo.Name;
+        
+        // Determine display name
+        if (!string.IsNullOrEmpty(displayName))
+        {
+            DisplayName = displayName;
+        }
+        else if (Path == "/")
+        {
+            DisplayName = "Macintosh HD";
+        }
+        else if (Path.StartsWith("/Volumes/"))
+        {
+            DisplayName = System.IO.Path.GetFileName(Path);
+        }
+        else if (!string.IsNullOrEmpty(driveInfo.VolumeLabel))
+        {
+            DisplayName = driveInfo.VolumeLabel;
+        }
+        else
+        {
+            DisplayName = Path;
+        }
+        
+        // Determine drive type description
+        DriveType = driveInfo.DriveType switch
+        {
+            System.IO.DriveType.Fixed => "Local Disk",
+            System.IO.DriveType.Network => "Network Drive",
+            System.IO.DriveType.Removable => "Removable",
+            _ => "Drive"
+        };
+    }
+    
+    public override string ToString() => DisplayName;
+}
+
+/// <summary>
 /// Main ViewModel handling all disk analysis operations for Avalonia
 /// </summary>
 public partial class MainWindowViewModel : ViewModelBase
@@ -73,10 +125,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private ObservableCollection<TreemapLegendItem> _treemapLegendItems = new();
 
     [ObservableProperty]
-    private ObservableCollection<DriveInfo> _availableDrives = new();
+    private ObservableCollection<DriveDisplayInfo> _availableDrives = new();
 
     [ObservableProperty]
-    private DriveInfo? _selectedDrive;
+    private DriveDisplayInfo? _selectedDrive;
 
     [ObservableProperty]
     private ISeries[] _categorySeries = Array.Empty<ISeries>();
@@ -184,7 +236,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _themeService.ApplyTheme("Default");
         
         LoadAvailableDrives();
-        Console.WriteLine($"[ViewModel] Constructor complete. AvailableDrives: {AvailableDrives.Count}, SelectedDrive: {SelectedDrive?.Name ?? "null"}");
+        Console.WriteLine($"[ViewModel] Constructor complete. AvailableDrives: {AvailableDrives.Count}, SelectedDrive: {SelectedDrive?.DisplayName ?? "null"}");
     }
     
     /// <summary>
@@ -272,17 +324,115 @@ public partial class MainWindowViewModel : ViewModelBase
     private void LoadAvailableDrives()
     {
         AvailableDrives.Clear();
-        foreach (var drive in DriveInfo.GetDrives())
+        
+        if (OperatingSystem.IsMacOS())
         {
-            if (drive.IsReady)
+            // On macOS, use filtered drive list to hide system volumes
+            foreach (var drive in GetMacOSDrives())
             {
                 AvailableDrives.Add(drive);
             }
         }
+        else
+        {
+            // Windows/Linux - show ready fixed/removable drives
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (drive.IsReady && (drive.DriveType == DriveType.Fixed || 
+                                       drive.DriveType == DriveType.Removable ||
+                                       drive.DriveType == DriveType.Network))
+                {
+                    AvailableDrives.Add(new DriveDisplayInfo(drive));
+                }
+            }
+        }
+        
         if (AvailableDrives.Count > 0)
         {
             SelectedDrive = AvailableDrives[0];
         }
+    }
+    
+    /// <summary>
+    /// Gets filtered list of drives for macOS, hiding system volumes
+    /// </summary>
+    private static List<DriveDisplayInfo> GetMacOSDrives()
+    {
+        var drives = new List<DriveDisplayInfo>();
+        var addedPaths = new HashSet<string>();
+        
+        // Always include root volume (main Mac disk) - shown as "Macintosh HD"
+        var rootDrive = new DriveInfo("/");
+        if (rootDrive.IsReady)
+        {
+            addedPaths.Add("/");
+            drives.Add(new DriveDisplayInfo(rootDrive, "Macintosh HD"));
+        }
+        
+        // Scan /Volumes for external drives (including NAS mounts)
+        var volumesPath = "/Volumes";
+        if (Directory.Exists(volumesPath))
+        {
+            foreach (var volumePath in Directory.GetDirectories(volumesPath))
+            {
+                var volumeName = Path.GetFileName(volumePath);
+                
+                // Skip system and hidden volumes
+                if (ShouldSkipMacVolume(volumeName, volumePath))
+                    continue;
+                
+                if (addedPaths.Contains(volumePath))
+                    continue;
+                
+                try
+                {
+                    var drive = new DriveInfo(volumePath);
+                    if (drive.IsReady)
+                    {
+                        addedPaths.Add(volumePath);
+                        // Use the volume folder name as the display name
+                        drives.Add(new DriveDisplayInfo(drive, volumeName));
+                    }
+                }
+                catch
+                {
+                    // Skip volumes we can't access
+                }
+            }
+        }
+        
+        return drives;
+    }
+    
+    /// <summary>
+    /// Determines if a macOS volume should be hidden from users
+    /// </summary>
+    private static bool ShouldSkipMacVolume(string volumeName, string volumePath)
+    {
+        // Skip main disk symlinks in /Volumes
+        if (volumeName == "Macintosh HD" || volumeName == "Macintosh HD - Data")
+            return true;
+        
+        // Skip APFS system container volumes
+        var lowerName = volumeName.ToLowerInvariant();
+        var systemNames = new[] { "preboot", "recovery", "vm", "update", "xarts", 
+                                   "iscpreboot", "hardware", "data", "home" };
+        if (systemNames.Contains(lowerName))
+            return true;
+        
+        // Skip system volume paths
+        if (volumePath.StartsWith("/System/Volumes", StringComparison.OrdinalIgnoreCase))
+            return true;
+        
+        // Skip Xcode simulator volumes
+        if (volumePath.Contains("/CoreSimulator/", StringComparison.OrdinalIgnoreCase))
+            return true;
+        
+        // Skip Apple-internal volumes
+        if (lowerName.StartsWith("com.apple."))
+            return true;
+        
+        return false;
     }
 
     #region Commands
@@ -292,14 +442,14 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (SelectedDrive == null) return;
 
-        Console.WriteLine($"[ViewModel] StartScan called for drive: {SelectedDrive.Name}");
+        Console.WriteLine($"[ViewModel] StartScan called for drive: {SelectedDrive.DisplayName} ({SelectedDrive.Path})");
         
         CanStart = false;
         CanStop = true;
         CanPause = true;
         ScanProgress.Reset();
         ScanProgress.State = ScanState.Scanning;
-        StatusText = $"Scanning {SelectedDrive.Name}...";
+        StatusText = $"Scanning {SelectedDrive.DisplayName}...";
 
         _cancellationTokenSource = new CancellationTokenSource();
 
@@ -318,9 +468,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 ScanProgress.StatusMessage = p.StatusMessage;
             });
 
-            // Run actual scan using injected FileScanner
+            // Run actual scan using injected FileScanner - use Path for the actual scan path
             var result = await _fileScanner.ScanAsync(
-                SelectedDrive.RootDirectory.FullName, 
+                SelectedDrive.Path, 
                 progress, 
                 _cancellationTokenSource.Token);
 

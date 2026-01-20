@@ -254,23 +254,41 @@ public abstract class DevToolDetectorBase : IDevToolDetector
         catch { /* Skip inaccessible */ }
     }
     
-    protected static long GetDirectorySize(DirectoryInfo directory)
+    protected static long GetDirectorySize(DirectoryInfo directory, int maxDepth = 20)
     {
+        // Prevent infinite recursion
+        if (maxDepth <= 0) return 0;
+        
         long size = 0;
         try
         {
+            // Skip symlinks to prevent following into other filesystems
+            if ((directory.Attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
+                return 0;
+            
+            // Skip common problematic macOS paths that can cause hangs
+            var name = directory.Name.ToLowerInvariant();
+            if (name == "coresimulator" || name == "simulators" || name == ".timemachine" || 
+                name == "time machine backups" || name.Contains(".mobilebackups"))
+                return 0;
+            
             foreach (var file in directory.GetFiles())
             {
-                size += file.Length;
+                try { size += file.Length; } catch { }
             }
 
             foreach (var subDir in directory.GetDirectories())
             {
-                size += GetDirectorySize(subDir);
+                // Skip symlinks
+                if ((subDir.Attributes & FileAttributes.ReparsePoint) != FileAttributes.ReparsePoint)
+                {
+                    size += GetDirectorySize(subDir, maxDepth - 1);
+                }
             }
         }
         catch (UnauthorizedAccessException) { }
         catch (DirectoryNotFoundException) { }
+        catch { /* Catch all for any other errors */ }
         
         return size;
     }

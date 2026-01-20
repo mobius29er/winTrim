@@ -85,17 +85,20 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="24,0">
                     <ComboBox ItemsSource="{Binding AvailableDrives}" 
                               SelectedItem="{Binding SelectedDrive}"
-                              Width="200" Margin="0,0,8,0"
+                              Width="280" Margin="0,0,8,0"
                               VerticalContentAlignment="Center">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Name}" FontWeight="Medium" Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding VolumeLabel}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Medium" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding DriveType}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                     <TextBlock Text=" - " Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding TotalSize, Converter={StaticResource FileSizeConverter}}" 
+                                               Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock Text=" (" Foreground="{DynamicResource TextMutedBrush}"/>
                                     <TextBlock Text="{Binding AvailableFreeSpace, Converter={StaticResource FileSizeConverter}}" 
                                                Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                    <TextBlock Text=" free" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock Text=" free)" Foreground="{DynamicResource TextMutedBrush}"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>

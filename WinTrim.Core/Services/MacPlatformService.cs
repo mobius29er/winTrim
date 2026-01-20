@@ -34,31 +34,77 @@ public class MacPlatformService : IPlatformService
 
     public IEnumerable<DriveInfoModel> GetDrives()
     {
-        // On macOS, we scan mounted volumes
-        var volumesPath = "/Volumes";
+        var addedPaths = new HashSet<string>();
         
-        // Always include the root volume
-        yield return CreateDriveInfo("/", "Macintosh HD");
+        // Always include the user's home folder root (main disk)
+        var mainDrive = CreateDriveInfoSafe("/", "Macintosh HD");
+        if (mainDrive != null)
+        {
+            addedPaths.Add("/");
+            yield return mainDrive;
+        }
 
+        // Scan /Volumes for external drives, NAS, and other mounted volumes
+        var volumesPath = "/Volumes";
         if (Directory.Exists(volumesPath))
         {
             foreach (var volume in Directory.GetDirectories(volumesPath))
             {
                 var volumeName = Path.GetFileName(volume);
                 
-                // Skip the main disk symlink in /Volumes
-                if (volumeName == "Macintosh HD") continue;
+                // Skip system volumes and internal macOS partitions
+                if (ShouldSkipVolume(volumeName, volume))
+                    continue;
                 
-                var driveInfo = CreateDriveInfo(volume, volumeName);
+                // Skip if we already added this (like main disk symlink)
+                if (addedPaths.Contains(volume))
+                    continue;
+                
+                var driveInfo = CreateDriveInfoSafe(volume, volumeName);
                 if (driveInfo != null)
                 {
+                    addedPaths.Add(volume);
                     yield return driveInfo;
                 }
             }
         }
     }
+    
+    /// <summary>
+    /// Determines if a volume should be hidden from the user
+    /// </summary>
+    private static bool ShouldSkipVolume(string volumeName, string volumePath)
+    {
+        // Skip the main disk symlink in /Volumes (we already show root /)
+        if (volumeName == "Macintosh HD" || volumeName == "Macintosh HD - Data")
+            return true;
+        
+        // Skip macOS system volumes (APFS container volumes)
+        var lowerName = volumeName.ToLowerInvariant();
+        if (lowerName == "preboot" || 
+            lowerName == "recovery" || 
+            lowerName == "vm" || 
+            lowerName == "update" ||
+            lowerName.StartsWith("com.apple."))
+            return true;
+            
+        // Check if path indicates a system volume
+        if (volumePath.StartsWith("/System/Volumes", StringComparison.OrdinalIgnoreCase))
+            return true;
+            
+        // Skip iOS/watchOS/tvOS simulator volumes
+        if (volumePath.Contains("/CoreSimulator/", StringComparison.OrdinalIgnoreCase))
+            return true;
+            
+        // Skip hidden/system volumes (xarts, iSCPreboot, Hardware, etc.)
+        var systemVolumes = new[] { "xarts", "iscpreboot", "hardware", "data", "home" };
+        if (systemVolumes.Contains(lowerName))
+            return true;
+            
+        return false;
+    }
 
-    private static DriveInfoModel? CreateDriveInfo(string path, string label)
+    private static DriveInfoModel? CreateDriveInfoSafe(string path, string label)
     {
         try
         {

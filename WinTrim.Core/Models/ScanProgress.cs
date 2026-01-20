@@ -51,7 +51,15 @@ public partial class ScanProgress : ObservableObject
     [ObservableProperty]
     private string _statusMessage = "Ready to scan";
 
+    [ObservableProperty]
+    private long _totalDiskSize;
+
+    [ObservableProperty]
+    private long _usedDiskSpace;
+
     public string BytesFormatted => FormatSize(BytesScanned);
+    public string TotalDiskSizeFormatted => FormatSize(TotalDiskSize);
+    public string UsedDiskSpaceFormatted => FormatSize(UsedDiskSpace);
 
     private static string FormatSize(long bytes)
     {
@@ -78,6 +86,8 @@ public partial class ScanProgress : ObservableObject
         _errorCount = 0;
         ProgressPercentage = 0;
         StatusMessage = "Ready to scan";
+        TotalDiskSize = 0;
+        UsedDiskSpace = 0;
         
         // Notify property changes
         OnPropertyChanged(nameof(FilesScanned));

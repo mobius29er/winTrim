@@ -1,13 +1,25 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using WinTrim.Core.Models;
 
 namespace WinTrim.Core.Services;
+
+/// <summary>
+/// Type of storage drive for parallelism optimization
+/// </summary>
+internal enum DriveStorageType
+{
+    Ssd,      // Solid-state drive - high parallelism
+    Hdd,      // Spinning disk - limited parallelism
+    Network   // Network/NAS - very limited parallelism due to latency
+}
 
 /// <summary>
 /// High-performance file scanner with async enumeration and pause/resume support.
@@ -24,20 +36,38 @@ public sealed class FileScanner : IFileScanner
     private readonly ConcurrentBag<FileSystemItem> _largestFiles = new();
     private readonly ConcurrentDictionary<ItemCategory, CategoryStats> _categoryStats = new();
     
+    // Track seen inodes to prevent counting hardlinked/firmlinked files multiple times (macOS/Linux)
+    private readonly ConcurrentDictionary<ulong, bool> _seenInodes = new();
+    
     // Pause mechanism using ManualResetEventSlim (more efficient than ManualResetEvent)
     private readonly ManualResetEventSlim _pauseEvent = new(true); // Initially signaled (not paused)
     private volatile bool _isPaused;
     
+    // Cached SSD detection result per drive
+    private readonly ConcurrentDictionary<string, bool> _ssdCache = new();
+    
+    // Root filesystem device ID for staying within mount boundaries (Unix)
+    private ulong _rootDeviceId;
+
     // Progress tracking
     private long _totalExpectedBytes;
     private IProgress<ScanProgress>? _progressReporter;
     private ScanProgress? _currentScanProgress;
     private int _lastReportedFileCount;
     
-    // Performance tuning
+    // Performance tuning - parallelism is determined dynamically based on drive type
     private const int LargestFilesLimit = 100;
-    private const int MaxParallelism = 4; // Limit parallel directory scans to prevent disk thrashing
-    private const int ProgressReportInterval = 100; // Report every N files
+    private const int SsdParallelism = 16;     // SSDs can handle high parallelism
+    private const int HddParallelism = 4;      // HDDs need limited parallelism to avoid thrashing  
+    private const int NetworkParallelism = 2;  // Network drives limited by latency, not I/O
+    private int _currentMaxParallelism = 8;    // Default, updated per scan based on drive type
+    private const int ProgressReportInterval = 250; // Report every N files (balanced for responsiveness)
+    private const long LargeFileThreshold = 1 * 1024 * 1024; // Only track files > 1MB for largest files list
+    
+    // Drive type detection cache (true = fast storage SSD, false = slow storage HDD/Network)
+    // Network drives are cached separately
+    private readonly ConcurrentDictionary<string, bool> _networkDriveCache = new();
+    
     private static readonly EnumerationOptions FastEnumerationOptions = new()
     {
         IgnoreInaccessible = true,
@@ -82,9 +112,21 @@ public sealed class FileScanner : IFileScanner
         // Clear previous state
         _largestFiles.Clear();
         _categoryStats.Clear();
+        _seenInodes.Clear();
         _isPaused = false;
         _pauseEvent.Set();
         _lastReportedFileCount = 0;
+        
+        // Detect drive type and set parallelism accordingly
+        var driveType = DetectDriveType(path);
+        _currentMaxParallelism = driveType switch
+        {
+            DriveStorageType.Ssd => Math.Min(SsdParallelism, Environment.ProcessorCount),
+            DriveStorageType.Hdd => HddParallelism,
+            DriveStorageType.Network => NetworkParallelism,
+            _ => HddParallelism
+        };
+        Console.WriteLine($"[FileScanner] Drive type: {driveType}, using {_currentMaxParallelism} parallel workers");
         
         var result = new ScanResult
         {
@@ -94,21 +136,29 @@ public sealed class FileScanner : IFileScanner
 
         // Get total drive size for progress estimation
         long totalDriveBytes = 0;
+        long usedDriveBytes = 0;
         try
         {
             var driveInfo = new DriveInfo(Path.GetPathRoot(path) ?? path);
-            totalDriveBytes = driveInfo.TotalSize - driveInfo.AvailableFreeSpace; // Used space
+            totalDriveBytes = driveInfo.TotalSize;
+            usedDriveBytes = driveInfo.TotalSize - driveInfo.AvailableFreeSpace;
+            Console.WriteLine($"[FileScanner] Disk size: {FormatBytes(totalDriveBytes)} total, {FormatBytes(usedDriveBytes)} used, {FormatBytes(driveInfo.AvailableFreeSpace)} free");
         }
-        catch { /* Ignore if can't get drive info */ }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[FileScanner] Could not get drive info: {ex.Message}");
+        }
 
         var scanProgress = new ScanProgress
         {
             State = ScanState.Scanning,
-            StatusMessage = "Starting scan..."
+            StatusMessage = "Starting scan...",
+            TotalDiskSize = totalDriveBytes,
+            UsedDiskSpace = usedDriveBytes
         };
 
         // Store for progress calculation
-        _totalExpectedBytes = totalDriveBytes > 0 ? totalDriveBytes : 100L * 1024 * 1024 * 1024; // Default 100GB
+        _totalExpectedBytes = usedDriveBytes > 0 ? usedDriveBytes : 100L * 1024 * 1024 * 1024; // Default 100GB
         _progressReporter = progress;
         _currentScanProgress = scanProgress;
 
@@ -133,12 +183,33 @@ public sealed class FileScanner : IFileScanner
 
             result.RootItem = rootItem;
 
-            // Scan recursively
-            await ScanDirectoryAsync(rootItem, scanProgress, progress, cancellationToken);
+            // Track filesystem device ID to prevent crossing mount points (critical for macOS root scan)
+            if (!OperatingSystem.IsWindows())
+            {
+                try
+                {
+                    _rootDeviceId = GetDeviceId(path);
+                    // Console.WriteLine($"[FileScanner] Root device ID: {_rootDeviceId}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Could not get root device info: {ex.Message}");
+                    _rootDeviceId = 0;
+                }
+            }
+
+            // Use parallel breadth-first scan with work-stealing for better performance
+            await ScanDirectoryParallelAsync(rootItem, scanProgress, progress, cancellationToken);
             Console.WriteLine($"[FileScanner] Recursive scan complete. Total files in bag: {_largestFiles.Count}");
 
             // Post-scan analysis phase
             scanProgress.ProgressPercentage = 96;
+            scanProgress.StatusMessage = "Calculating folder sizes...";
+            progress.Report(scanProgress);
+            
+            // Propagate sizes up the tree (needed for parallel scan approach)
+            CalculateFolderSizes(rootItem);
+
             scanProgress.StatusMessage = "Analyzing file structure...";
             progress.Report(scanProgress);
 
@@ -167,7 +238,7 @@ public sealed class FileScanner : IFileScanner
                 .Take(50)
                 .ToList();
 
-            // Detect games and dev tools in parallel for speed
+            // Detect games and dev tools in parallel for speed (with timeout to prevent hangs)
             scanProgress.ProgressPercentage = 97;
             scanProgress.StatusMessage = "Detecting games and dev tools...";
             progress.Report(scanProgress);
@@ -177,10 +248,25 @@ public sealed class FileScanner : IFileScanner
             Console.WriteLine($"[FileScanner] Starting dev tools detection...");
             var devToolTask = _devToolDetector.ScanAllAsync();
             
-            // Wait for both to complete
-            await Task.WhenAll(gameTask, devToolTask);
-            result.GameInstallations = await gameTask;
+            // Wait for both to complete with a 30 second timeout to prevent hangs
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+            var allTasks = Task.WhenAll(gameTask, devToolTask);
+            
+            var completedTask = await Task.WhenAny(allTasks, timeoutTask);
+            
+            if (completedTask == timeoutTask)
+            {
+                Console.WriteLine($"[FileScanner] Game/DevTool detection timed out after 30s - continuing with partial results");
+                result.GameInstallations = gameTask.IsCompleted ? await gameTask : new List<GameInstallation>();
+                result.DevTools = devToolTask.IsCompleted ? (await devToolTask).OrderByDescending(d => d.SizeBytes).ToList() : new List<CleanupItem>();
+            }
+            else
+            {
+                result.GameInstallations = await gameTask;
+                result.DevTools = (await devToolTask).OrderByDescending(d => d.SizeBytes).ToList();
+            }
             Console.WriteLine($"[FileScanner] Games found: {result.GameInstallations.Count}");
+            Console.WriteLine($"[FileScanner] DevTools found: {result.DevTools.Count}");
 
             // Get cleanup suggestions
             scanProgress.ProgressPercentage = 98;
@@ -188,10 +274,6 @@ public sealed class FileScanner : IFileScanner
             progress.Report(scanProgress);
             
             result.CleanupSuggestions = await _cleanupAdvisor.GetSuggestionsAsync(rootItem, cancellationToken);
-
-            // Dev tools result (already completed from Task.WhenAll above)
-            result.DevTools = (await devToolTask).OrderByDescending(d => d.SizeBytes).ToList();
-            Console.WriteLine($"[FileScanner] DevTools found: {result.DevTools.Count}");
 
             // Finalizing
             scanProgress.ProgressPercentage = 99;
@@ -252,6 +334,169 @@ public sealed class FileScanner : IFileScanner
         return result;
     }
 
+    /// <summary>
+    /// High-performance parallel directory scanner using work-stealing queue.
+    /// Much faster than recursive approach for deep directory trees.
+    /// </summary>
+    private async Task ScanDirectoryParallelAsync(
+        FileSystemItem rootFolder,
+        ScanProgress scanProgress,
+        IProgress<ScanProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        // Use a concurrent queue for work-stealing parallelism
+        var workQueue = new ConcurrentQueue<(FileSystemItem folder, DirectoryInfo dirInfo)>();
+        
+        // Seed with root
+        var rootDirInfo = new DirectoryInfo(rootFolder.FullPath);
+        workQueue.Enqueue((rootFolder, rootDirInfo));
+        
+        // Track active workers to know when we're done
+        var activeWorkers = 0;
+        var completionSource = new TaskCompletionSource<bool>();
+        var workerCount = _currentMaxParallelism;
+        
+        // Start worker tasks
+        var workers = new Task[workerCount];
+        for (int i = 0; i < workerCount; i++)
+        {
+            workers[i] = Task.Run(async () =>
+            {
+                Interlocked.Increment(ref activeWorkers);
+                try
+                {
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Pause checkpoint
+                        if (_isPaused)
+                        {
+                            _pauseEvent.Wait(cancellationToken);
+                        }
+                        
+                        if (workQueue.TryDequeue(out var work))
+                        {
+                            try
+                            {
+                                await ProcessDirectoryWorkItem(work.folder, work.dirInfo, workQueue, scanProgress, cancellationToken);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception)
+                            {
+                                Interlocked.Increment(ref scanProgress._errorCount);
+                            }
+                        }
+                        else
+                        {
+                            // No work available, check if all workers are idle
+                            if (Interlocked.Decrement(ref activeWorkers) == 0)
+                            {
+                                // All workers idle and queue empty - we're done
+                                completionSource.TrySetResult(true);
+                                return;
+                            }
+                            
+                            // Wait a bit for more work
+                            await Task.Delay(1, cancellationToken);
+                            Interlocked.Increment(ref activeWorkers);
+                            
+                            // Double-check if we should exit
+                            if (workQueue.IsEmpty && activeWorkers == 1)
+                            {
+                                Interlocked.Decrement(ref activeWorkers);
+                                completionSource.TrySetResult(true);
+                                return;
+                            }
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected on cancellation
+                }
+                finally
+                {
+                    if (Interlocked.Decrement(ref activeWorkers) == 0)
+                    {
+                        completionSource.TrySetResult(true);
+                    }
+                }
+            }, cancellationToken);
+        }
+        
+        // Wait for completion or cancellation
+        await completionSource.Task;
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+    
+    /// <summary>
+    /// Process a single directory work item - scan files and enqueue subdirectories
+    /// </summary>
+    private Task ProcessDirectoryWorkItem(
+        FileSystemItem folder,
+        DirectoryInfo dirInfo,
+        ConcurrentQueue<(FileSystemItem, DirectoryInfo)> workQueue,
+        ScanProgress scanProgress,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        scanProgress.CurrentFolder = folder.FullPath;
+        Interlocked.Increment(ref scanProgress._foldersScanned);
+        
+        try
+        {
+            // Process files in this directory
+            ProcessFilesOptimized(folder, dirInfo, scanProgress, cancellationToken);
+            
+            // Enumerate and enqueue subdirectories
+            foreach (var subDir in dirInfo.EnumerateDirectories("*", FastEnumerationOptions))
+            {
+                if (ShouldSkipDirectory(subDir))
+                    continue;
+                    
+                try
+                {
+                    var subFolder = new FileSystemItem
+                    {
+                        Name = subDir.Name,
+                        FullPath = subDir.FullName,
+                        IsFolder = true,
+                        Parent = folder,
+                        Created = subDir.CreationTime,
+                        LastModified = subDir.LastWriteTime,
+                        LastAccessed = subDir.LastAccessTime
+                    };
+                    
+                    // Thread-safe add to children
+                    lock (folder.Children)
+                    {
+                        folder.Children.Add(subFolder);
+                    }
+                    
+                    // Enqueue for parallel processing
+                    workQueue.Enqueue((subFolder, subDir));
+                }
+                catch (Exception)
+                {
+                    Interlocked.Increment(ref scanProgress._errorCount);
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        catch (IOException)
+        {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        
+        return Task.CompletedTask;
+    }
+
     private async Task ScanDirectoryAsync(
         FileSystemItem folder, 
         ScanProgress scanProgress, 
@@ -297,7 +542,7 @@ public sealed class FileScanner : IFileScanner
                 // Parallel scan for folders with many subdirectories
                 var parallelOptions = new ParallelOptions
                 {
-                    MaxDegreeOfParallelism = MaxParallelism,
+                    MaxDegreeOfParallelism = _currentMaxParallelism,
                     CancellationToken = cancellationToken
                 };
 
@@ -426,6 +671,21 @@ public sealed class FileScanner : IFileScanner
 
                 try
                 {
+                    // On macOS/Linux, check inode to skip hardlinked files we've already counted
+                    if (!OperatingSystem.IsWindows())
+                    {
+                        var inode = GetInode(file.FullName);
+                        if (inode != 0)
+                        {
+                            // TryAdd returns false if key already exists - skip this file
+                            if (!_seenInodes.TryAdd(inode, true))
+                            {
+                                // We've already counted this file via another path (hardlink)
+                                continue;
+                            }
+                        }
+                    }
+                    
                     var fileItem = new FileSystemItem
                     {
                         Name = file.Name,
@@ -447,8 +707,11 @@ public sealed class FileScanner : IFileScanner
                     }
                     Interlocked.Add(ref folder._size, fileItem.Size);
 
-                    // Track largest files (ConcurrentBag is already thread-safe)
-                    _largestFiles.Add(fileItem);
+                    // Track largest files - only add files above threshold to reduce memory pressure
+                    if (fileItem.Size >= LargeFileThreshold)
+                    {
+                        _largestFiles.Add(fileItem);
+                    }
 
                     // Update category stats (ConcurrentDictionary is thread-safe)
                     UpdateCategoryStats(fileItem);
@@ -517,7 +780,7 @@ public sealed class FileScanner : IFileScanner
             });
     }
 
-    private static bool ShouldSkipDirectory(DirectoryInfo dir)
+    private bool ShouldSkipDirectory(DirectoryInfo dir)
     {
         // Skip system directories that typically cause issues
         var name = dir.Name.ToLowerInvariant();
@@ -529,14 +792,110 @@ public sealed class FileScanner : IFileScanner
             name == "$windows.~ws")
             return true;
         
-        // macOS-specific
+        // macOS-specific directories to skip
         if (name == ".trash" ||
             name == ".fseventsd" ||
-            name == ".spotlight-v100")
+            name == ".spotlight-v100" ||
+            name == ".timemachine" ||
+            name == "com.apple.timemachine.localsnapshots")
             return true;
+        
+        // macOS: Skip other mount points when scanning root to avoid crossing filesystems
+        if (OperatingSystem.IsMacOS())
+        {
+            var fullPath = dir.FullName;
+            
+            // Skip entire /System directory - it's the read-only system volume (macOS 10.15+)
+            // Contains OS files, not user data. Skipping this prevents double-counting since
+            // /System/Volumes/Data contains firmlinks to /Applications, /Users, etc.
+            if (fullPath == "/System" || fullPath.StartsWith("/System/"))
+                return true;
+            
+            // Skip /Volumes entirely when scanning root - these are other mounted drives
+            if (fullPath == "/Volumes" || fullPath.StartsWith("/Volumes/"))
+                return true;
+            
+            // Skip cloud/NAS sync folders that point to remote storage
+            // These are local sync folders but contain replicated content from NAS/cloud
+            if (name == "synologydrive" || 
+                name == "cloudstation" ||
+                fullPath.Contains("/SynologyDrive/") ||
+                fullPath.Contains("/CloudStation/"))
+                return true;
+            
+            // Also skip common cloud storage mount/sync folders
+            if (name == "google drive" ||
+                name == "dropbox" ||
+                name == "onedrive" ||
+                name == "icloud drive" ||
+                fullPath.Contains("/Mobile Documents/"))  // iCloud
+                return true;
+                
+            // Skip Time Machine backups specifically
+            if (name.Contains(".timemachine") || 
+                name == "Time Machine Backups" || 
+                name == ".MobileBackups" ||
+                fullPath.Contains("/.MobileBackups"))
+                return true;
+            
+            // Skip /dev, /private/var/vm (swap), and other system paths
+            if (fullPath == "/dev" || 
+                fullPath == "/private/var/vm" ||
+                fullPath.StartsWith("/Library/Developer/CoreSimulator/"))
+                return true;
+            
+            // Check if directory is on a different filesystem (mount point)
+            // This catches firmlinks and other cross-volume references
+            if (_rootDeviceId != 0)
+            {
+                try
+                {
+                    // If device ID is different from root, we've crossed a filesystem boundary
+                    // This is the most reliable way to handle firmlinks and mounts on macOS
+                    ulong deviceId = GetDeviceId(fullPath);
+                    if (deviceId != 0 && deviceId != _rootDeviceId)
+                        return true;
+                }
+                catch
+                {
+                    // Ignore errors checking device ID
+                }
+            }
+            
+            try
+            {
+                // Skip if it's a symlink (firmlinks might NOT show as symlinks, hence device ID check above)
+                if (dir.LinkTarget != null)
+                    return true;
+            }
+            catch
+            {
+                // Ignore errors checking link target
+            }
+        }
         
         // Skip symlinks/junctions on all platforms
         return (dir.Attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint;
+    }
+
+    /// <summary>
+    /// Calculates folder sizes by summing child sizes (needed after parallel scan)
+    /// </summary>
+    private long CalculateFolderSizes(FileSystemItem item)
+    {
+        if (!item.IsFolder)
+        {
+            return item.Size;
+        }
+        
+        long totalSize = 0;
+        foreach (var child in item.Children)
+        {
+            totalSize += CalculateFolderSizes(child);
+        }
+        
+        item.Size = totalSize;
+        return totalSize;
     }
 
     private void CalculatePercentages(FileSystemItem item)
@@ -611,4 +970,428 @@ public sealed class FileScanner : IFileScanner
             return size;
         }, cancellationToken);
     }
+
+    #region SSD Detection
+    
+    /// <summary>
+    /// Detects the storage type of the drive containing the specified path.
+    /// Uses platform-specific methods with caching for performance.
+    /// </summary>
+    private DriveStorageType DetectDriveType(string path)
+    {
+        try
+        {
+            var root = Path.GetPathRoot(path) ?? path;
+            
+            // Check network cache first
+            if (_networkDriveCache.TryGetValue(root, out var isNetwork) && isNetwork)
+                return DriveStorageType.Network;
+            
+            // Check SSD cache
+            if (_ssdCache.TryGetValue(root, out var isSsd))
+                return isSsd ? DriveStorageType.Ssd : DriveStorageType.Hdd;
+            
+            DriveStorageType driveType;
+            
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                driveType = DetectDriveTypeMacOS(path);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                driveType = DetectDriveTypeWindows(root);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                driveType = DetectDriveTypeLinux(root);
+            }
+            else
+            {
+                // Unknown platform, assume SSD for better default performance
+                driveType = DriveStorageType.Ssd;
+            }
+            
+            // Cache the result
+            if (driveType == DriveStorageType.Network)
+                _networkDriveCache[root] = true;
+            else
+                _ssdCache[root] = driveType == DriveStorageType.Ssd;
+                
+            return driveType;
+        }
+        catch
+        {
+            // On any error, assume SSD (better default for modern systems)
+            return DriveStorageType.Ssd;
+        }
+    }
+    
+    /// <summary>
+    /// macOS drive detection - checks for network mounts and drive type
+    /// </summary>
+    private static DriveStorageType DetectDriveTypeMacOS(string path)
+    {
+        try
+        {
+            // First check if this is a network mount (NAS, SMB, NFS, AFP)
+            // Network mounts should use low parallelism due to network latency
+            var mountCheckPsi = new ProcessStartInfo
+            {
+                FileName = "mount",
+                Arguments = "",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using (var mountProcess = Process.Start(mountCheckPsi))
+            {
+                if (mountProcess != null)
+                {
+                    var mountOutput = mountProcess.StandardOutput.ReadToEnd();
+                    mountProcess.WaitForExit(2000);
+                    
+                    // Find the best matching mount point for this path (longest match wins)
+                    string? bestMatchMount = null;
+                    string? bestMatchOptions = null;
+                    int bestMatchLength = 0;
+                    
+                    var lines = mountOutput.Split('\n');
+                    foreach (var line in lines)
+                    {
+                        // Mount output format: /dev/disk1s1 on / (apfs, local, journaled)
+                        // or: //server/share on /Volumes/NAS (smbfs, ...)
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        
+                        var onIndex = line.IndexOf(" on ", StringComparison.Ordinal);
+                        if (onIndex < 0) continue;
+                        
+                        var afterOn = line[(onIndex + 4)..];
+                        var parenIndex = afterOn.IndexOf(" (", StringComparison.Ordinal);
+                        if (parenIndex < 0) continue;
+                        
+                        var mountPoint = afterOn[..parenIndex];
+                        var options = afterOn[(parenIndex + 2)..].TrimEnd(')');
+                        
+                        // Check if path starts with this mount point (longest match wins)
+                        if (path.StartsWith(mountPoint, StringComparison.Ordinal) && 
+                            mountPoint.Length > bestMatchLength)
+                        {
+                            bestMatchMount = mountPoint;
+                            bestMatchOptions = options;
+                            bestMatchLength = mountPoint.Length;
+                        }
+                    }
+                    
+                    if (bestMatchMount != null && bestMatchOptions != null)
+                    {
+                        var optionsLower = bestMatchOptions.ToLowerInvariant();
+                        
+                        // Network filesystems - treat as network storage
+                        if (optionsLower.Contains("smbfs") ||    // SMB/CIFS (NAS)
+                            optionsLower.Contains("nfs") ||      // NFS
+                            optionsLower.Contains("afpfs") ||    // AFP (older Mac shares)
+                            optionsLower.Contains("webdav"))     // WebDAV
+                        {
+                            Console.WriteLine($"[FileScanner] Detected NETWORK mount: {bestMatchMount} ({bestMatchOptions})");
+                            return DriveStorageType.Network;
+                        }
+                        
+                        // Local drive - check if it's internal/SSD
+                        if (optionsLower.Contains("local"))
+                        {
+                            // For local drives, assume SSD (all Macs since 2012)
+                            Console.WriteLine($"[FileScanner] Detected LOCAL drive: {bestMatchMount} ({bestMatchOptions})");
+                            return DriveStorageType.Ssd;
+                        }
+                        
+                        // Not explicitly local - might be external or network
+                        Console.WriteLine($"[FileScanner] Detected UNKNOWN mount type: {bestMatchMount} ({bestMatchOptions})");
+                    }
+                }
+            }
+            
+            // Fallback: use diskutil for more accurate detection
+            return DetectSsdMacOSDiskutil(path);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[FileScanner] macOS drive detection error: {ex.Message}");
+            return DriveStorageType.Ssd; // Default to SSD for local Macs
+        }
+    }
+    
+    /// <summary>
+    /// Uses diskutil to detect if a drive is SSD on macOS
+    /// </summary>
+    private static DriveStorageType DetectSsdMacOSDiskutil(string path)
+    {
+        try
+        {
+            // Get disk identifier for path using df
+            var dfPsi = new ProcessStartInfo
+            {
+                FileName = "df",
+                Arguments = $"\"{path}\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            string devicePath;
+            using (var dfProcess = Process.Start(dfPsi))
+            {
+                if (dfProcess == null) return DriveStorageType.Ssd;
+                var dfOutput = dfProcess.StandardOutput.ReadToEnd();
+                dfProcess.WaitForExit(2000);
+                
+                // Parse df output to get device (first column of second line)
+                var lines = dfOutput.Split('\n');
+                if (lines.Length < 2) return DriveStorageType.Ssd;
+                
+                var parts = lines[1].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 0) return DriveStorageType.Ssd;
+                
+                devicePath = parts[0];
+            }
+            
+            // Network paths don't start with /dev/
+            if (!devicePath.StartsWith("/dev/"))
+            {
+                Console.WriteLine($"[FileScanner] Non-local device (network): {devicePath}");
+                return DriveStorageType.Network;
+            }
+            
+            // Use diskutil to get drive info
+            var diskutilPsi = new ProcessStartInfo
+            {
+                FileName = "diskutil",
+                Arguments = $"info {devicePath}",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var diskutilProcess = Process.Start(diskutilPsi);
+            if (diskutilProcess == null) return DriveStorageType.Ssd;
+            
+            var output = diskutilProcess.StandardOutput.ReadToEnd();
+            diskutilProcess.WaitForExit(3000);
+            
+            // Check for SSD indicators
+            var outputLower = output.ToLowerInvariant();
+            
+            // "Solid State: Yes" indicates SSD
+            if (output.Contains("Solid State:"))
+            {
+                var isSsd = output.Contains("Solid State:   Yes") || 
+                           output.Contains("Solid State: Yes");
+                Console.WriteLine($"[FileScanner] diskutil reports Solid State: {isSsd}");
+                return isSsd ? DriveStorageType.Ssd : DriveStorageType.Hdd;
+            }
+            
+            // Check media type
+            if (outputLower.Contains("ssd") || outputLower.Contains("solid state"))
+                return DriveStorageType.Ssd;
+            if (outputLower.Contains("hdd") || outputLower.Contains("rotational"))
+                return DriveStorageType.Hdd;
+            
+            // Default: assume SSD for internal Mac drives
+            return DriveStorageType.Ssd;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[FileScanner] diskutil detection error: {ex.Message}");
+            return DriveStorageType.Ssd;
+        }
+    }
+    
+    /// <summary>
+    /// Windows drive type detection using PowerShell/WMI query
+    /// </summary>
+    private static DriveStorageType DetectDriveTypeWindows(string driveLetter)
+    {
+        try
+        {
+            // Check if it's a network drive first
+            var driveInfo = new DriveInfo(driveLetter);
+            if (driveInfo.DriveType == DriveType.Network)
+            {
+                Console.WriteLine($"[FileScanner] Windows detected network drive: {driveLetter}");
+                return DriveStorageType.Network;
+            }
+            
+            // Extract just the drive letter (e.g., "C" from "C:\")
+            var letter = driveLetter.TrimEnd('\\', ':');
+            if (letter.Length > 1) letter = letter[..1];
+            
+            // Use PowerShell to query drive media type
+            // MediaType: 3 = HDD, 4 = SSD, 5 = SCM
+            var psi = new ProcessStartInfo
+            {
+                FileName = "powershell",
+                Arguments = $"-NoProfile -Command \"(Get-PhysicalDisk | Where-Object {{ $_.DeviceId -eq (Get-Partition -DriveLetter '{letter}' | Get-Disk).Number }}).MediaType\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var process = Process.Start(psi);
+            if (process == null) return DriveStorageType.Ssd;
+            
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit(3000); // 3 second timeout
+            
+            // "SSD" or "Solid State Drive" indicates SSD
+            if (output.Contains("SSD", StringComparison.OrdinalIgnoreCase) ||
+                output.Contains("Solid", StringComparison.OrdinalIgnoreCase))
+            {
+                return DriveStorageType.Ssd;
+            }
+            
+            return DriveStorageType.Hdd;
+        }
+        catch
+        {
+            return DriveStorageType.Ssd; // Default to SSD on error
+        }
+    }
+    
+    /// <summary>
+    /// Linux drive type detection using /sys/block rotational flag
+    /// </summary>
+    private static DriveStorageType DetectDriveTypeLinux(string path)
+    {
+        try
+        {
+            // Check for network mounts first
+            var mountPsi = new ProcessStartInfo
+            {
+                FileName = "bash",
+                Arguments = $"-c \"mount | grep ' {path} ' | head -1\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using (var mountProcess = Process.Start(mountPsi))
+            {
+                if (mountProcess != null)
+                {
+                    var mountOutput = mountProcess.StandardOutput.ReadToEnd().ToLowerInvariant();
+                    mountProcess.WaitForExit(2000);
+                    
+                    if (mountOutput.Contains("nfs") || mountOutput.Contains("cifs") || 
+                        mountOutput.Contains("smb") || mountOutput.Contains("sshfs"))
+                    {
+                        Console.WriteLine($"[FileScanner] Linux detected network mount: {path}");
+                        return DriveStorageType.Network;
+                    }
+                }
+            }
+            
+            // Find the block device for this path
+            // Use df to get the device, then check /sys/block
+            var psi = new ProcessStartInfo
+            {
+                FileName = "bash",
+                Arguments = $"-c \"lsblk -no ROTA $(df '{path}' | tail -1 | awk '{{print $1}}') 2>/dev/null | head -1\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var process = Process.Start(psi);
+            if (process == null) return DriveStorageType.Ssd;
+            
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit(3000);
+            
+            // ROTA=0 means non-rotational (SSD), ROTA=1 means rotational (HDD)
+            if (int.TryParse(output, out var rotational))
+            {
+                return rotational == 0 ? DriveStorageType.Ssd : DriveStorageType.Hdd;
+            }
+            
+            return DriveStorageType.Ssd; // Default to SSD on parse error
+        }
+        catch
+        {
+            return DriveStorageType.Ssd; // Default to SSD on error
+        }
+    }
+    
+    #endregion
+    
+    #region Helpers
+    
+    /// <summary>
+    /// Gets the device ID for a path to prevent crossing filesystems (macOS/Linux)
+    /// </summary>
+    private static ulong GetDeviceId(string path)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            try 
+            {
+                // struct stat is large, allocate enough buffer
+                byte[] buffer = new byte[256];
+                if (stat_bytebuffer(path, buffer) == 0)
+                {
+                    // st_dev is at offset 0 (int32 on macOS)
+                    return (ulong)BitConverter.ToInt32(buffer, 0);
+                }
+            }
+            catch { /* Ignore P/Invoke errors */ }
+        }
+        
+        return 0;
+    }
+
+    /// <summary>
+    /// Gets the inode number for a file to detect hardlinks (macOS/Linux only)
+    /// Returns 0 if unable to get inode (Windows or error)
+    /// </summary>
+    private static ulong GetInode(string path)
+    {
+        if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+        {
+            try 
+            {
+                // struct stat buffer - st_ino is at offset 8 on macOS (after st_dev which is 4 bytes + padding)
+                byte[] buffer = new byte[256];
+                if (stat_bytebuffer(path, buffer) == 0)
+                {
+                    // On macOS ARM64: st_ino is at offset 8 as a uint64
+                    return BitConverter.ToUInt64(buffer, 8);
+                }
+            }
+            catch { /* Ignore P/Invoke errors */ }
+        }
+        
+        return 0;
+    }
+
+    [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
+    private static extern int stat_bytebuffer(string path, byte[] buffer);
+
+    /// <summary>
+    /// Formats bytes into human-readable string
+    /// </summary>
+    private static string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int suffixIndex = 0;
+        double size = bytes;
+
+        while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+        {
+            size /= 1024;
+            suffixIndex++;
+        }
+
+        return $"{size:N2} {suffixes[suffixIndex]}";
+    }
+    
+    #endregion
 }
