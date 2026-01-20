@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <RootNamespace>WinTrim.Avalonia</RootNamespace>
+    <AssemblyName>WinTrim</AssemblyName>
+    
+    <!-- App metadata -->
+    <Product>WinTrim</Product>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Company>Mobius29er</Company>
+    <Authors>Jeremy Foxx</Authors>
+    <Description>Analyze and optimize your disk storage</Description>
+    <Copyright>Copyright © 2026 Mobius29er</Copyright>
+    
+    <!-- macOS specific -->
+    <CFBundleName>WinTrim</CFBundleName>
+    <CFBundleDisplayName>WinTrim</CFBundleDisplayName>
+    <CFBundleIdentifier>com.mobius29er.wintrim</CFBundleIdentifier>
+    <CFBundleVersion>1.0.0</CFBundleVersion>
+    <CFBundleShortVersionString>1.0.0</CFBundleShortVersionString>
+    <NSHighResolutionCapable>true</NSHighResolutionCapable>
+    
+    <!-- Windows specific -->
+    <ApplicationIcon>Assets\wintrim.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+    <AvaloniaResource Include="Themes\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.2" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.2" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.2" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.2" />
+    <PackageReference Include="Avalonia.Skia" Version="11.2.2" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.2" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.2.2" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.Avalonia" Version="2.0.0-rc2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WinTrim.Core\WinTrim.Core.csproj" />
+  </ItemGroup>
+</Project>

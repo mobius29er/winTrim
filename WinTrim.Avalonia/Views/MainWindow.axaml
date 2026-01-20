@@ -1,0 +1,824 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:WinTrim.Avalonia.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:lvc="using:LiveChartsCore.SkiaSharpView.Avalonia"
+        xmlns:ctrl="using:WinTrim.Avalonia.Controls"
+        mc:Ignorable="d" 
+        d:DesignWidth="1280" d:DesignHeight="800"
+        x:Class="WinTrim.Avalonia.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="WinTrim - Disk Analyzer"
+        Icon="/Assets/wintrim.png"
+        Width="1280" Height="800"
+        MinWidth="900" MinHeight="600"
+        Background="{DynamicResource BackgroundBrush}"
+        FontSize="{DynamicResource BaseFontSize}"
+        WindowStartupLocation="CenterScreen">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Window.Resources>
+        <!-- File/Folder Context Menu -->
+        <MenuFlyout x:Key="FileItemContextMenu">
+            <MenuItem Header="📂 Open File Location" Click="FileItemOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="FileItemCopyPath_Click"/>
+        </MenuFlyout>
+        
+        <!-- Game Context Menu -->
+        <MenuFlyout x:Key="GameContextMenu">
+            <MenuItem Header="📂 Open Game Folder" Click="GameOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="GameCopyPath_Click"/>
+        </MenuFlyout>
+        
+        <!-- Developer Tool Context Menu -->
+        <MenuFlyout x:Key="DevToolContextMenu">
+            <MenuItem Header="📂 Open Location" Click="DevToolOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="DevToolCopyPath_Click"/>
+        </MenuFlyout>
+        
+        <!-- Treemap Context Menu -->
+        <MenuFlyout x:Key="TreemapContextMenu">
+            <MenuItem Header="📋 Copy Path" Click="TreemapCopyPath_Click"/>
+            <MenuItem Header="📂 Open Folder Location" Click="TreemapOpenFolder_Click"/>
+            <Separator/>
+            <MenuItem Header="⬆️ Navigate Back (Up)" Click="TreemapNavigateBack_Click"/>
+        </MenuFlyout>
+        
+        <!-- Cleanup File Context Menu -->
+        <MenuFlyout x:Key="CleanupFileContextMenu">
+            <MenuItem Header="📂 Open File Location" Click="CleanupFileOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="CleanupFileCopyPath_Click"/>
+        </MenuFlyout>
+        
+        <!-- Cleanup Suggestion Context Menu -->
+        <MenuFlyout x:Key="CleanupSuggestionContextMenu">
+            <MenuItem Header="📂 Open Location" Click="CleanupSuggestionOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="CleanupSuggestionCopyPath_Click"/>
+        </MenuFlyout>
+    </Window.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        
+        <!-- Header -->
+        <Border Grid.Row="0" 
+                Background="{DynamicResource SurfaceBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" 
+                BorderThickness="0,0,0,1"
+                Padding="24,16">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                
+                <!-- Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="💾" FontSize="28" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="WinTrim" FontSize="20" FontWeight="Bold" 
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Analyze and optimize your storage" FontSize="12" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </StackPanel>
+                
+                <!-- Drive Selection -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="24,0">
+                    <ComboBox ItemsSource="{Binding AvailableDrives}" 
+                              SelectedItem="{Binding SelectedDrive}"
+                              Width="280" Margin="0,0,8,0"
+                              VerticalContentAlignment="Center">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Medium" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding DriveType}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock Text=" - " Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding TotalSize, Converter={StaticResource FileSizeConverter}}" 
+                                               Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock Text=" (" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding AvailableFreeSpace, Converter={StaticResource FileSizeConverter}}" 
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock Text=" free)" Foreground="{DynamicResource TextMutedBrush}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    
+                    <!-- Express Scan Toggle -->
+                    <CheckBox IsChecked="{Binding ExpressScanEnabled}" 
+                              Content="⚡ Express" 
+                              ToolTip.Tip="Express mode: Scan only your user folder (~/) for faster results. Disable for full disk scan."
+                              Margin="0,0,8,0"
+                              VerticalAlignment="Center"/>
+                    
+                    <Button Content="📁 Browse" Command="{Binding BrowseFolderCommand}" 
+                            Classes="Outline" Margin="0,0,8,0"/>
+                    
+                    <Button Content="🔄" Command="{Binding RefreshDrivesCommand}" 
+                            Classes="Outline" ToolTip.Tip="Refresh drives" Padding="8"/>
+                </StackPanel>
+                
+                <!-- Scan Controls -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="⚙" Command="{Binding ToggleSettingsCommand}"
+                            Classes="Outline" 
+                            ToolTip.Tip="Settings" Padding="10,8" Margin="0,0,8,0"
+                            FontSize="16"/>
+                    
+                    <Button Content="▶ Start Scan" Command="{Binding StartScanCommand}"
+                            Classes="Primary" Margin="0,0,8,0"
+                            IsEnabled="{Binding CanStart}"/>
+                    <Button Command="{Binding RecallLastScanCommand}"
+                            Classes="Outline" Margin="0,0,8,0"
+                            IsVisible="{Binding HasCachedScan}"
+                            IsEnabled="{Binding CanStart}"
+                            ToolTip.Tip="{Binding CachedScanInfo}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,4,0"/>
+                            <TextBlock Text="Recall"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Content="⏸ Pause" Command="{Binding PauseScanCommand}"
+                            Classes="Outline" Margin="0,0,8,0"
+                            IsVisible="{Binding CanPause}"/>
+                    <Button Content="▶ Resume" Command="{Binding ResumeScanCommand}"
+                            Classes="Secondary" Margin="0,0,8,0"
+                            IsVisible="{Binding CanResume}"/>
+                    <Button Content="⏹ Stop" Command="{Binding StopScanCommand}"
+                            Classes="Danger"
+                            IsVisible="{Binding CanStop}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        
+        <!-- Progress Bar -->
+        <Border Grid.Row="1" 
+                Background="{DynamicResource SurfaceBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" 
+                BorderThickness="0,0,0,1"
+                Padding="24,12" 
+                IsVisible="{Binding CanStop}">
+            <Grid ColumnDefinitions="*,Auto">
+                
+                <StackPanel Grid.Column="0">
+                    <ProgressBar Value="{Binding ScanProgress.ProgressPercentage}" 
+                                 Maximum="100" 
+                                 Classes="ScanProgress" 
+                                 Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding ScanProgress.CurrentFolder}" 
+                               FontSize="12" 
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="24,0,0,0">
+                    <TextBlock Text="{Binding ScanProgress.FilesScanned, StringFormat='{}{0:N0} files'}" 
+                               Margin="0,0,16,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding ScanProgress.FoldersScanned, StringFormat='{}{0:N0} folders'}" 
+                               Margin="0,0,16,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding ScanProgress.BytesScanned, Converter={StaticResource FileSizeConverter}}" 
+                               FontWeight="Medium" Foreground="{DynamicResource PrimaryBrush}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        
+        <!-- Main Content -->
+        <TabControl x:Name="MainTabControl" Grid.Row="2" Margin="24,16">
+            
+            <!-- Overview Tab -->
+            <TabItem Header="📊 Overview">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="0,16,0,0" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                    
+                        <!-- Category Breakdown -->
+                        <Border Grid.Column="0" Grid.Row="0" Classes="Card" Margin="0,0,8,8">
+                            <Grid ColumnDefinitions="Auto,*">
+                                
+                                <!-- Left: Pie Chart -->
+                                <StackPanel Grid.Column="0" Width="220">
+                                    <TextBlock Text="File Categories" Classes="SectionHeader"/>
+                                    <lvc:PieChart Series="{Binding CategorySeries}" 
+                                                  Height="140" Width="140"
+                                                  TooltipPosition="Top"
+                                                  LegendPosition="Hidden"
+                                                  Margin="5,0,0,12"/>
+                                    
+                                    <!-- Category Legend -->
+                                    <ScrollViewer MaxHeight="180">
+                                        <ItemsControl ItemsSource="{Binding CategoryLegendItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:CategoryLegendItem">
+                                                    <Button Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectCategoryCommand}"
+                                                            CommandParameter="{Binding CategoryKey}"
+                                                            HorizontalContentAlignment="Left"
+                                                            Padding="4,3" Margin="0,1"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Cursor="Hand">
+                                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                                            <Ellipse Grid.Column="0" Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                     Fill="{Binding Color}"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding DisplayText}" FontSize="11"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                       TextTrimming="CharacterEllipsis" MaxWidth="130"/>
+                                                            <TextBlock Grid.Column="2" Text="{Binding FileCountText}" FontSize="10"
+                                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                                       VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                                
+                                <!-- Right: File List -->
+                                <Grid Grid.Column="1" Margin="12,0,0,0" RowDefinitions="Auto,*">
+                                    
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding SelectedCategoryName, FallbackValue='Select a category'}" 
+                                                   FontWeight="SemiBold" FontSize="14"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <TextBlock Text="{Binding CategoryFiles.Count, StringFormat=' ({0} files)'}" 
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   IsVisible="{Binding SelectedCategoryName, Converter={StaticResource NullToBool}}"/>
+                                    </StackPanel>
+                                    
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding CategoryFiles}" 
+                                              MaxHeight="200"
+                                              CanUserSortColumns="True"
+                                              CanUserResizeColumns="True"
+                                              HorizontalScrollBarVisibility="Auto"
+                                              DoubleTapped="DataGrid_DoubleTapped"
+                                              SelectionChanged="FileItem_SelectionChanged"
+                                              ContextFlyout="{StaticResource FileItemContextMenu}">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="80" SortMemberPath="Name"/>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="65" SortMemberPath="Size"/>
+                                            <DataGridTemplateColumn Header="Open" Width="50">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="📂" 
+                                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenInExplorerCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Classes="Outline" 
+                                                                Padding="2" Cursor="Hand"
+                                                                ToolTip.Tip="Open file location"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                        
+                        <!-- Largest Folders -->
+                        <Border Grid.Column="1" Grid.Row="0" Classes="Card" Margin="8,0,0,8">
+                            <Grid ColumnDefinitions="*,*">
+                                <Grid Grid.Column="0" RowDefinitions="Auto,*">
+                                    <TextBlock Grid.Row="0" Text="Largest Folders" Classes="SectionHeader"/>
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding LargestFolders}" 
+                                              MaxHeight="260" Margin="0,8,0,0"
+                                              IsReadOnly="True"
+                                              CanUserSortColumns="True"
+                                              CanUserResizeColumns="True"
+                                              HorizontalScrollBarVisibility="Auto"
+                                              HeadersVisibility="Column"
+                                              GridLinesVisibility="None"
+                                              Background="Transparent"
+                                              DoubleTapped="DataGrid_DoubleTapped"
+                                              SelectionChanged="LargestFolders_SelectionChanged"
+                                              ContextFlyout="{StaticResource FileItemContextMenu}">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Name" Width="2*" SortMemberPath="Name">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Button Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectFolderCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                                                HorizontalContentAlignment="Left" Padding="4,2">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="📁" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Name}" 
+                                                                           Foreground="{DynamicResource TextPrimaryBrush}" 
+                                                                           VerticalAlignment="Center"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="60" SortMemberPath="Size"/>
+                                            <DataGridTemplateColumn Header="Open" Width="50">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="📂" ToolTip.Tip="Open in Explorer"
+                                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenInExplorerCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Background="Transparent" BorderThickness="0"
+                                                                Padding="4,2" Cursor="Hand"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                                <Grid Grid.Column="1" Margin="16,0,0,0" RowDefinitions="Auto,*">
+                                    <TextBlock Grid.Row="0" Text="{Binding SelectedFolderName, FallbackValue='Click a folder to see contents'}" 
+                                               Classes="SectionHeader" FontSize="14"/>
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding FolderContents}" 
+                                              MaxHeight="200" Margin="0,8,0,0"
+                                              CanUserResizeColumns="True"
+                                              HorizontalScrollBarVisibility="Auto"
+                                              DoubleTapped="DataGrid_DoubleTapped"
+                                              SelectionChanged="FileItem_SelectionChanged"
+                                              ContextFlyout="{StaticResource FileItemContextMenu}">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="80" SortMemberPath="Name"/>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="60" SortMemberPath="Size"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                        
+                        <!-- Games Section -->
+                        <Border Grid.Column="0" Grid.Row="1" Classes="Card" Margin="0,8,8,0">
+                            <StackPanel>
+                                <TextBlock Text="🎮 Game Installations" Classes="SectionHeader"/>
+                                <DataGrid ItemsSource="{Binding Games}" 
+                                          MaxHeight="200"
+                                          IsReadOnly="True"
+                                          CanUserSortColumns="True"
+                                          CanUserResizeColumns="True"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          DoubleTapped="DataGrid_DoubleTapped"
+                                          SelectionChanged="Game_SelectionChanged"
+                                          ContextFlyout="{StaticResource GameContextMenu}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="100" SortMemberPath="Name"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="60" SortMemberPath="Size"/>
+                                        <DataGridTextColumn Header="Last Played" Binding="{Binding LastPlayed, Converter={StaticResource RelativeTime}}" Width="*" MinWidth="70" SortMemberPath="LastPlayed"/>
+                                        <DataGridTemplateColumn Header="Open" Width="50">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="📂" 
+                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenGameFolderCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip.Tip="Open in Explorer"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Padding="4,2"
+                                                            Cursor="Hand"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Developer Tools Section - moved to right column -->
+                        <Border Grid.Column="1" Grid.Row="1" Classes="Card" Margin="8,8,0,0">
+                            <Grid RowDefinitions="Auto,Auto,*">
+                                <TextBlock Grid.Row="0" Text="🛠️ Developer Tools &amp; Caches" Classes="SectionHeader"/>
+                                <TextBlock Grid.Row="1" Text="Large caches from development tools that can be safely cleaned"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="11"
+                                           Margin="0,0,0,8"/>
+                                <DataGrid Grid.Row="2" ItemsSource="{Binding DevToolItems}" 
+                                          MaxHeight="200"
+                                          IsReadOnly="True"
+                                          CanUserSortColumns="True"
+                                          CanUserResizeColumns="True"
+                                          HeadersVisibility="Column"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Auto"
+                                          DoubleTapped="DataGrid_DoubleTapped"
+                                          SelectionChanged="DevTool_SelectionChanged"
+                                          ContextFlyout="{StaticResource DevToolContextMenu}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="80" SortMemberPath="Name"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="*" MinWidth="60" SortMemberPath="SizeBytes"/>
+                                        <DataGridTextColumn Header="Last Used" Binding="{Binding LastAccessedFormatted}" Width="*" MinWidth="70"/>
+                                        <DataGridTemplateColumn Header="Open" Width="50">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="📂" 
+                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenDevToolPathCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip.Tip="Open in Explorer"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Padding="4,2"
+                                                            Cursor="Hand"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+            
+            <!-- Cleanup Tab - Full space for suggestions and file details -->
+            <TabItem Header="🧹 Cleanup">
+                <Grid Margin="0,16,0,0" RowDefinitions="Auto,*">
+                    
+                    <!-- Header with Quick Clean -->
+                    <Border Grid.Row="0" Classes="Card" Margin="0,0,0,8" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="🧹 Cleanup Suggestions" Classes="SectionHeader" Margin="0"/>
+                                <TextBlock Text=" - Select items to clean and free up disk space" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                           VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </StackPanel>
+                            <Button Grid.Column="2" 
+                                    x:Name="QuickCleanButton"
+                                    Click="QuickCleanButton_Click"
+                                    IsVisible="{Binding HasQuickCleanItems}"
+                                    Background="#4CAF50"
+                                    Foreground="White"
+                                    Padding="12,6"
+                                    Cursor="Hand"
+                                    ToolTip.Tip="Clean all safe/low-risk items with one click">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⚡ Quick Clean" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding QuickCleanInfo}" Margin="8,0,0,0" Opacity="0.9"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Main Cleanup Content -->
+                    <Grid Grid.Row="1" ColumnDefinitions="*,2*">
+                        
+                        <!-- Left: Suggestions List -->
+                        <Border Grid.Column="0" Classes="Card" Margin="0,0,8,0">
+                            <Grid RowDefinitions="Auto,*">
+                                <TextBlock Grid.Row="0" Text="Suggestions" Classes="SectionHeader"/>
+                                <DataGrid Grid.Row="1" ItemsSource="{Binding CleanupSuggestions}"
+                                          SelectionChanged="CleanupSuggestions_SelectionChanged"
+                                          IsReadOnly="True"
+                                          CanUserSortColumns="True"
+                                          CanUserResizeColumns="True"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          DoubleTapped="DataGrid_DoubleTapped"
+                                          ContextFlyout="{StaticResource CleanupSuggestionContextMenu}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="150" SortMemberPath="Description"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SavingsFormatted}" Width="Auto" MinWidth="70" SortMemberPath="PotentialSavings"/>
+                                        <DataGridTextColumn Header="Files" Binding="{Binding AffectedFiles.Count}" Width="Auto" MinWidth="50"/>
+                                        <DataGridTextColumn Header="Risk" Binding="{Binding RiskLevel}" Width="Auto" MinWidth="55" SortMemberPath="RiskLevel"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+                        
+                        <!-- Right: Affected Files with Details -->
+                        <Border Grid.Column="1" Classes="Card" Margin="8,0,0,0">
+                            <Grid RowDefinitions="Auto,*">
+                                <TextBlock Grid.Row="0" Text="{Binding SelectedCleanupDescription, FallbackValue='Select a suggestion to see affected files'}" 
+                                           Classes="SectionHeader" TextTrimming="CharacterEllipsis"/>
+                                <DataGrid x:Name="CleanupFilesGrid"
+                                          Grid.Row="1" ItemsSource="{Binding CleanupFiles}" 
+                                          Margin="0,8,0,0"
+                                          CanUserSortColumns="True"
+                                          CanUserResizeColumns="True"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          SelectionChanged="CleanupFilesGrid_SelectionChanged"
+                                          DoubleTapped="DataGrid_DoubleTapped"
+                                          ContextFlyout="{StaticResource CleanupFileContextMenu}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="2*" MinWidth="150" SortMemberPath="FileName"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="Auto" MinWidth="70" SortMemberPath="SizeBytes"/>
+                                        <DataGridTextColumn Header="Last Accessed" Binding="{Binding LastAccessedFormatted}" Width="Auto" MinWidth="100" SortMemberPath="LastAccessed"/>
+                                        <DataGridTextColumn Header="Risk" Binding="{Binding Risk}" Width="Auto" MinWidth="60" SortMemberPath="Risk"/>
+                                        <DataGridTextColumn Header="Full Path" Binding="{Binding FilePath}" Width="3*" MinWidth="200" SortMemberPath="FilePath"/>
+                                        <DataGridTemplateColumn Header="Open" Width="50">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="📂" 
+                                                            Click="CleanupFileOpenButton_Click"
+                                                            Background="Transparent"
+                                                            Padding="4,2"
+                                                            Cursor="Hand"
+                                                            HorizontalAlignment="Center"
+                                                            ToolTip.Tip="Open file location"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+            
+            <!-- Treemap Tab (Placeholder for now) -->
+            <TabItem Header="🗺️ Treemap">
+                <Grid Margin="0,16,0,0" RowDefinitions="Auto,Auto,*">
+                    
+                    <!-- Header -->
+                    <Border Grid.Row="0" Classes="Card" Margin="0,0,0,8" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="🗺️ Storage Treemap" Classes="SectionHeader" Margin="0"/>
+                                <TextBlock Text=" - Double-click to zoom, right-click to go back" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                           VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <TextBlock Text="Color by:" VerticalAlignment="Center" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0"/>
+                                <ComboBox ItemsSource="{Binding AvailableTreemapColorModes}"
+                                          SelectedItem="{Binding SelectedTreemapColorMode}"
+                                          Width="100"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Legend -->
+                    <Border Grid.Row="1" Classes="Card" Margin="0,0,0,8" Padding="8,6">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding TreemapLegendItems}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TreemapLegendItem">
+                                        <StackPanel Orientation="Horizontal" Margin="8,0">
+                                            <Border Width="14" Height="14" CornerRadius="2" Margin="0,0,6,0"
+                                                    Background="{Binding Color}"/>
+                                            <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                    
+                    <!-- Treemap Visualization -->
+                    <Border Grid.Row="2" Classes="Card" Padding="4">
+                        <ctrl:TreemapControl x:Name="TreemapView"
+                                             SourceItem="{Binding TreemapRootItem}"
+                                             MaxDepth="{Binding TreemapMaxDepth}"
+                                             SelectedTheme="{Binding SelectedTheme}"
+                                             ColorMode="{Binding SelectedTreemapColorMode}"/>
+                    </Border>
+                </Grid>
+            </TabItem>
+            
+            <!-- File Explorer Tab -->
+            <TabItem Header="📁 File Explorer">
+                <Grid Margin="0,16,0,0" ColumnDefinitions="350,8,*">
+                    
+                    <!-- Folder Tree -->
+                    <Border Grid.Column="0" Classes="Card">
+                        <Grid RowDefinitions="Auto,Auto,*">
+                            <TextBlock Grid.Row="0" Text="Folder Structure" Classes="SectionHeader"/>
+                            
+                            <!-- Search and Sort -->
+                            <Grid Grid.Row="1" Margin="0,0,0,8" ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding TreeSearchText}"
+                                         Watermark="Search folders..."
+                                         Margin="0,0,8,0"/>
+                                
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding TreeSortOptions}"
+                                          SelectedItem="{Binding TreeSortBy}"
+                                          Width="90"
+                                          ToolTip.Tip="Sort folders by"/>
+                            </Grid>
+                            
+                            <TreeView Grid.Row="2" 
+                                      ItemsSource="{Binding FilteredRootItems}" 
+                                      SelectedItem="{Binding SelectedItem}">
+                                <TreeView.ItemTemplate>
+                                    <TreeDataTemplate ItemsSource="{Binding Children}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="📁" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text=" - " Foreground="{DynamicResource TextMutedBrush}"/>
+                                            <TextBlock Text="{Binding SizeFormatted}" 
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding PercentageOfParent, StringFormat=' ({0:F1}%)'}" 
+                                                       Foreground="{DynamicResource TextMutedBrush}"/>
+                                        </StackPanel>
+                                    </TreeDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- GridSplitter -->
+                    <GridSplitter Grid.Column="1" 
+                                  Background="Transparent"
+                                  ResizeDirection="Columns"/>
+                    
+                    <!-- File Details -->
+                    <Border Grid.Column="2" Classes="Card">
+                        <Grid RowDefinitions="Auto,Auto,*">
+                            
+                            <!-- Selected Item Details -->
+                            <StackPanel Grid.Row="0" IsVisible="{Binding SelectedItem, Converter={StaticResource NullToBool}}">
+                                <TextBlock Text="Selected Item" Classes="SectionHeader"/>
+                                <Grid Margin="0,0,0,16" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                    
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Path:" Classes="DataLabel" Margin="0,0,16,4"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.FullPath}" 
+                                               Classes="DataValue" TextTrimming="CharacterEllipsis"/>
+                                    
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Size:" Classes="DataLabel" Margin="0,0,16,4"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.SizeFormatted}" 
+                                               Classes="DataValue"/>
+                                    
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Last Accessed:" Classes="DataLabel" Margin="0,0,16,4"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedItem.LastAccessed, Converter={StaticResource RelativeTime}}" 
+                                               Classes="DataValue"/>
+                                    
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Modified:" Classes="DataLabel" Margin="0,0,16,4"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedItem.LastModified, StringFormat='{}{0:g}'}" 
+                                               Classes="DataValue"/>
+                                </Grid>
+                                
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="📂 Open in Explorer" 
+                                            Command="{Binding OpenInExplorerCommand}" 
+                                            CommandParameter="{Binding SelectedItem}"
+                                            Classes="Outline" Margin="0,0,8,0"/>
+                                    <Button Content="📋 Copy Path" 
+                                            Command="{Binding CopyPathCommand}" 
+                                            CommandParameter="{Binding SelectedItem}"
+                                            Classes="Outline"/>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- Filter Controls -->
+                            <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" 
+                                    CornerRadius="4" Padding="8" Margin="0,8,0,8"
+                                    IsVisible="{Binding SelectedItem, Converter={StaticResource NullToBool}}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBox Grid.Column="0" 
+                                             Text="{Binding FileExplorerSearchText}"
+                                             Watermark="Search files..."
+                                             Margin="0,0,8,0"/>
+                                    
+                                    <ComboBox Grid.Column="1" 
+                                              ItemsSource="{Binding FileExplorerFilterOptions}"
+                                              SelectedItem="{Binding FileExplorerFilter}"
+                                              MinWidth="150"/>
+                                </Grid>
+                            </Border>
+                            
+                            <!-- Children List -->
+                            <DataGrid Grid.Row="2" ItemsSource="{Binding FilteredChildren}" 
+                                      IsReadOnly="True"
+                                      CanUserSortColumns="True"
+                                      CanUserResizeColumns="True"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      SelectionChanged="FileItem_SelectionChanged"
+                                      ContextFlyout="{StaticResource FileItemContextMenu}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" MinWidth="120" SortMemberPath="Name"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="Auto" MinWidth="70" SortMemberPath="Size"/>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="Auto" MinWidth="65" SortMemberPath="Category"/>
+                                    <DataGridTextColumn Header="Last Accessed" Binding="{Binding LastAccessed, Converter={StaticResource RelativeTime}}" Width="Auto" MinWidth="90" SortMemberPath="LastAccessed"/>
+                                    <DataGridTemplateColumn Header="Open" Width="50">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="📂" 
+                                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenInExplorerCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="Open in Explorer"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Padding="4,2"
+                                                        Cursor="Hand"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+            
+            <!-- Largest Files Tab -->
+            <TabItem Header="📈 Largest Files">
+                <Border Classes="Card" Margin="0,16,0,0">
+                    <Grid RowDefinitions="Auto,*">
+                        <TextBlock Grid.Row="0" Text="Top 50 Largest Files" Classes="SectionHeader"/>
+                        <DataGrid Grid.Row="1" 
+                                  ItemsSource="{Binding LargestFiles}" 
+                                  IsReadOnly="True"
+                                  CanUserSortColumns="True"
+                                  CanUserResizeColumns="True"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  DoubleTapped="DataGrid_DoubleTapped"
+                                  SelectionChanged="FileItem_SelectionChanged"
+                                  ContextFlyout="{StaticResource FileItemContextMenu}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="150" SortMemberPath="Name"/>
+                                <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="Auto" MinWidth="70" SortMemberPath="Size"/>
+                                <DataGridTextColumn Header="Location" Binding="{Binding FullPath}" Width="3*" MinWidth="200" SortMemberPath="FullPath"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="Auto" MinWidth="65" SortMemberPath="Category"/>
+                                <DataGridTextColumn Header="Last Accessed" Binding="{Binding LastAccessed, Converter={StaticResource RelativeTime}}" Width="Auto" MinWidth="90" SortMemberPath="LastAccessed"/>
+                                <DataGridTemplateColumn Header="Open" Width="50">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="📂" 
+                                                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenInExplorerCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip.Tip="Open in Explorer"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Padding="4,2"
+                                                    Cursor="Hand"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </Border>
+            </TabItem>
+            
+        </TabControl>
+        
+        <!-- Status Bar -->
+        <Border Grid.Row="3" 
+                Background="{DynamicResource SurfaceBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" 
+                BorderThickness="0,1,0,0"
+                Padding="24,8">
+            <Grid>
+                <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondaryBrush}" 
+                           VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding ScanResult.Duration, StringFormat='Scan time: {0:hh\\:mm\\:ss}'}" 
+                           HorizontalAlignment="Right" Foreground="{DynamicResource TextMutedBrush}"
+                           IsVisible="{Binding ScanResult, Converter={StaticResource NullToBool}}"/>
+            </Grid>
+        </Border>
+        
+        <!-- Settings Popup Overlay -->
+        <Border Grid.RowSpan="4" Background="#80000000" 
+                IsVisible="{Binding IsSettingsOpen}"
+                PointerPressed="SettingsOverlay_PointerPressed">
+            <Border Background="{DynamicResource SurfaceBrush}" 
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="24" Margin="0,80,24,0"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    MinWidth="320" MaxWidth="400">
+                <StackPanel>
+                    <TextBlock Text="⚙ Settings" FontSize="18" FontWeight="SemiBold" 
+                               Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,16"/>
+                    
+                    <!-- Theme Selection -->
+                    <TextBlock Text="Theme" Foreground="{DynamicResource TextSecondaryBrush}" 
+                               Margin="0,0,0,4"/>
+                    <ComboBox ItemsSource="{Binding AvailableThemes}"
+                              SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
+                              Margin="0,0,0,16" MinWidth="200"/>
+                    
+                    <!-- Font Size -->
+                    <TextBlock Text="Font Size" Foreground="{DynamicResource TextSecondaryBrush}" 
+                               Margin="0,0,0,4"/>
+                    <ComboBox ItemsSource="{Binding AvailableFontSizes}"
+                              SelectedItem="{Binding SelectedFontSize, Mode=TwoWay}"
+                              Margin="0,0,0,16" MinWidth="200"/>
+                    
+                    <!-- Treemap Depth -->
+                    <TextBlock Text="Treemap Depth" Foreground="{DynamicResource TextSecondaryBrush}" 
+                               Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Slider Minimum="1" Maximum="5" 
+                                Value="{Binding TreemapMaxDepth}" 
+                                Width="180" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding TreemapMaxDepth}" 
+                                   Foreground="{DynamicResource TextPrimaryBrush}" 
+                                   Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    
+                    <!-- Close Button -->
+                    <Button Content="Close" Command="{Binding ToggleSettingsCommand}"
+                            Classes="Outline" 
+                            HorizontalAlignment="Right" Padding="16,8"/>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</Window>

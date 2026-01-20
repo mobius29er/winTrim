@@ -1,0 +1,1782 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using WinTrim.Core.Models;
+
+namespace WinTrim.Core.Services;
+
+/// <summary>
+/// Type of storage drive for parallelism optimization
+/// </summary>
+internal enum DriveStorageType
+{
+    Ssd,      // Solid-state drive - high parallelism
+    Hdd,      // Spinning disk - limited parallelism
+    Network   // Network/NAS - very limited parallelism due to latency
+}
+
+/// <summary>
+/// High-performance file scanner with async enumeration and pause/resume support.
+/// Cross-platform implementation for WinTrim.Core.
+/// </summary>
+public sealed class FileScanner : IFileScanner
+{
+    private readonly IGameDetector _gameDetector;
+    private readonly ICleanupAdvisor _cleanupAdvisor;
+    private readonly ICategoryClassifier _categoryClassifier;
+    private readonly IDevToolDetector _devToolDetector;
+    
+    // Thread-safe collections for parallel processing results
+    private readonly ConcurrentBag<FileSystemItem> _largestFiles = new();
+    private readonly ConcurrentDictionary<ItemCategory, CategoryStats> _categoryStats = new();
+    
+    // Track seen inodes to prevent counting hardlinked/firmlinked files multiple times (macOS/Linux)
+    private readonly ConcurrentDictionary<ulong, bool> _seenInodes = new();
+    
+    // Detected games and dev tools during scan (inline detection)
+    private readonly ConcurrentBag<GameInstallation> _detectedGames = new();
+    private readonly ConcurrentBag<CleanupItem> _detectedDevTools = new();
+    
+    // Pause mechanism using ManualResetEventSlim (more efficient than ManualResetEvent)
+    private readonly ManualResetEventSlim _pauseEvent = new(true); // Initially signaled (not paused)
+    private volatile bool _isPaused;
+    
+    // Cached SSD detection result per drive
+    private readonly ConcurrentDictionary<string, bool> _ssdCache = new();
+    
+    // Root filesystem device ID for staying within mount boundaries (Unix)
+    private ulong _rootDeviceId;
+
+    // Progress tracking
+    private long _totalExpectedBytes;
+    private IProgress<ScanProgress>? _progressReporter;
+    private ScanProgress? _currentScanProgress;
+    private int _lastReportedFileCount;
+    
+    // Performance tuning - parallelism is determined dynamically based on drive type
+    private const int LargestFilesLimit = 100;
+    private const int SsdParallelism = 32;     // SSDs/NVMe can handle very high parallelism
+    private const int HddParallelism = 4;      // HDDs need limited parallelism to avoid thrashing  
+    private const int NetworkParallelism = 2;  // Network drives limited by latency, not I/O
+    private int _currentMaxParallelism = 8;    // Default, updated per scan based on drive type
+    private const int ProgressReportInterval = 500; // Report every N files (less frequent = faster)
+    private const long LargeFileThreshold = 1 * 1024 * 1024; // Only track files > 1MB for largest files list
+    
+    // Drive type detection cache (true = fast storage SSD, false = slow storage HDD/Network)
+    // Network drives are cached separately
+    private readonly ConcurrentDictionary<string, bool> _networkDriveCache = new();
+    
+    private static readonly EnumerationOptions FastEnumerationOptions = new()
+    {
+        IgnoreInaccessible = true,
+        RecurseSubdirectories = false, // We handle recursion manually for better control
+        AttributesToSkip = FileAttributes.ReparsePoint // Skip symlinks/junctions
+    };
+
+    public bool IsPaused => _isPaused;
+
+    public FileScanner(
+        IGameDetector gameDetector, 
+        ICleanupAdvisor cleanupAdvisor, 
+        ICategoryClassifier categoryClassifier,
+        IDevToolDetector devToolDetector)
+    {
+        _gameDetector = gameDetector;
+        _cleanupAdvisor = cleanupAdvisor;
+        _categoryClassifier = categoryClassifier;
+        _devToolDetector = devToolDetector;
+    }
+    
+    /// <summary>
+    /// Pauses the current scan. Scanner will stop at next checkpoint and wait.
+    /// </summary>
+    public void Pause()
+    {
+        _isPaused = true;
+        _pauseEvent.Reset(); // Block threads waiting on this event
+    }
+    
+    /// <summary>
+    /// Resumes a paused scan.
+    /// </summary>
+    public void Resume()
+    {
+        _isPaused = false;
+        _pauseEvent.Set(); // Allow threads to continue
+    }
+
+    public async Task<ScanResult> ScanAsync(string path, IProgress<ScanProgress> progress, CancellationToken cancellationToken)
+    {
+        // Clear previous state
+        _largestFiles.Clear();
+        _categoryStats.Clear();
+        _seenInodes.Clear();
+        _detectedGames.Clear();
+        _detectedDevTools.Clear();
+        _isPaused = false;
+        _pauseEvent.Set();
+        _lastReportedFileCount = 0;
+        
+        // Detect drive type and set parallelism accordingly
+        var driveType = DetectDriveType(path);
+        _currentMaxParallelism = driveType switch
+        {
+            DriveStorageType.Ssd => Math.Max(SsdParallelism, Environment.ProcessorCount * 4), // SSDs benefit from high parallelism
+            DriveStorageType.Hdd => HddParallelism,
+            DriveStorageType.Network => NetworkParallelism,
+            _ => HddParallelism
+        };
+        Console.WriteLine($"[FileScanner] Drive type: {driveType}, using {_currentMaxParallelism} parallel workers");
+        
+        var result = new ScanResult
+        {
+            RootPath = path,
+            ScanStarted = DateTime.Now
+        };
+
+        // Get total drive size for progress estimation
+        long totalDriveBytes = 0;
+        long usedDriveBytes = 0;
+        try
+        {
+            var driveInfo = new DriveInfo(Path.GetPathRoot(path) ?? path);
+            totalDriveBytes = driveInfo.TotalSize;
+            usedDriveBytes = driveInfo.TotalSize - driveInfo.AvailableFreeSpace;
+            Console.WriteLine($"[FileScanner] Disk size: {FormatBytes(totalDriveBytes)} total, {FormatBytes(usedDriveBytes)} used, {FormatBytes(driveInfo.AvailableFreeSpace)} free");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[FileScanner] Could not get drive info: {ex.Message}");
+        }
+
+        var scanProgress = new ScanProgress
+        {
+            State = ScanState.Scanning,
+            StatusMessage = "Starting scan...",
+            TotalDiskSize = totalDriveBytes,
+            UsedDiskSpace = usedDriveBytes
+        };
+
+        // Store for progress calculation
+        _totalExpectedBytes = usedDriveBytes > 0 ? usedDriveBytes : 100L * 1024 * 1024 * 1024; // Default 100GB
+        _progressReporter = progress;
+        _currentScanProgress = scanProgress;
+
+        try
+        {
+            // Create root item
+            var rootInfo = new DirectoryInfo(path);
+            if (!rootInfo.Exists)
+            {
+                throw new DirectoryNotFoundException($"Directory not found: {path}");
+            }
+
+            var rootItem = new FileSystemItem
+            {
+                Name = rootInfo.Name,
+                FullPath = rootInfo.FullName,
+                IsFolder = true,
+                Created = rootInfo.CreationTime,
+                LastModified = rootInfo.LastWriteTime,
+                LastAccessed = rootInfo.LastAccessTime
+            };
+
+            result.RootItem = rootItem;
+
+            // Track filesystem device ID to prevent crossing mount points (critical for macOS root scan)
+            if (!OperatingSystem.IsWindows())
+            {
+                try
+                {
+                    _rootDeviceId = GetDeviceId(path);
+                    // Console.WriteLine($"[FileScanner] Root device ID: {_rootDeviceId}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Could not get root device info: {ex.Message}");
+                    _rootDeviceId = 0;
+                }
+            }
+
+            // Start game and dev tool detection IN PARALLEL with main scan
+            // These scan different directories (Steam paths, dev caches) than the main file scan
+            Console.WriteLine($"[FileScanner] Starting game detection (parallel)...");
+            var gameTask = _gameDetector.DetectGamesAsync(path, cancellationToken);
+            Console.WriteLine($"[FileScanner] Starting dev tools detection (parallel)...");
+            var devToolTask = _devToolDetector.ScanAllAsync();
+
+            // Use parallel breadth-first scan with work-stealing for better performance
+            await ScanDirectoryParallelAsync(rootItem, scanProgress, progress, cancellationToken);
+            Console.WriteLine($"[FileScanner] Recursive scan complete. Total files in bag: {_largestFiles.Count}");
+
+            // Post-scan analysis phase
+            scanProgress.ProgressPercentage = 96;
+            scanProgress.StatusMessage = "Calculating folder sizes...";
+            progress.Report(scanProgress);
+            
+            // Propagate sizes up the tree (needed for parallel scan approach)
+            CalculateFolderSizes(rootItem);
+
+            scanProgress.StatusMessage = "Analyzing file structure...";
+            progress.Report(scanProgress);
+
+            // Calculate percentages and finalize
+            CalculatePercentages(rootItem);
+
+            // Get largest files (sorted)
+            result.LargestFiles = _largestFiles
+                .OrderByDescending(f => f.Size)
+                .Take(LargestFilesLimit)
+                .ToList();
+            Console.WriteLine($"[FileScanner] LargestFiles sorted and limited: {result.LargestFiles.Count}");
+            if (result.LargestFiles.Count > 0)
+            {
+                Console.WriteLine($"[FileScanner] Top file: {result.LargestFiles[0].Name} ({result.LargestFiles[0].Size} bytes)");
+            }
+
+            // Get largest folders
+            result.LargestFolders = GetLargestFolders(rootItem, 50);
+            Console.WriteLine($"[FileScanner] LargestFolders: {result.LargestFolders.Count}");
+
+            // Get oldest accessed files
+            result.OldestAccessedFiles = _largestFiles
+                .Where(f => f.DaysSinceAccessed > 30)
+                .OrderByDescending(f => f.DaysSinceAccessed)
+                .Take(50)
+                .ToList();
+
+            // Use inline-detected games and dev tools (already found during traversal!)
+            scanProgress.ProgressPercentage = 97;
+            scanProgress.StatusMessage = "Processing detected games and dev tools...";
+            progress.Report(scanProgress);
+            
+            Console.WriteLine($"[FileScanner] Processing inline-detected items...");
+            
+            // Fill in sizes for games (lookup from scanned tree)
+            result.GameInstallations = FillGameSizes(rootItem, _detectedGames.ToList());
+            
+            // Fill in sizes for dev tools and deduplicate
+            result.DevTools = FillDevToolSizes(rootItem, _detectedDevTools.ToList())
+                .GroupBy(d => d.Path) // Deduplicate by path
+                .Select(g => g.First())
+                .OrderByDescending(d => d.SizeBytes)
+                .ToList();
+            
+            Console.WriteLine($"[FileScanner] Games found (inline): {result.GameInstallations.Count}");
+            Console.WriteLine($"[FileScanner] DevTools found (inline): {result.DevTools.Count}");
+
+            // Get cleanup suggestions
+            scanProgress.ProgressPercentage = 98;
+            scanProgress.StatusMessage = "Generating cleanup suggestions...";
+            progress.Report(scanProgress);
+            
+            result.CleanupSuggestions = await _cleanupAdvisor.GetSuggestionsAsync(rootItem, cancellationToken);
+
+            // Finalizing
+            scanProgress.ProgressPercentage = 99;
+            scanProgress.StatusMessage = "Finalizing results...";
+            progress.Report(scanProgress);
+
+            // Category breakdown
+            result.CategoryBreakdown = new Dictionary<ItemCategory, CategoryStats>(_categoryStats);
+
+            result.TotalSize = rootItem.Size;
+            result.TotalFiles = scanProgress.FilesScanned;
+            result.TotalFolders = scanProgress.FoldersScanned;
+            result.ErrorCount = scanProgress.ErrorCount;
+            result.ScanCompleted = DateTime.Now;
+
+            Console.WriteLine($"[FileScanner] Scan completed. Files: {result.TotalFiles}, Folders: {result.TotalFolders}");
+
+            scanProgress.State = ScanState.Completed;
+            scanProgress.StatusMessage = "Scan complete!";
+            scanProgress.ProgressPercentage = 100;
+            progress.Report(scanProgress);
+        }
+        catch (OperationCanceledException)
+        {
+            // Return partial results on cancellation - don't discard the work done!
+            if (result.RootItem != null)
+            {
+                CalculatePercentages(result.RootItem);
+                
+                result.LargestFiles = _largestFiles
+                    .OrderByDescending(f => f.Size)
+                    .Take(LargestFilesLimit)
+                    .ToList();
+                
+                result.LargestFolders = GetLargestFolders(result.RootItem, 50);
+                result.CategoryBreakdown = new Dictionary<ItemCategory, CategoryStats>(_categoryStats);
+                result.TotalSize = result.RootItem.Size;
+                result.TotalFiles = scanProgress.FilesScanned;
+                result.TotalFolders = scanProgress.FoldersScanned;
+                result.ErrorCount = scanProgress.ErrorCount;
+            }
+            
+            scanProgress.State = ScanState.Cancelled;
+            scanProgress.StatusMessage = "Scan cancelled - showing partial results";
+            progress.Report(scanProgress);
+            
+            result.ScanCompleted = DateTime.Now;
+            result.WasCancelled = true;
+        }
+        catch (Exception ex)
+        {
+            scanProgress.State = ScanState.Error;
+            scanProgress.StatusMessage = $"Error: {ex.Message}";
+            progress.Report(scanProgress);
+            throw;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// High-performance parallel directory scanner using work-stealing queue.
+    /// Much faster than recursive approach for deep directory trees.
+    /// </summary>
+    private async Task ScanDirectoryParallelAsync(
+        FileSystemItem rootFolder,
+        ScanProgress scanProgress,
+        IProgress<ScanProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        // Use a concurrent queue for work-stealing parallelism
+        var workQueue = new ConcurrentQueue<(FileSystemItem folder, DirectoryInfo dirInfo)>();
+        
+        // Seed with root
+        var rootDirInfo = new DirectoryInfo(rootFolder.FullPath);
+        workQueue.Enqueue((rootFolder, rootDirInfo));
+        
+        // Track active workers to know when we're done
+        var activeWorkers = 0;
+        var completionSource = new TaskCompletionSource<bool>();
+        var workerCount = _currentMaxParallelism;
+        
+        // Start worker tasks
+        var workers = new Task[workerCount];
+        for (int i = 0; i < workerCount; i++)
+        {
+            workers[i] = Task.Run(async () =>
+            {
+                Interlocked.Increment(ref activeWorkers);
+                try
+                {
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Pause checkpoint
+                        if (_isPaused)
+                        {
+                            _pauseEvent.Wait(cancellationToken);
+                        }
+                        
+                        if (workQueue.TryDequeue(out var work))
+                        {
+                            try
+                            {
+                                await ProcessDirectoryWorkItem(work.folder, work.dirInfo, workQueue, scanProgress, cancellationToken);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception)
+                            {
+                                Interlocked.Increment(ref scanProgress._errorCount);
+                            }
+                        }
+                        else
+                        {
+                            // No work available, check if all workers are idle
+                            if (Interlocked.Decrement(ref activeWorkers) == 0)
+                            {
+                                // All workers idle and queue empty - we're done
+                                completionSource.TrySetResult(true);
+                                return;
+                            }
+                            
+                            // Wait a bit for more work
+                            await Task.Delay(1, cancellationToken);
+                            Interlocked.Increment(ref activeWorkers);
+                            
+                            // Double-check if we should exit
+                            if (workQueue.IsEmpty && activeWorkers == 1)
+                            {
+                                Interlocked.Decrement(ref activeWorkers);
+                                completionSource.TrySetResult(true);
+                                return;
+                            }
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected on cancellation
+                }
+                finally
+                {
+                    if (Interlocked.Decrement(ref activeWorkers) == 0)
+                    {
+                        completionSource.TrySetResult(true);
+                    }
+                }
+            }, cancellationToken);
+        }
+        
+        // Wait for completion or cancellation
+        await completionSource.Task;
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+    
+    /// <summary>
+    /// Process a single directory work item - scan files and enqueue subdirectories
+    /// </summary>
+    private Task ProcessDirectoryWorkItem(
+        FileSystemItem folder,
+        DirectoryInfo dirInfo,
+        ConcurrentQueue<(FileSystemItem, DirectoryInfo)> workQueue,
+        ScanProgress scanProgress,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        scanProgress.CurrentFolder = folder.FullPath;
+        Interlocked.Increment(ref scanProgress._foldersScanned);
+        
+        // Inline game/devtool detection - check as we traverse
+        DetectGameOrDevToolInline(folder.FullPath, folder.Name);
+        
+        try
+        {
+            // Process files in this directory
+            ProcessFilesOptimized(folder, dirInfo, scanProgress, cancellationToken);
+            
+            // Enumerate and enqueue subdirectories
+            foreach (var subDir in dirInfo.EnumerateDirectories("*", FastEnumerationOptions))
+            {
+                if (ShouldSkipDirectory(subDir))
+                    continue;
+                    
+                try
+                {
+                    var subFolder = new FileSystemItem
+                    {
+                        Name = subDir.Name,
+                        FullPath = subDir.FullName,
+                        IsFolder = true,
+                        Parent = folder,
+                        Created = subDir.CreationTime,
+                        LastModified = subDir.LastWriteTime,
+                        LastAccessed = subDir.LastAccessTime
+                    };
+                    
+                    // Thread-safe add to children
+                    lock (folder.Children)
+                    {
+                        folder.Children.Add(subFolder);
+                    }
+                    
+                    // Enqueue for parallel processing
+                    workQueue.Enqueue((subFolder, subDir));
+                }
+                catch (Exception)
+                {
+                    Interlocked.Increment(ref scanProgress._errorCount);
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        catch (IOException)
+        {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        
+        return Task.CompletedTask;
+    }
+
+    private async Task ScanDirectoryAsync(
+        FileSystemItem folder, 
+        ScanProgress scanProgress, 
+        IProgress<ScanProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        // Check for cancellation first
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        // Pause checkpoint - wait here if paused
+        if (_isPaused)
+        {
+            scanProgress.State = ScanState.Paused;
+            scanProgress.StatusMessage = $"Paused at: {folder.FullPath}";
+            progress.Report(scanProgress);
+            
+            // Wait until resumed (or cancelled)
+            _pauseEvent.Wait(cancellationToken);
+            
+            scanProgress.State = ScanState.Scanning;
+            scanProgress.StatusMessage = "Resuming scan...";
+            progress.Report(scanProgress);
+        }
+
+        scanProgress.CurrentFolder = folder.FullPath;
+        Interlocked.Increment(ref scanProgress._foldersScanned);
+
+        try
+        {
+            var dirInfo = new DirectoryInfo(folder.FullPath);
+
+            // Process files using optimized enumeration
+            ProcessFilesOptimized(folder, dirInfo, scanProgress, cancellationToken);
+
+            // Get subdirectories using fast enumeration options
+            var subDirs = dirInfo.EnumerateDirectories("*", FastEnumerationOptions)
+                .Where(d => !ShouldSkipDirectory(d))
+                .ToList();
+
+            // Process subdirectories - use parallelism for large folders
+            if (subDirs.Count > 4)
+            {
+                // Parallel scan for folders with many subdirectories
+                var parallelOptions = new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = _currentMaxParallelism,
+                    CancellationToken = cancellationToken
+                };
+
+                await Parallel.ForEachAsync(subDirs, parallelOptions, async (subDir, ct) =>
+                {
+                    // Check for pause
+                    if (_isPaused)
+                    {
+                        _pauseEvent.Wait(ct);
+                    }
+
+                    try
+                    {
+                        var subFolder = new FileSystemItem
+                        {
+                            Name = subDir.Name,
+                            FullPath = subDir.FullName,
+                            IsFolder = true,
+                            Parent = folder,
+                            Created = subDir.CreationTime,
+                            LastModified = subDir.LastWriteTime,
+                            LastAccessed = subDir.LastAccessTime
+                        };
+
+                        // Thread-safe add to children
+                        lock (folder.Children)
+                        {
+                            folder.Children.Add(subFolder);
+                        }
+
+                        // Recursive scan
+                        await ScanDirectoryAsync(subFolder, scanProgress, progress, ct);
+
+                        // Thread-safe size update
+                        Interlocked.Add(ref folder._size, subFolder.Size);
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        Interlocked.Increment(ref scanProgress._errorCount);
+                    }
+                    catch (PathTooLongException)
+                    {
+                        Interlocked.Increment(ref scanProgress._errorCount);
+                    }
+                    catch (IOException)
+                    {
+                        // File/folder locked by another process - skip it
+                        Interlocked.Increment(ref scanProgress._errorCount);
+                    }
+                });
+            }
+            else
+            {
+                // Sequential scan for small folders (avoid parallelism overhead)
+                foreach (var subDir in subDirs)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
+                    if (_isPaused)
+                    {
+                        _pauseEvent.Wait(cancellationToken);
+                    }
+
+                    try
+                    {
+                        var subFolder = new FileSystemItem
+                        {
+                            Name = subDir.Name,
+                            FullPath = subDir.FullName,
+                            IsFolder = true,
+                            Parent = folder,
+                            Created = subDir.CreationTime,
+                            LastModified = subDir.LastWriteTime,
+                            LastAccessed = subDir.LastAccessTime
+                        };
+
+                        folder.Children.Add(subFolder);
+                        await ScanDirectoryAsync(subFolder, scanProgress, progress, cancellationToken);
+                        folder.Size += subFolder.Size;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        scanProgress.ErrorCount++;
+                    }
+                    catch (PathTooLongException)
+                    {
+                        scanProgress.ErrorCount++;
+                    }
+                    catch (IOException)
+                    {
+                        // File/folder locked by another process - skip it
+                        scanProgress.ErrorCount++;
+                    }
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        catch (IOException)
+        {
+            // Directory locked by another process - skip it
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+    }
+
+    /// <summary>
+    /// Optimized file processing - no async overhead, uses fast enumeration
+    /// </summary>
+    private void ProcessFilesOptimized(
+        FileSystemItem folder,
+        DirectoryInfo dirInfo,
+        ScanProgress scanProgress,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            foreach (var file in dirInfo.EnumerateFiles("*", FastEnumerationOptions))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    // On macOS/Linux, check inode to skip hardlinked files we've already counted
+                    // OPTIMIZATION: Only check inodes in system directories where firmlinks exist
+                    // User directories (/Users, /home) don't typically have hardlinks
+                    if (!OperatingSystem.IsWindows() && ShouldCheckInode(file.FullName))
+                    {
+                        var inode = GetInode(file.FullName);
+                        if (inode != 0)
+                        {
+                            // TryAdd returns false if key already exists - skip this file
+                            if (!_seenInodes.TryAdd(inode, true))
+                            {
+                                // We've already counted this file via another path (hardlink)
+                                continue;
+                            }
+                        }
+                    }
+                    
+                    var fileItem = new FileSystemItem
+                    {
+                        Name = file.Name,
+                        FullPath = file.FullName,
+                        Size = file.Length,
+                        Extension = file.Extension.ToLowerInvariant(),
+                        IsFolder = false,
+                        Parent = folder,
+                        Created = file.CreationTime,
+                        LastModified = file.LastWriteTime,
+                        LastAccessed = file.LastAccessTime,
+                        Category = _categoryClassifier.Classify(file.Extension)
+                    };
+
+                    // Thread-safe operations
+                    lock (folder.Children)
+                    {
+                        folder.Children.Add(fileItem);
+                    }
+                    Interlocked.Add(ref folder._size, fileItem.Size);
+
+                    // Track largest files - only add files above threshold to reduce memory pressure
+                    if (fileItem.Size >= LargeFileThreshold)
+                    {
+                        _largestFiles.Add(fileItem);
+                    }
+
+                    // Update category stats (ConcurrentDictionary is thread-safe)
+                    UpdateCategoryStats(fileItem);
+
+                    Interlocked.Increment(ref scanProgress._filesScanned);
+                    Interlocked.Add(ref scanProgress._bytesScanned, fileItem.Size);
+                    
+                    // Report progress periodically
+                    ReportProgressIfNeeded(scanProgress);
+                }
+                catch (Exception)
+                {
+                    Interlocked.Increment(ref scanProgress._errorCount);
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+        catch (IOException)
+        {
+            // Directory or files locked by another process
+            Interlocked.Increment(ref scanProgress._errorCount);
+        }
+    }
+
+    /// <summary>
+    /// Reports progress to the UI if enough files have been scanned since last report
+    /// </summary>
+    private void ReportProgressIfNeeded(ScanProgress scanProgress)
+    {
+        var currentFiles = scanProgress._filesScanned;
+        if (currentFiles - _lastReportedFileCount >= ProgressReportInterval)
+        {
+            _lastReportedFileCount = currentFiles;
+            
+            // Calculate progress percentage based on bytes scanned vs expected
+            if (_totalExpectedBytes > 0)
+            {
+                var rawPercentage = (double)scanProgress._bytesScanned / _totalExpectedBytes * 100;
+                // Cap at 95% during file scan - leave 5% for post-processing
+                scanProgress.ProgressPercentage = Math.Min(95, rawPercentage);
+            }
+            
+            scanProgress.StatusMessage = $"Scanning: {scanProgress._filesScanned:N0} files, {scanProgress._foldersScanned:N0} folders";
+            _progressReporter?.Report(scanProgress);
+        }
+    }
+
+    private void UpdateCategoryStats(FileSystemItem file)
+    {
+        _categoryStats.AddOrUpdate(
+            file.Category,
+            _ => new CategoryStats
+            {
+                Category = file.Category,
+                TotalSize = file.Size,
+                FileCount = 1
+            },
+            (_, stats) =>
+            {
+                Interlocked.Add(ref stats.TotalSize, file.Size);
+                Interlocked.Increment(ref stats.FileCount);
+                return stats;
+            });
+    }
+
+    private bool ShouldSkipDirectory(DirectoryInfo dir)
+    {
+        // Skip system directories that typically cause issues
+        var name = dir.Name.ToLowerInvariant();
+        
+        // Windows-specific
+        if (name == "$recycle.bin" ||
+            name == "system volume information" ||
+            name == "$windows.~bt" ||
+            name == "$windows.~ws")
+            return true;
+        
+        // macOS-specific directories to skip
+        if (name == ".trash" ||
+            name == ".fseventsd" ||
+            name == ".spotlight-v100" ||
+            name == ".timemachine" ||
+            name == "com.apple.timemachine.localsnapshots")
+            return true;
+        
+        // macOS: Skip other mount points when scanning root to avoid crossing filesystems
+        if (OperatingSystem.IsMacOS())
+        {
+            var fullPath = dir.FullName;
+            
+            // Skip entire /System directory - it's the read-only system volume (macOS 10.15+)
+            // Contains OS files, not user data. Skipping this prevents double-counting since
+            // /System/Volumes/Data contains firmlinks to /Applications, /Users, etc.
+            if (fullPath == "/System" || fullPath.StartsWith("/System/"))
+                return true;
+            
+            // Skip /Volumes entirely when scanning root - these are other mounted drives
+            if (fullPath == "/Volumes" || fullPath.StartsWith("/Volumes/"))
+                return true;
+            
+            // Skip cloud/NAS sync folders that point to remote storage
+            // These are local sync folders but contain replicated content from NAS/cloud
+            if (name == "synologydrive" || 
+                name == "cloudstation" ||
+                fullPath.Contains("/SynologyDrive/") ||
+                fullPath.Contains("/CloudStation/"))
+                return true;
+            
+            // Also skip common cloud storage mount/sync folders
+            if (name == "google drive" ||
+                name == "dropbox" ||
+                name == "onedrive" ||
+                name == "icloud drive" ||
+                fullPath.Contains("/Mobile Documents/"))  // iCloud
+                return true;
+                
+            // Skip Time Machine backups specifically
+            if (name.Contains(".timemachine") || 
+                name == "Time Machine Backups" || 
+                name == ".MobileBackups" ||
+                fullPath.Contains("/.MobileBackups"))
+                return true;
+            
+            // Skip /dev, /private/var/vm (swap), and other system paths
+            if (fullPath == "/dev" || 
+                fullPath == "/private/var/vm" ||
+                fullPath.StartsWith("/Library/Developer/CoreSimulator/"))
+                return true;
+            
+            // Check if directory is on a different filesystem (mount point)
+            // This catches firmlinks and other cross-volume references
+            if (_rootDeviceId != 0)
+            {
+                try
+                {
+                    // If device ID is different from root, we've crossed a filesystem boundary
+                    // This is the most reliable way to handle firmlinks and mounts on macOS
+                    ulong deviceId = GetDeviceId(fullPath);
+                    if (deviceId != 0 && deviceId != _rootDeviceId)
+                        return true;
+                }
+                catch
+                {
+                    // Ignore errors checking device ID
+                }
+            }
+            
+            try
+            {
+                // Skip if it's a symlink (firmlinks might NOT show as symlinks, hence device ID check above)
+                if (dir.LinkTarget != null)
+                    return true;
+            }
+            catch
+            {
+                // Ignore errors checking link target
+            }
+        }
+        
+        // Skip symlinks/junctions on all platforms
+        return (dir.Attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint;
+    }
+
+    #region Inline Game/DevTool Detection
+    
+    /// <summary>
+    /// Detects games and dev tools during main scan traversal - no re-scanning needed!
+    /// Called for each directory as we traverse the tree.
+    /// </summary>
+    private void DetectGameOrDevToolInline(string fullPath, string dirName)
+    {
+        var lowerName = dirName.ToLowerInvariant();
+        var lowerPath = fullPath.ToLowerInvariant();
+        
+        // === GAME DETECTION ===
+        
+        // Steam games: look for steamapps/common/{game}
+        if (lowerPath.Contains("/steamapps/common/") || lowerPath.Contains("\\steamapps\\common\\"))
+        {
+            // We're inside a Steam game folder - the parent of "common" is steamapps
+            var parts = fullPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var commonIndex = Array.FindIndex(parts, p => p.Equals("common", StringComparison.OrdinalIgnoreCase));
+            if (commonIndex >= 0 && commonIndex + 1 < parts.Length)
+            {
+                // This is a game folder directly under common
+                var gamePath = string.Join(Path.DirectorySeparatorChar.ToString(), parts.Take(commonIndex + 2));
+                if (fullPath.Equals(gamePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _detectedGames.Add(new GameInstallation
+                    {
+                        Name = dirName,
+                        Path = fullPath,
+                        Size = 0, // Will be filled after folder size calculation
+                        Platform = GamePlatform.Steam,
+                        LastPlayed = DateTime.Now // Will update from folder info
+                    });
+                }
+            }
+        }
+        
+        // Epic Games: look for Epic Games/{game}
+        if ((lowerPath.Contains("/epic games/") || lowerPath.Contains("\\epic games\\")) &&
+            !lowerPath.Contains("launcher") && !lowerPath.Contains("directxredist"))
+        {
+            var parts = fullPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var epicIndex = Array.FindIndex(parts, p => p.Equals("Epic Games", StringComparison.OrdinalIgnoreCase));
+            if (epicIndex >= 0 && epicIndex + 1 < parts.Length)
+            {
+                var gamePath = string.Join(Path.DirectorySeparatorChar.ToString(), parts.Take(epicIndex + 2));
+                if (fullPath.Equals(gamePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _detectedGames.Add(new GameInstallation
+                    {
+                        Name = dirName,
+                        Path = fullPath,
+                        Size = 0,
+                        Platform = GamePlatform.EpicGames,
+                        LastPlayed = DateTime.Now
+                    });
+                }
+            }
+        }
+        
+        // GOG Games
+        if (lowerPath.Contains("/gog games/") || lowerPath.Contains("\\gog games\\") ||
+            lowerPath.Contains("/gog galaxy/games/") || lowerPath.Contains("\\gog galaxy\\games\\"))
+        {
+            var parts = fullPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var gogIndex = Array.FindIndex(parts, p => 
+                p.Equals("GOG Games", StringComparison.OrdinalIgnoreCase) ||
+                p.Equals("Games", StringComparison.OrdinalIgnoreCase));
+            if (gogIndex >= 0 && gogIndex + 1 < parts.Length)
+            {
+                var gamePath = string.Join(Path.DirectorySeparatorChar.ToString(), parts.Take(gogIndex + 2));
+                if (fullPath.Equals(gamePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _detectedGames.Add(new GameInstallation
+                    {
+                        Name = dirName,
+                        Path = fullPath,
+                        Size = 0,
+                        Platform = GamePlatform.GOG,
+                        LastPlayed = DateTime.Now
+                    });
+                }
+            }
+        }
+        
+        // === DEV TOOL CACHE DETECTION ===
+        
+        // Detect dev tool caches by exact path patterns
+        DetectDevToolCache(fullPath, lowerPath, lowerName);
+    }
+    
+    /// <summary>
+    /// Detects developer tool caches based on path patterns
+    /// </summary>
+    private void DetectDevToolCache(string fullPath, string lowerPath, string lowerName)
+    {
+        // .gradle/caches
+        if (lowerPath.EndsWith("/.gradle/caches") || lowerPath.EndsWith("\\.gradle\\caches"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "Gradle Build Cache",
+                Path = fullPath,
+                SizeBytes = 0, // Filled after scan
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. Will rebuild on next compile.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // .nuget/packages
+        if (lowerPath.EndsWith("/.nuget/packages") || lowerPath.EndsWith("\\.nuget\\packages"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "NuGet Package Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. NuGet will re-download on next build.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // .npm cache
+        if (lowerName == ".npm" || lowerPath.EndsWith("/caches/npm") || lowerPath.EndsWith("\\caches\\npm"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "NPM Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. NPM will re-download packages.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // node_modules (large ones)
+        if (lowerName == "node_modules")
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = $"node_modules",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Project dependencies. Run 'npm install' to restore if deleted.",
+                Risk = CleanupRisk.Medium
+            });
+        }
+        
+        // Xcode DerivedData (macOS)
+        if (lowerPath.Contains("/developer/xcode/deriveddata"))
+        {
+            // Only add the root DerivedData, not subdirs
+            if (lowerName == "deriveddata")
+            {
+                _detectedDevTools.Add(new CleanupItem
+                {
+                    Name = "Xcode DerivedData",
+                    Path = fullPath,
+                    SizeBytes = 0,
+                    Category = "Developer Tools",
+                    Recommendation = "Build cache for Xcode projects. Safe to delete - will rebuild.",
+                    Risk = CleanupRisk.Safe
+                });
+            }
+        }
+        
+        // CocoaPods cache
+        if (lowerPath.EndsWith("/cocoapods") && lowerPath.Contains("/caches/"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "CocoaPods Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. CocoaPods will re-download.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // Maven cache
+        if (lowerPath.EndsWith("/.m2/repository") || lowerPath.EndsWith("\\.m2\\repository"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "Maven Repository Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. Maven will re-download dependencies.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // Cargo cache (Rust)
+        if (lowerPath.EndsWith("/.cargo/registry") || lowerPath.EndsWith("\\.cargo\\registry"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "Rust Cargo Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools", 
+                Recommendation = "Safe to delete. Cargo will re-download crates.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // pip cache
+        if (lowerPath.EndsWith("/.cache/pip") || lowerPath.EndsWith("/caches/pip"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "Python Pip Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. Pip will re-download packages.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // VS Code extensions cache
+        if (lowerPath.Contains("/code/") && lowerName == "cachedextensionvsixs")
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "VS Code Extension Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Cached extension downloads. Safe to delete.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // JetBrains IDE caches
+        if (lowerName == "jetbrains" && lowerPath.Contains("/caches/"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "JetBrains IDE Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "IDE caches and indexes. Safe to delete but IDE will re-index.",
+                Risk = CleanupRisk.Low
+            });
+        }
+    }
+    
+    #endregion
+
+    #region Size Lookup Helpers
+    
+    /// <summary>
+    /// Fill in sizes for detected games by looking up in the scanned tree
+    /// </summary>
+    private List<GameInstallation> FillGameSizes(FileSystemItem root, List<GameInstallation> games)
+    {
+        var pathToSize = BuildPathSizeMap(root);
+        
+        foreach (var game in games)
+        {
+            if (pathToSize.TryGetValue(game.Path, out var size))
+            {
+                game.Size = size;
+            }
+            else
+            {
+                // Try to calculate from filesystem if not in tree
+                try
+                {
+                    var dirInfo = new DirectoryInfo(game.Path);
+                    if (dirInfo.Exists)
+                    {
+                        game.LastPlayed = dirInfo.LastWriteTime;
+                    }
+                }
+                catch { }
+            }
+        }
+        
+        // Deduplicate by path and sort by size
+        return games
+            .GroupBy(g => g.Path)
+            .Select(g => g.First())
+            .OrderByDescending(g => g.Size)
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Fill in sizes for detected dev tools by looking up in the scanned tree
+    /// </summary>
+    private List<CleanupItem> FillDevToolSizes(FileSystemItem root, List<CleanupItem> devTools)
+    {
+        var pathToSize = BuildPathSizeMap(root);
+        
+        // Create new items with correct sizes (SizeBytes is init-only)
+        var result = new List<CleanupItem>();
+        foreach (var tool in devTools)
+        {
+            var size = pathToSize.TryGetValue(tool.Path, out var s) ? s : 0L;
+            if (size >= 1_000_000) // Only include items >= 1MB
+            {
+                result.Add(new CleanupItem
+                {
+                    Name = tool.Name,
+                    Path = tool.Path,
+                    SizeBytes = size,
+                    Category = tool.Category,
+                    Recommendation = tool.Recommendation,
+                    Risk = tool.Risk,
+                    LastAccessed = tool.LastAccessed
+                });
+            }
+        }
+        
+        return result;
+    }
+    
+    /// <summary>
+    /// Builds a dictionary of path -> size from the scanned tree for quick lookups
+    /// </summary>
+    private Dictionary<string, long> BuildPathSizeMap(FileSystemItem root)
+    {
+        var map = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        BuildPathSizeMapRecursive(root, map);
+        return map;
+    }
+    
+    private void BuildPathSizeMapRecursive(FileSystemItem item, Dictionary<string, long> map)
+    {
+        map[item.FullPath] = item.Size;
+        
+        foreach (var child in item.Children)
+        {
+            BuildPathSizeMapRecursive(child, map);
+        }
+    }
+    
+    #endregion
+
+    /// <summary>
+    /// Calculates folder sizes by summing child sizes (needed after parallel scan)
+    /// </summary>
+    private long CalculateFolderSizes(FileSystemItem item)
+    {
+        if (!item.IsFolder)
+        {
+            return item.Size;
+        }
+        
+        long totalSize = 0;
+        foreach (var child in item.Children)
+        {
+            totalSize += CalculateFolderSizes(child);
+        }
+        
+        item.Size = totalSize;
+        return totalSize;
+    }
+
+    private void CalculatePercentages(FileSystemItem item)
+    {
+        if (item.Parent != null && item.Parent.Size > 0)
+        {
+            item.PercentageOfParent = (double)item.Size / item.Parent.Size * 100;
+        }
+        else
+        {
+            item.PercentageOfParent = 100;
+        }
+
+        foreach (var child in item.Children)
+        {
+            CalculatePercentages(child);
+        }
+
+        // Calculate category percentages
+        var totalSize = _categoryStats.Values.Sum(c => c.TotalSize);
+        if (totalSize > 0)
+        {
+            foreach (var category in _categoryStats.Values)
+            {
+                category.Percentage = (double)category.TotalSize / totalSize * 100;
+            }
+        }
+    }
+
+    private List<FileSystemItem> GetLargestFolders(FileSystemItem root, int limit)
+    {
+        var folders = new List<FileSystemItem>();
+        CollectFolders(root, folders);
+        return folders
+            .Where(f => f.IsFolder && f.Size > 0)
+            .OrderByDescending(f => f.Size)
+            .Take(limit)
+            .ToList();
+    }
+
+    private void CollectFolders(FileSystemItem item, List<FileSystemItem> folders)
+    {
+        if (item.IsFolder)
+        {
+            folders.Add(item);
+            foreach (var child in item.Children)
+            {
+                CollectFolders(child, folders);
+            }
+        }
+    }
+
+    public async Task<long> GetFolderSizeAsync(string path, CancellationToken cancellationToken)
+    {
+        return await Task.Run(() =>
+        {
+            long size = 0;
+            try
+            {
+                var dir = new DirectoryInfo(path);
+                foreach (var file in dir.EnumerateFiles("*", SearchOption.AllDirectories))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        size += file.Length;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+            return size;
+        }, cancellationToken);
+    }
+
+    #region SSD Detection
+    
+    /// <summary>
+    /// Detects the storage type of the drive containing the specified path.
+    /// Uses platform-specific methods with caching for performance.
+    /// </summary>
+    private DriveStorageType DetectDriveType(string path)
+    {
+        try
+        {
+            var root = Path.GetPathRoot(path) ?? path;
+            
+            // Check network cache first
+            if (_networkDriveCache.TryGetValue(root, out var isNetwork) && isNetwork)
+                return DriveStorageType.Network;
+            
+            // Check SSD cache
+            if (_ssdCache.TryGetValue(root, out var isSsd))
+                return isSsd ? DriveStorageType.Ssd : DriveStorageType.Hdd;
+            
+            DriveStorageType driveType;
+            
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                driveType = DetectDriveTypeMacOS(path);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                driveType = DetectDriveTypeWindows(root);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                driveType = DetectDriveTypeLinux(root);
+            }
+            else
+            {
+                // Unknown platform, assume SSD for better default performance
+                driveType = DriveStorageType.Ssd;
+            }
+            
+            // Cache the result
+            if (driveType == DriveStorageType.Network)
+                _networkDriveCache[root] = true;
+            else
+                _ssdCache[root] = driveType == DriveStorageType.Ssd;
+                
+            return driveType;
+        }
+        catch
+        {
+            // On any error, assume SSD (better default for modern systems)
+            return DriveStorageType.Ssd;
+        }
+    }
+    
+    /// <summary>
+    /// macOS drive detection - checks for network mounts and drive type
+    /// </summary>
+    private static DriveStorageType DetectDriveTypeMacOS(string path)
+    {
+        try
+        {
+            // First check if this is a network mount (NAS, SMB, NFS, AFP)
+            // Network mounts should use low parallelism due to network latency
+            var mountCheckPsi = new ProcessStartInfo
+            {
+                FileName = "mount",
+                Arguments = "",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using (var mountProcess = Process.Start(mountCheckPsi))
+            {
+                if (mountProcess != null)
+                {
+                    var mountOutput = mountProcess.StandardOutput.ReadToEnd();
+                    mountProcess.WaitForExit(2000);
+                    
+                    // Find the best matching mount point for this path (longest match wins)
+                    string? bestMatchMount = null;
+                    string? bestMatchOptions = null;
+                    int bestMatchLength = 0;
+                    
+                    var lines = mountOutput.Split('\n');
+                    foreach (var line in lines)
+                    {
+                        // Mount output format: /dev/disk1s1 on / (apfs, local, journaled)
+                        // or: //server/share on /Volumes/NAS (smbfs, ...)
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        
+                        var onIndex = line.IndexOf(" on ", StringComparison.Ordinal);
+                        if (onIndex < 0) continue;
+                        
+                        var afterOn = line[(onIndex + 4)..];
+                        var parenIndex = afterOn.IndexOf(" (", StringComparison.Ordinal);
+                        if (parenIndex < 0) continue;
+                        
+                        var mountPoint = afterOn[..parenIndex];
+                        var options = afterOn[(parenIndex + 2)..].TrimEnd(')');
+                        
+                        // Check if path starts with this mount point (longest match wins)
+                        if (path.StartsWith(mountPoint, StringComparison.Ordinal) && 
+                            mountPoint.Length > bestMatchLength)
+                        {
+                            bestMatchMount = mountPoint;
+                            bestMatchOptions = options;
+                            bestMatchLength = mountPoint.Length;
+                        }
+                    }
+                    
+                    if (bestMatchMount != null && bestMatchOptions != null)
+                    {
+                        var optionsLower = bestMatchOptions.ToLowerInvariant();
+                        
+                        // Network filesystems - treat as network storage
+                        if (optionsLower.Contains("smbfs") ||    // SMB/CIFS (NAS)
+                            optionsLower.Contains("nfs") ||      // NFS
+                            optionsLower.Contains("afpfs") ||    // AFP (older Mac shares)
+                            optionsLower.Contains("webdav"))     // WebDAV
+                        {
+                            Console.WriteLine($"[FileScanner] Detected NETWORK mount: {bestMatchMount} ({bestMatchOptions})");
+                            return DriveStorageType.Network;
+                        }
+                        
+                        // Local drive - check if it's internal/SSD
+                        if (optionsLower.Contains("local"))
+                        {
+                            // For local drives, assume SSD (all Macs since 2012)
+                            Console.WriteLine($"[FileScanner] Detected LOCAL drive: {bestMatchMount} ({bestMatchOptions})");
+                            return DriveStorageType.Ssd;
+                        }
+                        
+                        // Not explicitly local - might be external or network
+                        Console.WriteLine($"[FileScanner] Detected UNKNOWN mount type: {bestMatchMount} ({bestMatchOptions})");
+                    }
+                }
+            }
+            
+            // Fallback: use diskutil for more accurate detection
+            return DetectSsdMacOSDiskutil(path);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[FileScanner] macOS drive detection error: {ex.Message}");
+            return DriveStorageType.Ssd; // Default to SSD for local Macs
+        }
+    }
+    
+    /// <summary>
+    /// Uses diskutil to detect if a drive is SSD on macOS
+    /// </summary>
+    private static DriveStorageType DetectSsdMacOSDiskutil(string path)
+    {
+        try
+        {
+            // Get disk identifier for path using df
+            var dfPsi = new ProcessStartInfo
+            {
+                FileName = "df",
+                Arguments = $"\"{path}\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            string devicePath;
+            using (var dfProcess = Process.Start(dfPsi))
+            {
+                if (dfProcess == null) return DriveStorageType.Ssd;
+                var dfOutput = dfProcess.StandardOutput.ReadToEnd();
+                dfProcess.WaitForExit(2000);
+                
+                // Parse df output to get device (first column of second line)
+                var lines = dfOutput.Split('\n');
+                if (lines.Length < 2) return DriveStorageType.Ssd;
+                
+                var parts = lines[1].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 0) return DriveStorageType.Ssd;
+                
+                devicePath = parts[0];
+            }
+            
+            // Network paths don't start with /dev/
+            if (!devicePath.StartsWith("/dev/"))
+            {
+                Console.WriteLine($"[FileScanner] Non-local device (network): {devicePath}");
+                return DriveStorageType.Network;
+            }
+            
+            // Use diskutil to get drive info
+            var diskutilPsi = new ProcessStartInfo
+            {
+                FileName = "diskutil",
+                Arguments = $"info {devicePath}",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var diskutilProcess = Process.Start(diskutilPsi);
+            if (diskutilProcess == null) return DriveStorageType.Ssd;
+            
+            var output = diskutilProcess.StandardOutput.ReadToEnd();
+            diskutilProcess.WaitForExit(3000);
+            
+            // Check for SSD indicators
+            var outputLower = output.ToLowerInvariant();
+            
+            // "Solid State: Yes" indicates SSD
+            if (output.Contains("Solid State:"))
+            {
+                var isSsd = output.Contains("Solid State:   Yes") || 
+                           output.Contains("Solid State: Yes");
+                Console.WriteLine($"[FileScanner] diskutil reports Solid State: {isSsd}");
+                return isSsd ? DriveStorageType.Ssd : DriveStorageType.Hdd;
+            }
+            
+            // Check media type
+            if (outputLower.Contains("ssd") || outputLower.Contains("solid state"))
+                return DriveStorageType.Ssd;
+            if (outputLower.Contains("hdd") || outputLower.Contains("rotational"))
+                return DriveStorageType.Hdd;
+            
+            // Default: assume SSD for internal Mac drives
+            return DriveStorageType.Ssd;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[FileScanner] diskutil detection error: {ex.Message}");
+            return DriveStorageType.Ssd;
+        }
+    }
+    
+    /// <summary>
+    /// Windows drive type detection using PowerShell/WMI query
+    /// </summary>
+    private static DriveStorageType DetectDriveTypeWindows(string driveLetter)
+    {
+        try
+        {
+            // Check if it's a network drive first
+            var driveInfo = new DriveInfo(driveLetter);
+            if (driveInfo.DriveType == DriveType.Network)
+            {
+                Console.WriteLine($"[FileScanner] Windows detected network drive: {driveLetter}");
+                return DriveStorageType.Network;
+            }
+            
+            // Extract just the drive letter (e.g., "C" from "C:\")
+            var letter = driveLetter.TrimEnd('\\', ':');
+            if (letter.Length > 1) letter = letter[..1];
+            
+            // Use PowerShell to query drive media type
+            // MediaType: 3 = HDD, 4 = SSD, 5 = SCM
+            var psi = new ProcessStartInfo
+            {
+                FileName = "powershell",
+                Arguments = $"-NoProfile -Command \"(Get-PhysicalDisk | Where-Object {{ $_.DeviceId -eq (Get-Partition -DriveLetter '{letter}' | Get-Disk).Number }}).MediaType\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var process = Process.Start(psi);
+            if (process == null) return DriveStorageType.Ssd;
+            
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit(3000); // 3 second timeout
+            
+            // "SSD" or "Solid State Drive" indicates SSD
+            if (output.Contains("SSD", StringComparison.OrdinalIgnoreCase) ||
+                output.Contains("Solid", StringComparison.OrdinalIgnoreCase))
+            {
+                return DriveStorageType.Ssd;
+            }
+            
+            return DriveStorageType.Hdd;
+        }
+        catch
+        {
+            return DriveStorageType.Ssd; // Default to SSD on error
+        }
+    }
+    
+    /// <summary>
+    /// Linux drive type detection using /sys/block rotational flag
+    /// </summary>
+    private static DriveStorageType DetectDriveTypeLinux(string path)
+    {
+        try
+        {
+            // Check for network mounts first
+            var mountPsi = new ProcessStartInfo
+            {
+                FileName = "bash",
+                Arguments = $"-c \"mount | grep ' {path} ' | head -1\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using (var mountProcess = Process.Start(mountPsi))
+            {
+                if (mountProcess != null)
+                {
+                    var mountOutput = mountProcess.StandardOutput.ReadToEnd().ToLowerInvariant();
+                    mountProcess.WaitForExit(2000);
+                    
+                    if (mountOutput.Contains("nfs") || mountOutput.Contains("cifs") || 
+                        mountOutput.Contains("smb") || mountOutput.Contains("sshfs"))
+                    {
+                        Console.WriteLine($"[FileScanner] Linux detected network mount: {path}");
+                        return DriveStorageType.Network;
+                    }
+                }
+            }
+            
+            // Find the block device for this path
+            // Use df to get the device, then check /sys/block
+            var psi = new ProcessStartInfo
+            {
+                FileName = "bash",
+                Arguments = $"-c \"lsblk -no ROTA $(df '{path}' | tail -1 | awk '{{print $1}}') 2>/dev/null | head -1\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var process = Process.Start(psi);
+            if (process == null) return DriveStorageType.Ssd;
+            
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit(3000);
+            
+            // ROTA=0 means non-rotational (SSD), ROTA=1 means rotational (HDD)
+            if (int.TryParse(output, out var rotational))
+            {
+                return rotational == 0 ? DriveStorageType.Ssd : DriveStorageType.Hdd;
+            }
+            
+            return DriveStorageType.Ssd; // Default to SSD on parse error
+        }
+        catch
+        {
+            return DriveStorageType.Ssd; // Default to SSD on error
+        }
+    }
+    
+    #endregion
+    
+    #region Helpers
+    
+    /// <summary>
+    /// Gets the device ID for a path to prevent crossing filesystems (macOS/Linux)
+    /// </summary>
+    private static ulong GetDeviceId(string path)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            try 
+            {
+                // struct stat is large, allocate enough buffer
+                byte[] buffer = new byte[256];
+                if (stat_bytebuffer(path, buffer) == 0)
+                {
+                    // st_dev is at offset 0 (int32 on macOS)
+                    return (ulong)BitConverter.ToInt32(buffer, 0);
+                }
+            }
+            catch { /* Ignore P/Invoke errors */ }
+        }
+        
+        return 0;
+    }
+
+    /// <summary>
+    /// Determines if we should check inodes for a given path.
+    /// OPTIMIZATION: Only check inodes in system directories where APFS firmlinks exist.
+    /// User directories (/Users, /home) don't have firmlinks and don't need the overhead.
+    /// </summary>
+    private static bool ShouldCheckInode(string path)
+    {
+        // Fast path: user directories don't need inode checking
+        if (path.StartsWith("/Users/", StringComparison.Ordinal) ||
+            path.StartsWith("/home/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+        
+        // Firmlinks exist primarily in these paths on macOS:
+        // /Applications <-> /System/Volumes/Data/Applications  
+        // /Library <-> /System/Volumes/Data/Library
+        // etc.
+        if (path.StartsWith("/Applications", StringComparison.Ordinal) ||
+            path.StartsWith("/Library", StringComparison.Ordinal) ||
+            path.StartsWith("/System/Volumes/Data", StringComparison.Ordinal) ||
+            path.StartsWith("/usr/", StringComparison.Ordinal) ||
+            path.StartsWith("/private/", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the inode number for a file to detect hardlinks (macOS/Linux only)
+    /// Returns 0 if unable to get inode (Windows or error)
+    /// </summary>
+    private static ulong GetInode(string path)
+    {
+        if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+        {
+            try 
+            {
+                // struct stat buffer - st_ino is at offset 8 on macOS (after st_dev which is 4 bytes + padding)
+                byte[] buffer = new byte[256];
+                if (stat_bytebuffer(path, buffer) == 0)
+                {
+                    // On macOS ARM64: st_ino is at offset 8 as a uint64
+                    return BitConverter.ToUInt64(buffer, 8);
+                }
+            }
+            catch { /* Ignore P/Invoke errors */ }
+        }
+        
+        return 0;
+    }
+
+    [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
+    private static extern int stat_bytebuffer(string path, byte[] buffer);
+
+    /// <summary>
+    /// Formats bytes into human-readable string
+    /// </summary>
+    private static string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int suffixIndex = 0;
+        double size = bytes;
+
+        while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+        {
+            size /= 1024;
+            suffixIndex++;
+        }
+
+        return $"{size:N2} {suffixes[suffixIndex]}";
+    }
+    
+    #endregion
+}

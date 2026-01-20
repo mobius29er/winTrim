@@ -1,0 +1,295 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="WinTrim.Avalonia.App"
+             xmlns:local="using:WinTrim.Avalonia"
+             xmlns:conv="using:WinTrim.Avalonia.Converters"
+             xmlns:themes="using:WinTrim.Avalonia.Themes"
+             RequestedThemeVariant="{x:Static themes:ThemeVariants.Retrofuturistic}">
+             <!-- RequestedThemeVariant is changed at runtime by ThemeService to custom ThemeVariants -->
+
+    <Application.DataTemplates>
+        <local:ViewLocator/>
+    </Application.DataTemplates>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- 
+            ══════════════════════════════════════════════════════════════════════════════
+            THEME SYSTEM: Uses ThemeDictionaries for runtime theme switching
+            - Colors are defined per-theme in ThemeDictionaries
+            - Brushes are defined OUTSIDE ThemeDictionaries and reference Colors via DynamicResource
+            - When RequestedThemeVariant changes, DynamicResource automatically updates
+            ══════════════════════════════════════════════════════════════════════════════
+            -->
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- RETROFUTURISTIC THEME - Blade Runner style dark theme -->
+                <ResourceDictionary x:Key="{x:Static themes:ThemeVariants.Retrofuturistic}">
+                    <Color x:Key="BackgroundColor">#030A0D</Color>
+                    <Color x:Key="SurfaceColor">#071418</Color>
+                    <Color x:Key="SurfaceHoverColor">#0A1E24</Color>
+                    <Color x:Key="CardColor">#0A1A1F</Color>
+                    <Color x:Key="PrimaryColor">#00D4E5</Color>
+                    <Color x:Key="PrimaryHoverColor">#00F3FF</Color>
+                    <Color x:Key="PrimaryDimColor">#007A8A</Color>
+                    <Color x:Key="AccentColor">#FF7B00</Color>
+                    <Color x:Key="AccentHoverColor">#FF9500</Color>
+                    <Color x:Key="AccentDimColor">#CC6200</Color>
+                    <Color x:Key="SecondaryColor">#0D4A4A</Color>
+                    <Color x:Key="SecondaryHoverColor">#0F5C5C</Color>
+                    <Color x:Key="TextPrimaryColor">#E0F7FA</Color>
+                    <Color x:Key="TextSecondaryColor">#80DEEA</Color>
+                    <Color x:Key="TextMutedColor">#4A7C7F</Color>
+                    <Color x:Key="TextDisabledColor">#2A4A4D</Color>
+                    <Color x:Key="BorderColor">#1A3A40</Color>
+                    <Color x:Key="BorderHoverColor">#00D4E5</Color>
+                    <Color x:Key="GridLineColor">#0D2A30</Color>
+                    <Color x:Key="SuccessColor">#00E676</Color>
+                    <Color x:Key="WarningColor">#FF7B00</Color>
+                    <Color x:Key="DangerColor">#FF3D00</Color>
+                    <Color x:Key="InfoColor">#00D4E5</Color>
+                    <Color x:Key="RiskSafeColor">#4CAF50</Color>
+                    <Color x:Key="RiskLowColor">#8BC34A</Color>
+                    <Color x:Key="RiskMediumColor">#FFC107</Color>
+                    <Color x:Key="RiskHighColor">#F44336</Color>
+                </ResourceDictionary>
+                
+                <!-- TECH THEME - Tech-Noir Cyberpunk style -->
+                <ResourceDictionary x:Key="{x:Static themes:ThemeVariants.Tech}">
+                    <Color x:Key="BackgroundColor">#050505</Color>
+                    <Color x:Key="SurfaceColor">#0D1117</Color>
+                    <Color x:Key="SurfaceHoverColor">#161B22</Color>
+                    <Color x:Key="CardColor">#0D1117</Color>
+                    <Color x:Key="PrimaryColor">#00F3FF</Color>
+                    <Color x:Key="PrimaryHoverColor">#66F8FF</Color>
+                    <Color x:Key="PrimaryDimColor">#00C4CC</Color>
+                    <Color x:Key="AccentColor">#FF9900</Color>
+                    <Color x:Key="AccentHoverColor">#FFAA33</Color>
+                    <Color x:Key="AccentDimColor">#CC7700</Color>
+                    <Color x:Key="SecondaryColor">#FF00FF</Color>
+                    <Color x:Key="SecondaryHoverColor">#FF66FF</Color>
+                    <Color x:Key="TextPrimaryColor">#F0F6FC</Color>
+                    <Color x:Key="TextSecondaryColor">#8B949E</Color>
+                    <Color x:Key="TextMutedColor">#484F58</Color>
+                    <Color x:Key="TextDisabledColor">#30363D</Color>
+                    <Color x:Key="BorderColor">#1F2937</Color>
+                    <Color x:Key="BorderHoverColor">#00F3FF</Color>
+                    <Color x:Key="GridLineColor">#161B22</Color>
+                    <Color x:Key="SuccessColor">#00CC88</Color>
+                    <Color x:Key="WarningColor">#FF9900</Color>
+                    <Color x:Key="DangerColor">#FF3366</Color>
+                    <Color x:Key="InfoColor">#00F3FF</Color>
+                    <Color x:Key="RiskSafeColor">#00F3FF</Color>
+                    <Color x:Key="RiskLowColor">#00CC88</Color>
+                    <Color x:Key="RiskMediumColor">#FF9900</Color>
+                    <Color x:Key="RiskHighColor">#FF3366</Color>
+                </ResourceDictionary>
+                
+                <!-- ENTERPRISE THEME - Professional Light Mode -->
+                <ResourceDictionary x:Key="{x:Static themes:ThemeVariants.Enterprise}">
+                    <Color x:Key="BackgroundColor">#F8FAFC</Color>
+                    <Color x:Key="SurfaceColor">#FFFFFF</Color>
+                    <Color x:Key="SurfaceHoverColor">#F1F5F9</Color>
+                    <Color x:Key="CardColor">#FFFFFF</Color>
+                    <Color x:Key="PrimaryColor">#2563EB</Color>
+                    <Color x:Key="PrimaryHoverColor">#3B82F6</Color>
+                    <Color x:Key="PrimaryDimColor">#1D4ED8</Color>
+                    <Color x:Key="AccentColor">#F59E0B</Color>
+                    <Color x:Key="AccentHoverColor">#FBBF24</Color>
+                    <Color x:Key="AccentDimColor">#D97706</Color>
+                    <Color x:Key="SecondaryColor">#10B981</Color>
+                    <Color x:Key="SecondaryHoverColor">#34D399</Color>
+                    <Color x:Key="TextPrimaryColor">#1E293B</Color>
+                    <Color x:Key="TextSecondaryColor">#64748B</Color>
+                    <Color x:Key="TextMutedColor">#94A3B8</Color>
+                    <Color x:Key="TextDisabledColor">#CBD5E1</Color>
+                    <Color x:Key="BorderColor">#E2E8F0</Color>
+                    <Color x:Key="BorderHoverColor">#2563EB</Color>
+                    <Color x:Key="GridLineColor">#E2E8F0</Color>
+                    <Color x:Key="SuccessColor">#10B981</Color>
+                    <Color x:Key="WarningColor">#F59E0B</Color>
+                    <Color x:Key="DangerColor">#EF4444</Color>
+                    <Color x:Key="InfoColor">#2563EB</Color>
+                    <Color x:Key="RiskSafeColor">#10B981</Color>
+                    <Color x:Key="RiskLowColor">#3B82F6</Color>
+                    <Color x:Key="RiskMediumColor">#F59E0B</Color>
+                    <Color x:Key="RiskHighColor">#EF4444</Color>
+                </ResourceDictionary>
+                
+                <!-- TERMINAL GREEN THEME - Classic Green on Black -->
+                <ResourceDictionary x:Key="{x:Static themes:ThemeVariants.TerminalGreen}">
+                    <Color x:Key="BackgroundColor">#000000</Color>
+                    <Color x:Key="SurfaceColor">#0A0A0A</Color>
+                    <Color x:Key="SurfaceHoverColor">#111111</Color>
+                    <Color x:Key="CardColor">#0A0A0A</Color>
+                    <Color x:Key="PrimaryColor">#00FF00</Color>
+                    <Color x:Key="PrimaryHoverColor">#33FF33</Color>
+                    <Color x:Key="PrimaryDimColor">#00CC00</Color>
+                    <Color x:Key="AccentColor">#00FF00</Color>
+                    <Color x:Key="AccentHoverColor">#33FF33</Color>
+                    <Color x:Key="AccentDimColor">#00CC00</Color>
+                    <Color x:Key="SecondaryColor">#00FF00</Color>
+                    <Color x:Key="SecondaryHoverColor">#33FF33</Color>
+                    <Color x:Key="TextPrimaryColor">#00FF00</Color>
+                    <Color x:Key="TextSecondaryColor">#00CC00</Color>
+                    <Color x:Key="TextMutedColor">#008800</Color>
+                    <Color x:Key="TextDisabledColor">#004400</Color>
+                    <Color x:Key="BorderColor">#1A1A1A</Color>
+                    <Color x:Key="BorderHoverColor">#00FF00</Color>
+                    <Color x:Key="GridLineColor">#0F0F0F</Color>
+                    <Color x:Key="SuccessColor">#00FF00</Color>
+                    <Color x:Key="WarningColor">#FFFF00</Color>
+                    <Color x:Key="DangerColor">#FF3333</Color>
+                    <Color x:Key="InfoColor">#00CCFF</Color>
+                    <Color x:Key="RiskSafeColor">#00FF00</Color>
+                    <Color x:Key="RiskLowColor">#00CCFF</Color>
+                    <Color x:Key="RiskMediumColor">#FFFF00</Color>
+                    <Color x:Key="RiskHighColor">#FF3333</Color>
+                </ResourceDictionary>
+                
+                <!-- TERMINAL RED THEME - Red on Black -->
+                <ResourceDictionary x:Key="{x:Static themes:ThemeVariants.TerminalRed}">
+                    <Color x:Key="BackgroundColor">#000000</Color>
+                    <Color x:Key="SurfaceColor">#0A0A0A</Color>
+                    <Color x:Key="SurfaceHoverColor">#111111</Color>
+                    <Color x:Key="CardColor">#0A0A0A</Color>
+                    <Color x:Key="PrimaryColor">#FF3333</Color>
+                    <Color x:Key="PrimaryHoverColor">#FF6666</Color>
+                    <Color x:Key="PrimaryDimColor">#CC0000</Color>
+                    <Color x:Key="AccentColor">#FF3333</Color>
+                    <Color x:Key="AccentHoverColor">#FF6666</Color>
+                    <Color x:Key="AccentDimColor">#CC0000</Color>
+                    <Color x:Key="SecondaryColor">#FF3333</Color>
+                    <Color x:Key="SecondaryHoverColor">#FF6666</Color>
+                    <Color x:Key="TextPrimaryColor">#FF3333</Color>
+                    <Color x:Key="TextSecondaryColor">#CC2222</Color>
+                    <Color x:Key="TextMutedColor">#881111</Color>
+                    <Color x:Key="TextDisabledColor">#440000</Color>
+                    <Color x:Key="BorderColor">#1A1A1A</Color>
+                    <Color x:Key="BorderHoverColor">#FF3333</Color>
+                    <Color x:Key="GridLineColor">#0F0F0F</Color>
+                    <Color x:Key="SuccessColor">#00FF00</Color>
+                    <Color x:Key="WarningColor">#FFFF00</Color>
+                    <Color x:Key="DangerColor">#FF0000</Color>
+                    <Color x:Key="InfoColor">#00CCFF</Color>
+                    <Color x:Key="RiskSafeColor">#00FF00</Color>
+                    <Color x:Key="RiskLowColor">#00CCFF</Color>
+                    <Color x:Key="RiskMediumColor">#FFFF00</Color>
+                    <Color x:Key="RiskHighColor">#FF0000</Color>
+                </ResourceDictionary>
+                
+                <!-- Fallback Dark theme (used when no specific theme matches) -->
+                <ResourceDictionary x:Key="Dark">
+                    <Color x:Key="BackgroundColor">#030A0D</Color>
+                    <Color x:Key="SurfaceColor">#071418</Color>
+                    <Color x:Key="SurfaceHoverColor">#0A1E24</Color>
+                    <Color x:Key="CardColor">#0A1A1F</Color>
+                    <Color x:Key="PrimaryColor">#00D4E5</Color>
+                    <Color x:Key="PrimaryHoverColor">#00F3FF</Color>
+                    <Color x:Key="PrimaryDimColor">#007A8A</Color>
+                    <Color x:Key="AccentColor">#FF7B00</Color>
+                    <Color x:Key="AccentHoverColor">#FF9500</Color>
+                    <Color x:Key="AccentDimColor">#CC6200</Color>
+                    <Color x:Key="SecondaryColor">#0D4A4A</Color>
+                    <Color x:Key="SecondaryHoverColor">#0F5C5C</Color>
+                    <Color x:Key="TextPrimaryColor">#E0F7FA</Color>
+                    <Color x:Key="TextSecondaryColor">#80DEEA</Color>
+                    <Color x:Key="TextMutedColor">#4A7C7F</Color>
+                    <Color x:Key="TextDisabledColor">#2A4A4D</Color>
+                    <Color x:Key="BorderColor">#1A3A40</Color>
+                    <Color x:Key="BorderHoverColor">#00D4E5</Color>
+                    <Color x:Key="GridLineColor">#0D2A30</Color>
+                    <Color x:Key="SuccessColor">#00E676</Color>
+                    <Color x:Key="WarningColor">#FF7B00</Color>
+                    <Color x:Key="DangerColor">#FF3D00</Color>
+                    <Color x:Key="InfoColor">#00D4E5</Color>
+                    <Color x:Key="RiskSafeColor">#4CAF50</Color>
+                    <Color x:Key="RiskLowColor">#8BC34A</Color>
+                    <Color x:Key="RiskMediumColor">#FFC107</Color>
+                    <Color x:Key="RiskHighColor">#F44336</Color>
+                </ResourceDictionary>
+                
+                <!-- Fallback Light theme -->
+                <ResourceDictionary x:Key="Light">
+                    <Color x:Key="BackgroundColor">#F8FAFC</Color>
+                    <Color x:Key="SurfaceColor">#FFFFFF</Color>
+                    <Color x:Key="SurfaceHoverColor">#F1F5F9</Color>
+                    <Color x:Key="CardColor">#FFFFFF</Color>
+                    <Color x:Key="PrimaryColor">#2563EB</Color>
+                    <Color x:Key="PrimaryHoverColor">#3B82F6</Color>
+                    <Color x:Key="PrimaryDimColor">#1D4ED8</Color>
+                    <Color x:Key="AccentColor">#F59E0B</Color>
+                    <Color x:Key="AccentHoverColor">#FBBF24</Color>
+                    <Color x:Key="AccentDimColor">#D97706</Color>
+                    <Color x:Key="SecondaryColor">#10B981</Color>
+                    <Color x:Key="SecondaryHoverColor">#34D399</Color>
+                    <Color x:Key="TextPrimaryColor">#1E293B</Color>
+                    <Color x:Key="TextSecondaryColor">#64748B</Color>
+                    <Color x:Key="TextMutedColor">#94A3B8</Color>
+                    <Color x:Key="TextDisabledColor">#CBD5E1</Color>
+                    <Color x:Key="BorderColor">#E2E8F0</Color>
+                    <Color x:Key="BorderHoverColor">#2563EB</Color>
+                    <Color x:Key="GridLineColor">#E2E8F0</Color>
+                    <Color x:Key="SuccessColor">#10B981</Color>
+                    <Color x:Key="WarningColor">#F59E0B</Color>
+                    <Color x:Key="DangerColor">#EF4444</Color>
+                    <Color x:Key="InfoColor">#2563EB</Color>
+                    <Color x:Key="RiskSafeColor">#10B981</Color>
+                    <Color x:Key="RiskLowColor">#3B82F6</Color>
+                    <Color x:Key="RiskMediumColor">#F59E0B</Color>
+                    <Color x:Key="RiskHighColor">#EF4444</Color>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+            
+            <!-- Base font size - can be changed at runtime -->
+            <x:Double x:Key="BaseFontSize">14</x:Double>
+            
+            <!-- Converters as static resources -->
+            <conv:FileSizeConverter x:Key="FileSizeConverter"/>
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+            <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+            <conv:RiskLevelToBrushConverter x:Key="RiskToBrush"/>
+            <conv:PercentageToWidthConverter x:Key="PercentageToWidth"/>
+            <conv:DateTimeToRelativeConverter x:Key="RelativeTime"/>
+            <conv:ThemeToIconConverter x:Key="ThemeToIcon"/>
+            <conv:NullToBoolConverter x:Key="NullToBool"/>
+            
+            <!-- 
+            BRUSHES - Defined OUTSIDE ThemeDictionaries, reference Colors via DynamicResource
+            When ThemeVariant changes, Colors update, and Brushes automatically get new values
+            -->
+            <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundColor}"/>
+            <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource SurfaceColor}"/>
+            <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{DynamicResource SurfaceHoverColor}"/>
+            <SolidColorBrush x:Key="CardBrush" Color="{DynamicResource CardColor}"/>
+            <SolidColorBrush x:Key="PrimaryBrush" Color="{DynamicResource PrimaryColor}"/>
+            <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{DynamicResource PrimaryHoverColor}"/>
+            <SolidColorBrush x:Key="PrimaryDimBrush" Color="{DynamicResource PrimaryDimColor}"/>
+            <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
+            <SolidColorBrush x:Key="AccentHoverBrush" Color="{DynamicResource AccentHoverColor}"/>
+            <SolidColorBrush x:Key="AccentDimBrush" Color="{DynamicResource AccentDimColor}"/>
+            <SolidColorBrush x:Key="SecondaryBrush" Color="{DynamicResource SecondaryColor}"/>
+            <SolidColorBrush x:Key="SecondaryHoverBrush" Color="{DynamicResource SecondaryHoverColor}"/>
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimaryColor}"/>
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondaryColor}"/>
+            <SolidColorBrush x:Key="TextMutedBrush" Color="{DynamicResource TextMutedColor}"/>
+            <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextDisabledColor}"/>
+            <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}"/>
+            <SolidColorBrush x:Key="BorderHoverBrush" Color="{DynamicResource BorderHoverColor}"/>
+            <SolidColorBrush x:Key="GridLineBrush" Color="{DynamicResource GridLineColor}"/>
+            <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}"/>
+            <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
+            <SolidColorBrush x:Key="DangerBrush" Color="{DynamicResource DangerColor}"/>
+            <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}"/>
+            <SolidColorBrush x:Key="RiskSafeBrush" Color="{DynamicResource RiskSafeColor}"/>
+            <SolidColorBrush x:Key="RiskLowBrush" Color="{DynamicResource RiskLowColor}"/>
+            <SolidColorBrush x:Key="RiskMediumBrush" Color="{DynamicResource RiskMediumColor}"/>
+            <SolidColorBrush x:Key="RiskHighBrush" Color="{DynamicResource RiskHighColor}"/>
+        </ResourceDictionary>
+    </Application.Resources>
+  
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <StyleInclude Source="avares://WinTrim/Themes/Styles.axaml"/>
+    </Application.Styles>
+</Application>

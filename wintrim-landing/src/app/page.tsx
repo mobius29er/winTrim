@@ -26,7 +26,7 @@ export default function Home() {
               Privacy
             </Link>
             <a 
-              href="https://github.com/mobius29er/winLose" 
+              href="https://github.com/mobius29er/winTrim" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-sm text-gray-400 hover:text-[#00F3FF] transition-colors tracking-wider uppercase"
@@ -61,22 +61,23 @@ export default function Home() {
           {/* Subheadline */}
           <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-12 leading-relaxed">
             A precision disk analyzer that visualizes, identifies, and eliminates 
-            storage waste with <span className="text-[#00F3FF]">surgical accuracy</span>.
+            storage waste with <span className="text-[#00F3FF]">surgical accuracy</span>. 
+            Available on <span className="text-white">Windows</span>, <span className="text-white">macOS</span>, and <span className="text-white">Linux</span>.
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <a 
-              href="https://github.com/mobius29er/winLose/releases"
+              href="https://github.com/mobius29er/winTrim/releases"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-cyber px-8 py-4 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold rounded-lg tracking-wider uppercase hover:shadow-[0_0_30px_rgba(255,153,0,0.5)] transition-all duration-300"
               style={{ fontFamily: 'Rajdhani, sans-serif' }}
             >
-              Download for Windows
+              Download Now — $4.99
             </a>
             <a 
-              href="https://github.com/mobius29er/winLose"
+              href="https://github.com/mobius29er/winTrim"
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-4 border border-[#00F3FF]/30 text-[#00F3FF] font-bold rounded-lg tracking-wider uppercase hover:bg-[#00F3FF]/10 hover:border-[#00F3FF]/60 transition-all duration-300"
@@ -84,6 +85,22 @@ export default function Home() {
             >
               View Source
             </a>
+          </div>
+
+          {/* Platform Badges */}
+          <div className="flex items-center justify-center gap-6 mb-16">
+            <div className="flex items-center gap-2 text-gray-400">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+              <span className="text-sm">Windows</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-400">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.418 0-8-3.582-8-8s3.582-8 8-8 8 3.582 8 8-3.582 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+              <span className="text-sm">macOS</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-400">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.503 0c-.155 0-.31.004-.463.012-2.073.074-3.962.738-5.407 1.87C5.187 3.013 4.092 4.573 3.553 6.4c-.54 1.828-.479 3.89.17 5.678.536 1.476 1.397 2.727 2.448 3.684a8.49 8.49 0 0 0-.154 1.605c0 1.257.264 2.438.734 3.514.47 1.076 1.138 2.035 1.954 2.78.815.746 1.764 1.278 2.787 1.574 1.022.297 2.097.367 3.142.206 1.046-.16 2.044-.552 2.914-1.131.871-.58 1.604-1.333 2.142-2.2.538-.866.876-1.834.992-2.83.117-.996.01-2.007-.318-2.96a7.56 7.56 0 0 0-1.434-2.518c.573-1.312.846-2.736.8-4.156-.045-1.42-.41-2.821-1.073-4.06-.663-1.239-1.6-2.283-2.725-3.065C14.785.52 13.478.08 12.126.007 12.252.003 12.377 0 12.503 0z"/></svg>
+              <span className="text-sm">Linux</span>
+            </div>
           </div>
 
           {/* Holographic Screenshot */}
@@ -200,11 +217,11 @@ export default function Home() {
               <h3 className="text-white text-lg tracking-widest uppercase mb-2" style={{ fontFamily: 'Rajdhani' }}>
                 Speed
               </h3>
-              <div className="text-5xl font-bold text-white mb-2" style={{ fontFamily: 'Rajdhani' }}>
-                &lt;1s
+              <div className="text-3xl font-bold text-white mb-2" style={{ fontFamily: 'Rajdhani' }}>
+                1TB in 30s
               </div>
               <p className="text-xs text-gray-500">
-                Scan initialization time for standard SSD drives.
+                Blazing fast on Windows. ~2 min on Mac. Full disk analysis.
               </p>
             </div>
 
@@ -230,14 +247,58 @@ export default function Home() {
                 </h3>
               </div>
               <p className="text-xs text-gray-400">
-                AI-assisted cleanup suggestions with risk assessment. Safe, Low, Medium, High risk indicators.
+                Intelligent cleanup with risk assessment. Preview files with size, date, and risk level before deleting.
+              </p>
+            </div>
+
+            {/* Session Persistence Card */}
+            <div className="glass-card rounded-xl p-6 border border-[#00F3FF]/20 hover:border-[#00F3FF]/50">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">💾</span>
+                <h3 className="text-[#00F3FF] text-lg tracking-widest uppercase" style={{ fontFamily: 'Rajdhani' }}>
+                  Auto-Save
+                </h3>
+              </div>
+              <p className="text-xs text-gray-400">
+                Your scan results persist between sessions. Pick up right where you left off.
               </p>
             </div>
           </div>
 
           {/* Status Bar */}
           <div className="mt-16 text-center text-xs text-gray-600 uppercase tracking-[0.2em]">
-            // Verified_By_Microsoft_Store // Open_Source // Status_Clean
+            // Cross_Platform // One_Time_Purchase // No_Subscription // Open_Source
+          </div>
+        </div>
+      </section>
+
+      {/* Coming Soon / Roadmap Teaser */}
+      <section className="relative py-20 px-6 border-t border-white/5">
+        <div className="max-w-4xl mx-auto text-center">
+          <h3 
+            className="text-2xl md:text-3xl font-bold mb-8 tracking-wider"
+            style={{ fontFamily: 'Rajdhani, sans-serif' }}
+          >
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F3FF] to-[#FF00FF]">
+              COMING SOON
+            </span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="glass-card rounded-xl p-6 border border-gray-700/30">
+              <div className="text-2xl mb-3">🍎</div>
+              <h4 className="text-white text-sm uppercase tracking-wider mb-2" style={{ fontFamily: 'Rajdhani' }}>Mac App Store</h4>
+              <p className="text-xs text-gray-500">Official App Store listing for seamless installation</p>
+            </div>
+            <div className="glass-card rounded-xl p-6 border border-gray-700/30">
+              <div className="text-2xl mb-3">📦</div>
+              <h4 className="text-white text-sm uppercase tracking-wider mb-2" style={{ fontFamily: 'Rajdhani' }}>Duplicate Detection</h4>
+              <p className="text-xs text-gray-500">Find and remove duplicate files across your drives</p>
+            </div>
+            <div className="glass-card rounded-xl p-6 border border-gray-700/30">
+              <div className="text-2xl mb-3">🌐</div>
+              <h4 className="text-white text-sm uppercase tracking-wider mb-2" style={{ fontFamily: 'Rajdhani' }}>Browser Cleanup</h4>
+              <p className="text-xs text-gray-500">Chrome, Firefox, Safari, Edge cache detection</p>
+            </div>
           </div>
         </div>
       </section>
@@ -256,16 +317,16 @@ export default function Home() {
             </span>
           </h2>
           <p className="text-gray-400 mb-8">
-            Free. Open source. No account required.
+            One-time purchase. No subscription. No account required.
           </p>
           <a 
-            href="https://github.com/mobius29er/winLose/releases"
+            href="https://github.com/mobius29er/winTrim/releases"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-cyber inline-block px-12 py-5 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold text-lg rounded-lg tracking-wider uppercase hover:shadow-[0_0_40px_rgba(255,153,0,0.6)] transition-all duration-300"
             style={{ fontFamily: 'Rajdhani, sans-serif' }}
           >
-            Download WinTrim
+            Get WinTrim — $4.99
           </a>
         </div>
       </section>
@@ -290,7 +351,7 @@ export default function Home() {
                 Privacy
               </Link>
               <a 
-                href="https://github.com/mobius29er/winLose" 
+                href="https://github.com/mobius29er/winTrim" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="hover:text-[#00F3FF] transition-colors"
@@ -325,7 +386,7 @@ export default function Home() {
               </a>
               {" "}// Source available on{" "}
               <a 
-                href="https://github.com/mobius29er/winLose" 
+                href="https://github.com/mobius29er/winTrim" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-[#00F3FF]/60 hover:text-[#00F3FF] transition-colors"
