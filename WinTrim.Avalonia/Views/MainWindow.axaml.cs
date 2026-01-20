@@ -315,45 +315,64 @@ public partial class MainWindow : Window
         }
     }
 
-    private string? _rightClickedFilePath;
+    private WinTrim.Core.Models.CleanupFileInfo? _selectedCleanupFile;
 
     /// <summary>
     /// Tracks selection in the Cleanup Files DataGrid for context menu actions
     /// </summary>
     private void CleanupFilesGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (sender is DataGrid dataGrid && dataGrid.SelectedItem is string filePath)
+        if (sender is DataGrid dataGrid && dataGrid.SelectedItem is WinTrim.Core.Models.CleanupFileInfo fileInfo)
         {
-            _rightClickedFilePath = filePath;
+            _selectedCleanupFile = fileInfo;
         }
     }
 
     private void CleanupFileCopyPath_Click(object? sender, RoutedEventArgs e)
     {
-        if (_rightClickedFilePath != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        if (_selectedCleanupFile?.FilePath != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
         {
-            clipboard.SetTextAsync(_rightClickedFilePath);
+            clipboard.SetTextAsync(_selectedCleanupFile.FilePath);
         }
     }
 
     private void CleanupFileOpenFolder_Click(object? sender, RoutedEventArgs e)
     {
-        if (_rightClickedFilePath != null)
+        if (_selectedCleanupFile?.FilePath != null)
         {
-            try
-            {
-                var folder = System.IO.Path.GetDirectoryName(_rightClickedFilePath);
-                if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = folder,
-                        UseShellExecute = true
-                    });
-                }
-            }
-            catch { /* Ignore errors */ }
+            OpenFileLocation(_selectedCleanupFile.FilePath);
         }
+    }
+
+    /// <summary>
+    /// Handler for the Open button in the Cleanup Files DataGrid
+    /// </summary>
+    private void CleanupFileOpenButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.DataContext is WinTrim.Core.Models.CleanupFileInfo fileInfo)
+        {
+            OpenFileLocation(fileInfo.FilePath);
+        }
+    }
+
+    /// <summary>
+    /// Opens the containing folder for a file path
+    /// </summary>
+    private void OpenFileLocation(string filePath)
+    {
+        try
+        {
+            var folder = System.IO.Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = folder,
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch { /* Ignore errors */ }
     }
 
     private WinTrim.Core.Models.CleanupSuggestion? _rightClickedSuggestion;

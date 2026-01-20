@@ -150,7 +150,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private string? _selectedFolderName;
 
     [ObservableProperty]
-    private ObservableCollection<string> _cleanupFiles = new();
+    private ObservableCollection<CleanupFileInfo> _cleanupFiles = new();
 
     [ObservableProperty]
     private string? _selectedCleanupDescription;
@@ -983,7 +983,8 @@ public partial class MainWindowViewModel : ViewModelBase
         CleanupFiles.Clear();
         foreach (var file in suggestion.AffectedFiles)
         {
-            CleanupFiles.Add(file);
+            var fileInfo = CleanupFileInfo.FromPath(file, suggestion.RiskLevel);
+            CleanupFiles.Add(fileInfo);
         }
     }
 
