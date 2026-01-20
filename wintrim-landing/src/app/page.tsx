@@ -100,37 +100,13 @@ export default function Home() {
           </div>
 
           {/* Holographic Screenshot */}
-          <div className="relative max-w-4xl mx-auto">
-            <div className="hologram rounded-lg overflow-hidden border border-[#00F3FF]/20">
-              <div className="bg-[#0A0A0A] p-4 border-b border-[#00F3FF]/10">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#FF5F57]" />
-                  <div className="w-3 h-3 rounded-full bg-[#FEBC2E]" />
-                  <div className="w-3 h-3 rounded-full bg-[#28C840]" />
-                  <span className="ml-4 text-xs text-gray-500 tracking-wider">WinTrim v1.0</span>
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-[#0A0A0A] to-[#111] p-8 min-h-[300px] flex items-center justify-center">
-                <div className="text-center">
-                  <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div className="p-4 rounded-lg bg-[#00F3FF]/10 border border-[#00F3FF]/20">
-                      <div className="text-2xl font-bold text-[#00F3FF]" style={{ fontFamily: 'Rajdhani' }}>127 GB</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wider">Analyzed</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-[#FF9900]/10 border border-[#FF9900]/20">
-                      <div className="text-2xl font-bold text-[#FF9900]" style={{ fontFamily: 'Rajdhani' }}>23.4 GB</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wider">Recoverable</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-[#FF00FF]/10 border border-[#FF00FF]/20">
-                      <div className="text-2xl font-bold text-[#FF00FF]" style={{ fontFamily: 'Rajdhani' }}>1.2M</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wider">Files</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-600 tracking-[0.15em] uppercase">
-                    // Interactive_Visualization_Viewport
-                  </div>
-                </div>
-              </div>
+          <div className="relative max-w-5xl mx-auto">
+            <div className="hologram rounded-lg overflow-hidden border border-[#00F3FF]/30 shadow-2xl shadow-[#00F3FF]/10">
+              <img 
+                src="/screenshot-hero.png" 
+                alt="WinTrim scanning 1.81 TB drive - analyzing 1.9 million files in 78 seconds" 
+                className="w-full h-auto"
+              />
             </div>
             {/* Reflection */}
             <div className="absolute -bottom-20 left-0 right-0 h-20 bg-gradient-to-b from-[#00F3FF]/5 to-transparent blur-sm opacity-50 transform scale-y-[-1]" />
