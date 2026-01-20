@@ -1,0 +1,30 @@
+# WinTrim - Disk Analyzer
+# https://wintrim.io
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://wintrim.io/sitemap.xml
+
+# AI/LLM crawlers
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Anthropic-AI
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Cohere-ai
+Allow: /
