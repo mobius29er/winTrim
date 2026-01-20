@@ -104,6 +104,13 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
                     
+                    <!-- Express Scan Toggle -->
+                    <CheckBox IsChecked="{Binding ExpressScanEnabled}" 
+                              Content="⚡ Express" 
+                              ToolTip.Tip="Express mode: Scan only your user folder (~/) for faster results. Disable for full disk scan."
+                              Margin="0,0,8,0"
+                              VerticalAlignment="Center"/>
+                    
                     <Button Content="📁 Browse" Command="{Binding BrowseFolderCommand}" 
                             Classes="Outline" Margin="0,0,8,0"/>
                     

@@ -179,6 +179,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _hasQuickCleanItems;
 
     [ObservableProperty]
+    private bool _expressScanEnabled = true; // Default to express scan for faster results
+
+    [ObservableProperty]
     private string _quickCleanInfo = string.Empty;
 
     [ObservableProperty]
@@ -442,14 +445,31 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (SelectedDrive == null) return;
 
-        Console.WriteLine($"[ViewModel] StartScan called for drive: {SelectedDrive.DisplayName} ({SelectedDrive.Path})");
+        // Determine scan path - Express mode scans only user's home directory for speed
+        var scanPath = SelectedDrive.Path;
+        var scanModeLabel = "Full";
+        
+        if (ExpressScanEnabled && SelectedDrive.Path == "/")
+        {
+            // Express mode: scan only the current user's home directory
+            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrEmpty(homeDir) && Directory.Exists(homeDir))
+            {
+                scanPath = homeDir;
+                scanModeLabel = "Express";
+            }
+        }
+
+        Console.WriteLine($"[ViewModel] StartScan called for drive: {SelectedDrive.DisplayName} ({scanPath}) - {scanModeLabel} mode");
         
         CanStart = false;
         CanStop = true;
         CanPause = true;
         ScanProgress.Reset();
         ScanProgress.State = ScanState.Scanning;
-        StatusText = $"Scanning {SelectedDrive.DisplayName}...";
+        StatusText = ExpressScanEnabled && scanModeLabel == "Express" 
+            ? $"Express scanning {Path.GetFileName(scanPath)}..." 
+            : $"Scanning {SelectedDrive.DisplayName}...";
 
         _cancellationTokenSource = new CancellationTokenSource();
 
@@ -468,9 +488,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 ScanProgress.StatusMessage = p.StatusMessage;
             });
 
-            // Run actual scan using injected FileScanner - use Path for the actual scan path
+            // Run actual scan using injected FileScanner
             var result = await _fileScanner.ScanAsync(
-                SelectedDrive.Path, 
+                scanPath, 
                 progress, 
                 _cancellationTokenSource.Token);
 

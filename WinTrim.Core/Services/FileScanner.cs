@@ -39,6 +39,10 @@ public sealed class FileScanner : IFileScanner
     // Track seen inodes to prevent counting hardlinked/firmlinked files multiple times (macOS/Linux)
     private readonly ConcurrentDictionary<ulong, bool> _seenInodes = new();
     
+    // Detected games and dev tools during scan (inline detection)
+    private readonly ConcurrentBag<GameInstallation> _detectedGames = new();
+    private readonly ConcurrentBag<CleanupItem> _detectedDevTools = new();
+    
     // Pause mechanism using ManualResetEventSlim (more efficient than ManualResetEvent)
     private readonly ManualResetEventSlim _pauseEvent = new(true); // Initially signaled (not paused)
     private volatile bool _isPaused;
@@ -57,11 +61,11 @@ public sealed class FileScanner : IFileScanner
     
     // Performance tuning - parallelism is determined dynamically based on drive type
     private const int LargestFilesLimit = 100;
-    private const int SsdParallelism = 16;     // SSDs can handle high parallelism
+    private const int SsdParallelism = 32;     // SSDs/NVMe can handle very high parallelism
     private const int HddParallelism = 4;      // HDDs need limited parallelism to avoid thrashing  
     private const int NetworkParallelism = 2;  // Network drives limited by latency, not I/O
     private int _currentMaxParallelism = 8;    // Default, updated per scan based on drive type
-    private const int ProgressReportInterval = 250; // Report every N files (balanced for responsiveness)
+    private const int ProgressReportInterval = 500; // Report every N files (less frequent = faster)
     private const long LargeFileThreshold = 1 * 1024 * 1024; // Only track files > 1MB for largest files list
     
     // Drive type detection cache (true = fast storage SSD, false = slow storage HDD/Network)
@@ -113,6 +117,8 @@ public sealed class FileScanner : IFileScanner
         _largestFiles.Clear();
         _categoryStats.Clear();
         _seenInodes.Clear();
+        _detectedGames.Clear();
+        _detectedDevTools.Clear();
         _isPaused = false;
         _pauseEvent.Set();
         _lastReportedFileCount = 0;
@@ -121,7 +127,7 @@ public sealed class FileScanner : IFileScanner
         var driveType = DetectDriveType(path);
         _currentMaxParallelism = driveType switch
         {
-            DriveStorageType.Ssd => Math.Min(SsdParallelism, Environment.ProcessorCount),
+            DriveStorageType.Ssd => Math.Max(SsdParallelism, Environment.ProcessorCount * 4), // SSDs benefit from high parallelism
             DriveStorageType.Hdd => HddParallelism,
             DriveStorageType.Network => NetworkParallelism,
             _ => HddParallelism
@@ -198,6 +204,13 @@ public sealed class FileScanner : IFileScanner
                 }
             }
 
+            // Start game and dev tool detection IN PARALLEL with main scan
+            // These scan different directories (Steam paths, dev caches) than the main file scan
+            Console.WriteLine($"[FileScanner] Starting game detection (parallel)...");
+            var gameTask = _gameDetector.DetectGamesAsync(path, cancellationToken);
+            Console.WriteLine($"[FileScanner] Starting dev tools detection (parallel)...");
+            var devToolTask = _devToolDetector.ScanAllAsync();
+
             // Use parallel breadth-first scan with work-stealing for better performance
             await ScanDirectoryParallelAsync(rootItem, scanProgress, progress, cancellationToken);
             Console.WriteLine($"[FileScanner] Recursive scan complete. Total files in bag: {_largestFiles.Count}");
@@ -238,35 +251,25 @@ public sealed class FileScanner : IFileScanner
                 .Take(50)
                 .ToList();
 
-            // Detect games and dev tools in parallel for speed (with timeout to prevent hangs)
+            // Use inline-detected games and dev tools (already found during traversal!)
             scanProgress.ProgressPercentage = 97;
-            scanProgress.StatusMessage = "Detecting games and dev tools...";
+            scanProgress.StatusMessage = "Processing detected games and dev tools...";
             progress.Report(scanProgress);
             
-            Console.WriteLine($"[FileScanner] Starting game detection...");
-            var gameTask = _gameDetector.DetectGamesAsync(path, cancellationToken);
-            Console.WriteLine($"[FileScanner] Starting dev tools detection...");
-            var devToolTask = _devToolDetector.ScanAllAsync();
+            Console.WriteLine($"[FileScanner] Processing inline-detected items...");
             
-            // Wait for both to complete with a 30 second timeout to prevent hangs
-            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
-            var allTasks = Task.WhenAll(gameTask, devToolTask);
+            // Fill in sizes for games (lookup from scanned tree)
+            result.GameInstallations = FillGameSizes(rootItem, _detectedGames.ToList());
             
-            var completedTask = await Task.WhenAny(allTasks, timeoutTask);
+            // Fill in sizes for dev tools and deduplicate
+            result.DevTools = FillDevToolSizes(rootItem, _detectedDevTools.ToList())
+                .GroupBy(d => d.Path) // Deduplicate by path
+                .Select(g => g.First())
+                .OrderByDescending(d => d.SizeBytes)
+                .ToList();
             
-            if (completedTask == timeoutTask)
-            {
-                Console.WriteLine($"[FileScanner] Game/DevTool detection timed out after 30s - continuing with partial results");
-                result.GameInstallations = gameTask.IsCompleted ? await gameTask : new List<GameInstallation>();
-                result.DevTools = devToolTask.IsCompleted ? (await devToolTask).OrderByDescending(d => d.SizeBytes).ToList() : new List<CleanupItem>();
-            }
-            else
-            {
-                result.GameInstallations = await gameTask;
-                result.DevTools = (await devToolTask).OrderByDescending(d => d.SizeBytes).ToList();
-            }
-            Console.WriteLine($"[FileScanner] Games found: {result.GameInstallations.Count}");
-            Console.WriteLine($"[FileScanner] DevTools found: {result.DevTools.Count}");
+            Console.WriteLine($"[FileScanner] Games found (inline): {result.GameInstallations.Count}");
+            Console.WriteLine($"[FileScanner] DevTools found (inline): {result.DevTools.Count}");
 
             // Get cleanup suggestions
             scanProgress.ProgressPercentage = 98;
@@ -445,6 +448,9 @@ public sealed class FileScanner : IFileScanner
         
         scanProgress.CurrentFolder = folder.FullPath;
         Interlocked.Increment(ref scanProgress._foldersScanned);
+        
+        // Inline game/devtool detection - check as we traverse
+        DetectGameOrDevToolInline(folder.FullPath, folder.Name);
         
         try
         {
@@ -672,7 +678,9 @@ public sealed class FileScanner : IFileScanner
                 try
                 {
                     // On macOS/Linux, check inode to skip hardlinked files we've already counted
-                    if (!OperatingSystem.IsWindows())
+                    // OPTIMIZATION: Only check inodes in system directories where firmlinks exist
+                    // User directories (/Users, /home) don't typically have hardlinks
+                    if (!OperatingSystem.IsWindows() && ShouldCheckInode(file.FullName))
                     {
                         var inode = GetInode(file.FullName);
                         if (inode != 0)
@@ -877,6 +885,353 @@ public sealed class FileScanner : IFileScanner
         // Skip symlinks/junctions on all platforms
         return (dir.Attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint;
     }
+
+    #region Inline Game/DevTool Detection
+    
+    /// <summary>
+    /// Detects games and dev tools during main scan traversal - no re-scanning needed!
+    /// Called for each directory as we traverse the tree.
+    /// </summary>
+    private void DetectGameOrDevToolInline(string fullPath, string dirName)
+    {
+        var lowerName = dirName.ToLowerInvariant();
+        var lowerPath = fullPath.ToLowerInvariant();
+        
+        // === GAME DETECTION ===
+        
+        // Steam games: look for steamapps/common/{game}
+        if (lowerPath.Contains("/steamapps/common/") || lowerPath.Contains("\\steamapps\\common\\"))
+        {
+            // We're inside a Steam game folder - the parent of "common" is steamapps
+            var parts = fullPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var commonIndex = Array.FindIndex(parts, p => p.Equals("common", StringComparison.OrdinalIgnoreCase));
+            if (commonIndex >= 0 && commonIndex + 1 < parts.Length)
+            {
+                // This is a game folder directly under common
+                var gamePath = string.Join(Path.DirectorySeparatorChar.ToString(), parts.Take(commonIndex + 2));
+                if (fullPath.Equals(gamePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _detectedGames.Add(new GameInstallation
+                    {
+                        Name = dirName,
+                        Path = fullPath,
+                        Size = 0, // Will be filled after folder size calculation
+                        Platform = GamePlatform.Steam,
+                        LastPlayed = DateTime.Now // Will update from folder info
+                    });
+                }
+            }
+        }
+        
+        // Epic Games: look for Epic Games/{game}
+        if ((lowerPath.Contains("/epic games/") || lowerPath.Contains("\\epic games\\")) &&
+            !lowerPath.Contains("launcher") && !lowerPath.Contains("directxredist"))
+        {
+            var parts = fullPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var epicIndex = Array.FindIndex(parts, p => p.Equals("Epic Games", StringComparison.OrdinalIgnoreCase));
+            if (epicIndex >= 0 && epicIndex + 1 < parts.Length)
+            {
+                var gamePath = string.Join(Path.DirectorySeparatorChar.ToString(), parts.Take(epicIndex + 2));
+                if (fullPath.Equals(gamePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _detectedGames.Add(new GameInstallation
+                    {
+                        Name = dirName,
+                        Path = fullPath,
+                        Size = 0,
+                        Platform = GamePlatform.EpicGames,
+                        LastPlayed = DateTime.Now
+                    });
+                }
+            }
+        }
+        
+        // GOG Games
+        if (lowerPath.Contains("/gog games/") || lowerPath.Contains("\\gog games\\") ||
+            lowerPath.Contains("/gog galaxy/games/") || lowerPath.Contains("\\gog galaxy\\games\\"))
+        {
+            var parts = fullPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var gogIndex = Array.FindIndex(parts, p => 
+                p.Equals("GOG Games", StringComparison.OrdinalIgnoreCase) ||
+                p.Equals("Games", StringComparison.OrdinalIgnoreCase));
+            if (gogIndex >= 0 && gogIndex + 1 < parts.Length)
+            {
+                var gamePath = string.Join(Path.DirectorySeparatorChar.ToString(), parts.Take(gogIndex + 2));
+                if (fullPath.Equals(gamePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _detectedGames.Add(new GameInstallation
+                    {
+                        Name = dirName,
+                        Path = fullPath,
+                        Size = 0,
+                        Platform = GamePlatform.GOG,
+                        LastPlayed = DateTime.Now
+                    });
+                }
+            }
+        }
+        
+        // === DEV TOOL CACHE DETECTION ===
+        
+        // Detect dev tool caches by exact path patterns
+        DetectDevToolCache(fullPath, lowerPath, lowerName);
+    }
+    
+    /// <summary>
+    /// Detects developer tool caches based on path patterns
+    /// </summary>
+    private void DetectDevToolCache(string fullPath, string lowerPath, string lowerName)
+    {
+        // .gradle/caches
+        if (lowerPath.EndsWith("/.gradle/caches") || lowerPath.EndsWith("\\.gradle\\caches"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "Gradle Build Cache",
+                Path = fullPath,
+                SizeBytes = 0, // Filled after scan
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. Will rebuild on next compile.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // .nuget/packages
+        if (lowerPath.EndsWith("/.nuget/packages") || lowerPath.EndsWith("\\.nuget\\packages"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "NuGet Package Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. NuGet will re-download on next build.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // .npm cache
+        if (lowerName == ".npm" || lowerPath.EndsWith("/caches/npm") || lowerPath.EndsWith("\\caches\\npm"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "NPM Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. NPM will re-download packages.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // node_modules (large ones)
+        if (lowerName == "node_modules")
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = $"node_modules",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Project dependencies. Run 'npm install' to restore if deleted.",
+                Risk = CleanupRisk.Medium
+            });
+        }
+        
+        // Xcode DerivedData (macOS)
+        if (lowerPath.Contains("/developer/xcode/deriveddata"))
+        {
+            // Only add the root DerivedData, not subdirs
+            if (lowerName == "deriveddata")
+            {
+                _detectedDevTools.Add(new CleanupItem
+                {
+                    Name = "Xcode DerivedData",
+                    Path = fullPath,
+                    SizeBytes = 0,
+                    Category = "Developer Tools",
+                    Recommendation = "Build cache for Xcode projects. Safe to delete - will rebuild.",
+                    Risk = CleanupRisk.Safe
+                });
+            }
+        }
+        
+        // CocoaPods cache
+        if (lowerPath.EndsWith("/cocoapods") && lowerPath.Contains("/caches/"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "CocoaPods Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. CocoaPods will re-download.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // Maven cache
+        if (lowerPath.EndsWith("/.m2/repository") || lowerPath.EndsWith("\\.m2\\repository"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "Maven Repository Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. Maven will re-download dependencies.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // Cargo cache (Rust)
+        if (lowerPath.EndsWith("/.cargo/registry") || lowerPath.EndsWith("\\.cargo\\registry"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "Rust Cargo Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools", 
+                Recommendation = "Safe to delete. Cargo will re-download crates.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // pip cache
+        if (lowerPath.EndsWith("/.cache/pip") || lowerPath.EndsWith("/caches/pip"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "Python Pip Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Safe to delete. Pip will re-download packages.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // VS Code extensions cache
+        if (lowerPath.Contains("/code/") && lowerName == "cachedextensionvsixs")
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "VS Code Extension Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "Cached extension downloads. Safe to delete.",
+                Risk = CleanupRisk.Safe
+            });
+        }
+        
+        // JetBrains IDE caches
+        if (lowerName == "jetbrains" && lowerPath.Contains("/caches/"))
+        {
+            _detectedDevTools.Add(new CleanupItem
+            {
+                Name = "JetBrains IDE Cache",
+                Path = fullPath,
+                SizeBytes = 0,
+                Category = "Developer Tools",
+                Recommendation = "IDE caches and indexes. Safe to delete but IDE will re-index.",
+                Risk = CleanupRisk.Low
+            });
+        }
+    }
+    
+    #endregion
+
+    #region Size Lookup Helpers
+    
+    /// <summary>
+    /// Fill in sizes for detected games by looking up in the scanned tree
+    /// </summary>
+    private List<GameInstallation> FillGameSizes(FileSystemItem root, List<GameInstallation> games)
+    {
+        var pathToSize = BuildPathSizeMap(root);
+        
+        foreach (var game in games)
+        {
+            if (pathToSize.TryGetValue(game.Path, out var size))
+            {
+                game.Size = size;
+            }
+            else
+            {
+                // Try to calculate from filesystem if not in tree
+                try
+                {
+                    var dirInfo = new DirectoryInfo(game.Path);
+                    if (dirInfo.Exists)
+                    {
+                        game.LastPlayed = dirInfo.LastWriteTime;
+                    }
+                }
+                catch { }
+            }
+        }
+        
+        // Deduplicate by path and sort by size
+        return games
+            .GroupBy(g => g.Path)
+            .Select(g => g.First())
+            .OrderByDescending(g => g.Size)
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Fill in sizes for detected dev tools by looking up in the scanned tree
+    /// </summary>
+    private List<CleanupItem> FillDevToolSizes(FileSystemItem root, List<CleanupItem> devTools)
+    {
+        var pathToSize = BuildPathSizeMap(root);
+        
+        // Create new items with correct sizes (SizeBytes is init-only)
+        var result = new List<CleanupItem>();
+        foreach (var tool in devTools)
+        {
+            var size = pathToSize.TryGetValue(tool.Path, out var s) ? s : 0L;
+            if (size >= 1_000_000) // Only include items >= 1MB
+            {
+                result.Add(new CleanupItem
+                {
+                    Name = tool.Name,
+                    Path = tool.Path,
+                    SizeBytes = size,
+                    Category = tool.Category,
+                    Recommendation = tool.Recommendation,
+                    Risk = tool.Risk,
+                    LastAccessed = tool.LastAccessed
+                });
+            }
+        }
+        
+        return result;
+    }
+    
+    /// <summary>
+    /// Builds a dictionary of path -> size from the scanned tree for quick lookups
+    /// </summary>
+    private Dictionary<string, long> BuildPathSizeMap(FileSystemItem root)
+    {
+        var map = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        BuildPathSizeMapRecursive(root, map);
+        return map;
+    }
+    
+    private void BuildPathSizeMapRecursive(FileSystemItem item, Dictionary<string, long> map)
+    {
+        map[item.FullPath] = item.Size;
+        
+        foreach (var child in item.Children)
+        {
+            BuildPathSizeMapRecursive(child, map);
+        }
+    }
+    
+    #endregion
 
     /// <summary>
     /// Calculates folder sizes by summing child sizes (needed after parallel scan)
@@ -1346,6 +1701,36 @@ public sealed class FileScanner : IFileScanner
         }
         
         return 0;
+    }
+
+    /// <summary>
+    /// Determines if we should check inodes for a given path.
+    /// OPTIMIZATION: Only check inodes in system directories where APFS firmlinks exist.
+    /// User directories (/Users, /home) don't have firmlinks and don't need the overhead.
+    /// </summary>
+    private static bool ShouldCheckInode(string path)
+    {
+        // Fast path: user directories don't need inode checking
+        if (path.StartsWith("/Users/", StringComparison.Ordinal) ||
+            path.StartsWith("/home/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+        
+        // Firmlinks exist primarily in these paths on macOS:
+        // /Applications <-> /System/Volumes/Data/Applications  
+        // /Library <-> /System/Volumes/Data/Library
+        // etc.
+        if (path.StartsWith("/Applications", StringComparison.Ordinal) ||
+            path.StartsWith("/Library", StringComparison.Ordinal) ||
+            path.StartsWith("/System/Volumes/Data", StringComparison.Ordinal) ||
+            path.StartsWith("/usr/", StringComparison.Ordinal) ||
+            path.StartsWith("/private/", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        
+        return false;
     }
 
     /// <summary>
