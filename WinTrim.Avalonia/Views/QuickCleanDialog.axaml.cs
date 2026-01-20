@@ -128,10 +128,16 @@ public partial class QuickCleanDialog : Window
             return;
         }
         
-        // Show confirmation BEFORE deleting
+        // Show enhanced warning confirmation BEFORE deleting
         var confirmResult = await ShowConfirmAsync(
-            "Confirm Deletion", 
-            $"Are you sure you want to delete {selectedFiles.Count} files?\n\nThis will free approximately {FormatBytes(selectedFiles.Sum(f => f.size))}.\n\nThis action cannot be undone!");
+            "⚠️ Confirm Permanent Deletion", 
+            $"You are about to PERMANENTLY DELETE {selectedFiles.Count} files.\n\n" +
+            $"Space to recover: {FormatBytes(selectedFiles.Sum(f => f.size))}\n\n" +
+            "⚠️ WARNING:\n" +
+            "• Files will be permanently deleted (not sent to Recycle Bin)\n" +
+            "• This action CANNOT be undone\n" +
+            "• Deleted files may NOT be recoverable\n\n" +
+            "Are you absolutely sure you want to proceed?");
         
         if (!confirmResult)
             return;

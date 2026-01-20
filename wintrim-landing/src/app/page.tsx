@@ -25,9 +25,12 @@ export default function Home() {
             <Link href="/privacy" className="text-sm text-gray-400 hover:text-[#00F3FF] transition-colors tracking-wider uppercase">
               Privacy
             </Link>
+            <Link href="/terms" className="text-sm text-gray-400 hover:text-[#00F3FF] transition-colors tracking-wider uppercase">
+              Terms
+            </Link>
             <a 
               href="https://github.com/mobius29er/winTrim" 
-              target="_blank" 
+              target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-gray-400 hover:text-[#00F3FF] transition-colors tracking-wider uppercase"
             >
@@ -340,8 +343,17 @@ export default function Home() {
 
             {/* Copyright */}
             <div className="text-xs text-gray-600">
-              2026 Foxxception. Open Source.
+              2026 Foxxception LLC. All rights reserved.
             </div>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="mt-6 p-4 rounded-lg border border-[#FF9900]/30 bg-[#FF9900]/5">
+            <p className="text-xs text-gray-500 text-center leading-relaxed">
+              <span className="text-[#FF9900]">⚠️ DISCLAIMER:</span> WinTrim is provided "as is" without warranty of any kind. 
+              This software deletes files permanently. Deleted files may not be recoverable. 
+              Use at your own risk. See our <Link href="/terms" className="text-[#00F3FF] hover:underline">Terms of Service</Link> for full details.
+            </p>
           </div>
 
           {/* Attribution */}

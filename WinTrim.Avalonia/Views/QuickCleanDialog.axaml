@@ -13,10 +13,10 @@
         Background="{DynamicResource BackgroundBrush}"
         CanResize="True">
     
-    <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto">
+    <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
         
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+        <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock Text="🧹 Select Items to Clean" 
                        FontSize="18" FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -24,8 +24,20 @@
                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/>
         </StackPanel>
         
+        <!-- Warning Banner -->
+        <Border Grid.Row="1" Background="#3FF59E0B" BorderBrush="#F59E0B" BorderThickness="1" 
+                CornerRadius="4" Padding="12,8" Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠️" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Foreground="#F59E0B" TextWrapping="Wrap" VerticalAlignment="Center">
+                    <Run FontWeight="SemiBold">USE AT YOUR OWN RISK:</Run>
+                    <Run> Files are permanently deleted and may not be recoverable. Always review before cleaning.</Run>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+        
         <!-- Select All / None Buttons -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
             <Button Content="✓ Select All" Click="SelectAll_Click" 
                     Padding="12,6" Margin="0,0,8,0"
                     Background="{DynamicResource SurfaceBrush}"
@@ -53,7 +65,7 @@
         </StackPanel>
         
         <!-- Items List -->
-        <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" 
+        <Border Grid.Row="3" BorderBrush="{DynamicResource BorderBrush}" 
                 BorderThickness="1" CornerRadius="4" Background="{DynamicResource SurfaceBrush}">
             <ScrollViewer>
                 <ItemsControl x:Name="ItemsContainer" ItemsSource="{Binding Items}" Margin="8">
@@ -126,7 +138,7 @@
         </Border>
         
         <!-- Summary -->
-        <Border Grid.Row="3" Background="{DynamicResource BackgroundBrush}" 
+        <Border Grid.Row="4" Background="{DynamicResource BackgroundBrush}" 
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                 CornerRadius="4" Padding="12" Margin="0,12,0,0">
             <Grid ColumnDefinitions="*,Auto">
@@ -145,7 +157,7 @@
         </Border>
         
         <!-- Buttons -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" 
+        <StackPanel Grid.Row="5" Orientation="Horizontal" 
                     HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Cancel" Click="Cancel_Click" 
                     Padding="20,10" Margin="0,0,8,0"

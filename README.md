@@ -218,6 +218,39 @@ UI/UX:
 - Simple and friendly to use
 - Ability to Start/stop/pause analysis and maintain the current results
 
+## ⚠️ Disclaimer
+
+**USE AT YOUR OWN RISK**
+
+WinTrim is a disk cleanup utility that **permanently deletes files**. Please be aware:
+
+- **Deleted files may not be recoverable** - Files are permanently deleted, not sent to the Recycle Bin
+- **Always backup important data** before using cleanup features
+- **Review items before deletion** - Use the preview feature to see exactly what will be removed
+- **Check risk levels** - Each cleanup suggestion shows Safe/Low/Medium/High risk indicators
+
+This software is provided "AS IS" without warranty of any kind. Foxxception LLC shall not be liable for any data loss or damages arising from the use of this software.
+
 ## 📄 License
 
-MIT License - feel free to use and modify as needed.
+MIT License
+
+Copyright (c) 2026 Foxxception LLC
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

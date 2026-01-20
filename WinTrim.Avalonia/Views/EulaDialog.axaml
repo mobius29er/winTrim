@@ -1,0 +1,121 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="650" d:DesignHeight="550"
+        x:Class="WinTrim.Avalonia.Views.EulaDialog"
+        Title="WinTrim - Terms of Service"
+        Width="650" Height="550"
+        MinWidth="500" MinHeight="450"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BackgroundBrush}"
+        CanResize="False">
+    
+    <Grid Margin="24" RowDefinitions="Auto,*,Auto,Auto">
+        
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="📋 Terms of Service &amp; Disclaimer" 
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <TextBlock Text="Please read and accept the following terms before using WinTrim"
+                       Foreground="{DynamicResource TextSecondaryBrush}" 
+                       Margin="0,8,0,0"/>
+        </StackPanel>
+        
+        <!-- EULA Content -->
+        <Border Grid.Row="1" 
+                BorderBrush="{DynamicResource BorderBrush}" 
+                BorderThickness="1" 
+                CornerRadius="4" 
+                Background="{DynamicResource SurfaceBrush}">
+            <ScrollViewer Padding="16">
+                <StackPanel>
+                    <TextBlock Text="END USER LICENSE AGREEMENT" 
+                               FontWeight="Bold" FontSize="14"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               Margin="0,0,0,12"/>
+                    
+                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" LineHeight="22">
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}">1. DISCLAIMER OF WARRANTY</Run>
+                        <LineBreak/>
+                        WinTrim is provided "AS IS" without warranty of any kind, either expressed or implied, including but not limited to the implied warranties of merchantability and fitness for a particular purpose. The entire risk as to the quality and performance of the software is with you.
+                        <LineBreak/><LineBreak/>
+                        
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}">2. LIMITATION OF LIABILITY</Run>
+                        <LineBreak/>
+                        In no event shall Foxxception LLC or its contributors be liable for any direct, indirect, incidental, special, exemplary, or consequential damages (including, but not limited to, loss of data, business interruption, or any other commercial damages or losses) arising out of the use or inability to use this software.
+                        <LineBreak/><LineBreak/>
+                        
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}">3. DATA DELETION WARNING</Run>
+                        <LineBreak/>
+                        This software is designed to identify and delete files from your computer. While WinTrim attempts to identify safe-to-delete files, it cannot guarantee that deleted files are not important to you or your system. DELETED FILES MAY NOT BE RECOVERABLE.
+                        <LineBreak/><LineBreak/>
+                        
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}">4. USER RESPONSIBILITY</Run>
+                        <LineBreak/>
+                        You are solely responsible for:
+                        <LineBreak/>• Backing up important data before using cleanup features
+                        <LineBreak/>• Reviewing files before deletion
+                        <LineBreak/>• Understanding the risk levels indicated for each cleanup suggestion
+                        <LineBreak/>• Any consequences of deleting files
+                        <LineBreak/><LineBreak/>
+                        
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}">5. USE AT YOUR OWN RISK</Run>
+                        <LineBreak/>
+                        By using WinTrim, you acknowledge that you use this software at your own risk. You agree to hold harmless Foxxception LLC and its affiliates from any claims arising from your use of this software.
+                        <LineBreak/><LineBreak/>
+                        
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}">6. ACCEPTANCE</Run>
+                        <LineBreak/>
+                        By clicking "I Accept" below, you acknowledge that you have read, understood, and agree to be bound by the terms of this agreement.
+                    </TextBlock>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        
+        <!-- Checkbox -->
+        <CheckBox x:Name="AcceptCheckBox" 
+                  Grid.Row="2" 
+                  Margin="0,16,0,0"
+                  Foreground="{DynamicResource TextPrimaryBrush}">
+            <TextBlock TextWrapping="Wrap">
+                <Run>I have read and agree to the Terms of Service. I understand that </Run>
+                <Run FontWeight="Bold" Foreground="#F59E0B">deleted files may not be recoverable</Run>
+                <Run> and I </Run>
+                <Run FontWeight="Bold">use this software at my own risk</Run>
+                <Run>.</Run>
+            </TextBlock>
+        </CheckBox>
+        
+        <!-- Buttons -->
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto" Margin="0,16,0,0">
+            <TextBlock Grid.Column="0" 
+                       Text="© 2026 Foxxception LLC" 
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       VerticalAlignment="Center"
+                       FontSize="11"/>
+            
+            <Button Grid.Column="1" 
+                    Content="Decline &amp; Exit" 
+                    Click="Decline_Click"
+                    Padding="20,10" 
+                    Margin="0,0,8,0"
+                    Background="{DynamicResource SurfaceBrush}"
+                    Foreground="{DynamicResource TextPrimaryBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"/>
+            
+            <Button x:Name="AcceptButton" 
+                    Grid.Column="2" 
+                    Content="I Accept" 
+                    Click="Accept_Click"
+                    Padding="24,10"
+                    Background="#4CAF50"
+                    Foreground="White"
+                    BorderThickness="0"
+                    FontWeight="SemiBold"
+                    IsEnabled="False"/>
+        </Grid>
+    </Grid>
+</Window>
