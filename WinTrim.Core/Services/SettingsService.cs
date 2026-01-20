@@ -403,7 +403,7 @@ public class UserSettings
     /// <summary>
     /// Current application theme
     /// </summary>
-    public string Theme { get; set; } = "Default";
+    public string Theme { get; set; } = "Retrofuturistic";
     
     /// <summary>
     /// Font size

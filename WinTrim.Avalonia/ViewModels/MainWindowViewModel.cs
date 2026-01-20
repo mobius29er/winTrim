@@ -243,8 +243,14 @@ public partial class MainWindowViewModel : ViewModelBase
         _themeService = themeService;
         _settingsService = settingsService;
         
-        // Apply default theme on startup
-        _themeService.ApplyTheme("Retrofuturistic");
+        // Load saved theme from settings (or use default)
+        var savedTheme = _settingsService.Theme;
+        if (AvailableThemes.Contains(savedTheme))
+        {
+            _selectedTheme = savedTheme; // Set backing field directly to avoid triggering save
+        }
+        _themeService.ApplyTheme(_selectedTheme);
+        Console.WriteLine($"[ViewModel] Loaded theme from settings: {_selectedTheme}");
         
         // Load settings
         ExpressScanEnabled = _settingsService.ExpressScanEnabled;
@@ -297,6 +303,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         Console.WriteLine($"[ViewModel] OnSelectedThemeChanged called with: {value}");
         _themeService.ApplyTheme(value);
+        _settingsService.Theme = value; // Persist selection
     }
     
     /// <summary>
