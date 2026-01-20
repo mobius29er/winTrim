@@ -4,12 +4,14 @@ using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using WinTrim.Avalonia.Services;
 using WinTrim.Avalonia.Themes;
 using WinTrim.Avalonia.ViewModels;
 using WinTrim.Avalonia.Views;
+using WinTrim.Core.Services;
 
 namespace WinTrim.Avalonia;
 
@@ -43,16 +45,40 @@ public partial class App : Application
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
             
-            // Resolve MainWindowViewModel from DI container
+            // Create and show MainWindow first
             Console.WriteLine("[App] Resolving MainWindowViewModel...");
             var mainViewModel = Services.GetRequiredService<MainWindowViewModel>();
             Console.WriteLine("[App] MainWindowViewModel resolved.");
             
-            desktop.MainWindow = new MainWindow
+            var mainWindow = new MainWindow
             {
                 DataContext = mainViewModel,
             };
+            
+            desktop.MainWindow = mainWindow;
             Console.WriteLine("[App] MainWindow created with DataContext.");
+            
+            // Check if EULA needs to be shown after window is ready
+            var settingsService = Services.GetRequiredService<ISettingsService>();
+            if (!settingsService.EulaAccepted)
+            {
+                // Show EULA dialog as modal after the main window is loaded
+                mainWindow.Opened += async (s, e) =>
+                {
+                    var eulaDialog = new EulaDialog();
+                    var result = await eulaDialog.ShowDialog<bool?>(mainWindow);
+                    
+                    if (result == true)
+                    {
+                        settingsService.AcceptEula();
+                    }
+                    else
+                    {
+                        // User declined - exit application
+                        desktop.Shutdown();
+                    }
+                };
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

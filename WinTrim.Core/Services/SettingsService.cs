@@ -111,6 +111,35 @@ public sealed class SettingsService : ISettingsService
         }
     }
 
+    /// <summary>
+    /// Current EULA version - increment when terms change significantly
+    /// </summary>
+    public string CurrentEulaVersion => "1.0";
+
+    /// <summary>
+    /// Whether user has accepted the current EULA version
+    /// </summary>
+    public bool EulaAccepted
+    {
+        get => _settings.EulaAccepted && _settings.EulaVersion == CurrentEulaVersion;
+        set
+        {
+            _settings.EulaAccepted = value;
+            Save();
+        }
+    }
+
+    /// <summary>
+    /// Record EULA acceptance with timestamp and version
+    /// </summary>
+    public void AcceptEula()
+    {
+        _settings.EulaAccepted = true;
+        _settings.EulaAcceptedDate = DateTime.UtcNow;
+        _settings.EulaVersion = CurrentEulaVersion;
+        Save();
+    }
+
     private UserSettings Load()
     {
         try
@@ -390,6 +419,9 @@ public interface ISettingsService
     int TreemapMaxDepth { get; set; }
     bool ExpressScanEnabled { get; set; }
     string? LastScanPath { get; set; }
+    bool EulaAccepted { get; set; }
+    string CurrentEulaVersion { get; }
+    void AcceptEula();
     void SaveScanCache(ScanResult result, bool wasExpressMode = false);
     ScanCache? LoadScanCache();
     bool HasCachedScan { get; }
@@ -429,4 +461,19 @@ public class UserSettings
     /// Last scanned path for quick restore
     /// </summary>
     public string? LastScanPath { get; set; }
+    
+    /// <summary>
+    /// Whether user has accepted the EULA/Terms of Service
+    /// </summary>
+    public bool EulaAccepted { get; set; } = false;
+    
+    /// <summary>
+    /// Date when EULA was accepted
+    /// </summary>
+    public DateTime? EulaAcceptedDate { get; set; }
+    
+    /// <summary>
+    /// Version of EULA that was accepted
+    /// </summary>
+    public string? EulaVersion { get; set; }
 }
