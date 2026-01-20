@@ -125,5 +125,3 @@ public readonly struct FileSummary
 4. **C later** (save for a future optimization pass)
 
 
-> themes aren't loading
-
