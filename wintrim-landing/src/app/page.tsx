@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Home() {
   return (
@@ -105,9 +106,11 @@ export default function Home() {
           {/* Holographic Screenshot */}
           <div className="relative max-w-5xl mx-auto">
             <div className="hologram rounded-lg overflow-hidden border border-[#00F3FF]/30 shadow-2xl shadow-[#00F3FF]/10">
-              <img 
+              <Image 
                 src="/screenshot-hero.png" 
                 alt="WinTrim scanning 1.81 TB drive - analyzing 1.9 million files in 78 seconds" 
+                width={1200}
+                height={800}
                 className="w-full h-auto"
               />
             </div>
@@ -129,7 +132,7 @@ export default function Home() {
             </span>
           </h2>
           <p className="text-center text-gray-500 text-sm tracking-[0.2em] uppercase mb-16">
-            // Core_Module_Analysis
+            {"// Core_Module_Analysis"}
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -242,7 +245,7 @@ export default function Home() {
 
           {/* Status Bar */}
           <div className="mt-16 text-center text-xs text-gray-600 uppercase tracking-[0.2em]">
-            // Cross_Platform // Free_Download // Open_Source // No_Telemetry
+            {"// Cross_Platform // Free_Download // Open_Source // No_Telemetry"}
           </div>
         </div>
       </section>
@@ -350,7 +353,7 @@ export default function Home() {
           {/* Disclaimer */}
           <div className="mt-6 p-4 rounded-lg border border-[#FF9900]/30 bg-[#FF9900]/5">
             <p className="text-xs text-gray-500 text-center leading-relaxed">
-              <span className="text-[#FF9900]">⚠️ DISCLAIMER:</span> WinTrim is provided "as is" without warranty of any kind. 
+              <span className="text-[#FF9900]">⚠️ DISCLAIMER:</span> WinTrim is provided &ldquo;as is&rdquo; without warranty of any kind. 
               This software deletes files permanently. Deleted files may not be recoverable. 
               Use at your own risk. See our <Link href="/terms" className="text-[#00F3FF] hover:underline">Terms of Service</Link> for full details.
             </p>
@@ -368,7 +371,7 @@ export default function Home() {
               >
                 @mobius29er
               </a>
-              {" "}// Source available on{" "}
+              {" "}{"// Source available on "}{" "}
               <a 
                 href="https://github.com/mobius29er/winTrim" 
                 target="_blank" 
