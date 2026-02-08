@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    
+    <key>CFBundleDisplayName</key>
+    <string>WinTrim</string>
+    
+    <key>CFBundleExecutable</key>
+    <string>WinTrim</string>
+    
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    
+    <key>CFBundleIdentifier</key>
+    <string>com.mobius29er.wintrim</string>
+    
+    <!-- Export Compliance - No custom encryption used -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    
+    <key>CFBundleName</key>
+    <string>WinTrim</string>
+    
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    
+    <key>CFBundleVersion</key>
+    <string>4</string>
+    
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+    
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026 Mobius29er. All rights reserved.</string>
+    
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    
+    <!-- Privacy descriptions required by App Store -->
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>WinTrim needs access to analyze your Desktop folder for disk usage.</string>
+    
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>WinTrim needs access to analyze your Documents folder for disk usage.</string>
+    
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>WinTrim needs access to analyze your Downloads folder for disk usage.</string>
+    
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>WinTrim needs access to analyze external drives for disk usage.</string>
+</dict>
+</plist>

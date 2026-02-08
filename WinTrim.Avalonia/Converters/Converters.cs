@@ -222,3 +222,135 @@ public class NullToBoolConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
+
+/// <summary>
+/// Converts a boolean to FontWeight (SemiBold for true, Normal for false)
+/// Used to highlight "original" files in duplicate groups
+/// </summary>
+public class BoolToFontWeightConverter : IValueConverter
+{
+    public static readonly BoolToFontWeightConverter Instance = new();
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        return value is true ? FontWeight.SemiBold : FontWeight.Normal;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts even/odd group number to alternating background color
+/// Used to visually distinguish duplicate groups in the DataGrid
+/// </summary>
+public class EvenGroupToBackgroundConverter : IValueConverter
+{
+    public static readonly EvenGroupToBackgroundConverter Instance = new();
+
+    // Subtle alternating colors for dark theme
+    private static readonly SolidColorBrush EvenBrush = new(Color.FromArgb(20, 59, 130, 246)); // Subtle blue
+    private static readonly SolidColorBrush OddBrush = new(Color.FromArgb(20, 139, 92, 246));  // Subtle purple
+    
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        return value is true ? EvenBrush : OddBrush;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts IsOriginal to background color (highlights the "keep" file)
+/// </summary>
+public class OriginalFileBackgroundConverter : IValueConverter
+{
+    public static readonly OriginalFileBackgroundConverter Instance = new();
+
+    private static readonly SolidColorBrush OriginalBrush = new(Color.FromArgb(40, 16, 185, 129)); // Green tint
+    private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
+    
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        return value is true ? OriginalBrush : TransparentBrush;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts a percentage (0-100) to a width for progress bars.
+/// Uses a fixed max width and calculates proportionally.
+/// </summary>
+public class PercentToWidthConverter : IValueConverter
+{
+    public static readonly PercentToWidthConverter Instance = new();
+    
+    // This will be the maximum width in pixels (container minus padding)
+    private const double MaxWidth = 1000;
+    
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is double percent)
+        {
+            var width = Math.Max(0, Math.Min(100, percent)) / 100.0 * MaxWidth;
+            return width;
+        }
+        return 0.0;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Returns true if the value is zero (for hiding elements during initial scan)
+/// </summary>
+public class IsZeroConverter : IValueConverter
+{
+    public static readonly IsZeroConverter Instance = new();
+    
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is int intVal) return intVal == 0;
+        if (value is long longVal) return longVal == 0;
+        if (value is double doubleVal) return doubleVal == 0;
+        return true;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Returns true if the value is not zero (for showing elements once scan has real data)
+/// </summary>
+public class IsNotZeroConverter : IValueConverter
+{
+    public static readonly IsNotZeroConverter Instance = new();
+    
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is int intVal) return intVal != 0;
+        if (value is long longVal) return longVal != 0;
+        if (value is double doubleVal) return doubleVal != 0;
+        return false;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}

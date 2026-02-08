@@ -152,15 +152,12 @@ public partial class QuickCleanDialog : Window
         {
             try
             {
-                Console.WriteLine($"[QuickClean] Attempting to delete: {path}");
-                
                 if (System.IO.File.Exists(path))
                 {
                     System.IO.File.Delete(path);
                     deletedCount++;
                     deletedSize += size;
                     deletedPaths.Add(path);
-                    Console.WriteLine($"[QuickClean] Successfully deleted file: {path}");
                 }
                 else if (System.IO.Directory.Exists(path))
                 {
@@ -168,17 +165,14 @@ public partial class QuickCleanDialog : Window
                     deletedCount++;
                     deletedSize += size;
                     deletedPaths.Add(path);
-                    Console.WriteLine($"[QuickClean] Successfully deleted directory: {path}");
                 }
                 else
                 {
-                    Console.WriteLine($"[QuickClean] Path does not exist: {path}");
                     errors.Add($"{System.IO.Path.GetFileName(path)}: File not found");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[QuickClean] Error deleting {path}: {ex.Message}");
                 errors.Add($"{System.IO.Path.GetFileName(path)}: {ex.Message}");
             }
         }

@@ -16,12 +16,14 @@ public sealed class SettingsService : ISettingsService
     private readonly string _settingsPath;
     private readonly string _scanCachePath;
     private readonly string _appDataPath;
+    private readonly IAppLogger _logger;
     private UserSettings _settings;
 
     public event EventHandler? SettingsChanged;
 
-    public SettingsService()
+    public SettingsService(IAppLogger logger)
     {
+        _logger = logger;
         _appDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "WinTrim");
@@ -140,6 +142,102 @@ public sealed class SettingsService : ISettingsService
         Save();
     }
 
+    #region Recent Scan Paths & Bookmarks
+
+    private const int MaxRecentPaths = 10;
+
+    /// <summary>
+    /// Recently scanned folder paths
+    /// </summary>
+    public IReadOnlyList<string> RecentScanPaths => _settings.RecentScanPaths.AsReadOnly();
+
+    /// <summary>
+    /// Add a path to recent scan history (most recent first, max 10)
+    /// </summary>
+    public void AddRecentScanPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        
+        // Remove if already exists (will re-add at top)
+        _settings.RecentScanPaths.Remove(path);
+        
+        // Insert at beginning
+        _settings.RecentScanPaths.Insert(0, path);
+        
+        // Keep only max items
+        while (_settings.RecentScanPaths.Count > MaxRecentPaths)
+        {
+            _settings.RecentScanPaths.RemoveAt(_settings.RecentScanPaths.Count - 1);
+        }
+        
+        Save();
+        _logger.LogInfo($"Added recent scan path: {path}");
+    }
+
+    /// <summary>
+    /// Remove a path from recent scan history
+    /// </summary>
+    public void RemoveRecentScanPath(string path)
+    {
+        if (_settings.RecentScanPaths.Remove(path))
+        {
+            Save();
+            _logger.LogInfo($"Removed recent scan path: {path}");
+        }
+    }
+
+    /// <summary>
+    /// Security-scoped folder bookmarks (for macOS sandbox)
+    /// </summary>
+    public IReadOnlyDictionary<string, string> FolderBookmarks => _settings.FolderBookmarks;
+
+    /// <summary>
+    /// Save a bookmark ID for a folder path
+    /// </summary>
+    public void SaveFolderBookmark(string path, string bookmarkId)
+    {
+        if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(bookmarkId)) return;
+        
+        _settings.FolderBookmarks[path] = bookmarkId;
+        Save();
+        _logger.LogInfo($"Saved folder bookmark for: {path}");
+    }
+
+    /// <summary>
+    /// Remove a folder bookmark
+    /// </summary>
+    public void RemoveFolderBookmark(string path)
+    {
+        if (_settings.FolderBookmarks.Remove(path))
+        {
+            Save();
+            _logger.LogInfo($"Removed folder bookmark for: {path}");
+        }
+    }
+
+    /// <summary>
+    /// Get bookmark ID for a folder path
+    /// </summary>
+    public string? GetFolderBookmark(string path)
+    {
+        return _settings.FolderBookmarks.TryGetValue(path, out var bookmarkId) ? bookmarkId : null;
+    }
+
+    /// <summary>
+    /// Cleanup folder path for sandbox-safe file deletion
+    /// </summary>
+    public string? CleanupFolderPath
+    {
+        get => _settings.CleanupFolderPath;
+        set
+        {
+            _settings.CleanupFolderPath = value;
+            Save();
+        }
+    }
+
+    #endregion
+
     private UserSettings Load()
     {
         try
@@ -240,11 +338,11 @@ public sealed class SettingsService : ISettingsService
 
             var json = JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_scanCachePath, json);
-            Console.WriteLine($"[SettingsService] Saved scan cache: {result.TotalFiles:N0} files, {result.TotalFolders:N0} folders");
+            _logger.LogInfo($"Saved scan cache: {result.TotalFiles:N0} files, {result.TotalFolders:N0} folders");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SettingsService] Failed to save scan cache: {ex.Message}");
+            _logger.LogError($"Failed to save scan cache: {ex.Message}", ex);
         }
     }
 
@@ -358,14 +456,14 @@ public sealed class SettingsService : ISettingsService
                 var cache = JsonSerializer.Deserialize<ScanCache>(json);
                 if (cache != null)
                 {
-                    Console.WriteLine($"[SettingsService] Loaded scan cache from {cache.ScanDate}: {cache.TotalFiles:N0} files");
+                    _logger.LogInfo($"Loaded scan cache from {cache.ScanDate}: {cache.TotalFiles:N0} files");
                 }
                 return cache;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SettingsService] Failed to load scan cache: {ex.Message}");
+            _logger.LogError($"Failed to load scan cache: {ex.Message}", ex);
         }
         
         return null;
@@ -428,6 +526,20 @@ public interface ISettingsService
     (DateTime scanDate, string rootPath, bool wasExpressMode)? GetCacheInfo();
     void ClearScanCache();
     event EventHandler? SettingsChanged;
+    
+    // Recent scan paths for folder picker history
+    IReadOnlyList<string> RecentScanPaths { get; }
+    void AddRecentScanPath(string path);
+    void RemoveRecentScanPath(string path);
+    
+    // Folder bookmarks for sandbox compliance (macOS)
+    IReadOnlyDictionary<string, string> FolderBookmarks { get; }
+    void SaveFolderBookmark(string path, string bookmarkId);
+    void RemoveFolderBookmark(string path);
+    string? GetFolderBookmark(string path);
+    
+    // Cleanup folder for sandbox-safe file deletion
+    string? CleanupFolderPath { get; set; }
 }
 
 public class UserSettings
@@ -476,4 +588,21 @@ public class UserSettings
     /// Version of EULA that was accepted
     /// </summary>
     public string? EulaVersion { get; set; }
+    
+    /// <summary>
+    /// Recently scanned folder paths (max 10)
+    /// </summary>
+    public List<string> RecentScanPaths { get; set; } = new();
+    
+    /// <summary>
+    /// Security-scoped bookmarks for sandbox file access (macOS).
+    /// Key: folder path, Value: bookmark ID from StorageProvider
+    /// </summary>
+    public Dictionary<string, string> FolderBookmarks { get; set; } = new();
+    
+    /// <summary>
+    /// Cleanup folder path for sandbox-safe file deletion.
+    /// Files are moved here instead of being deleted directly.
+    /// </summary>
+    public string? CleanupFolderPath { get; set; }
 }

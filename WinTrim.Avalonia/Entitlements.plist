@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Application Identifier - REQUIRED for TestFlight/App Store -->
+    <key>com.apple.application-identifier</key>
+    <string>BVPSR4AWJD.com.mobius29er.wintrim</string>
+    
+    <!-- Team Identifier -->
+    <key>com.apple.developer.team-identifier</key>
+    <string>BVPSR4AWJD</string>
+    
+    <!-- App Sandbox - REQUIRED for Mac App Store -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    
+    <!-- Allow read access to user-selected files (via file picker) -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+    
+    <!-- Allow read-write access to user-selected files -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    
+    <!-- Allow app to store bookmarks for persistent access across launches -->
+    <key>com.apple.security.files.bookmarks.app-scope</key>
+    <true/>
+    
+    <!-- Allow read access to Downloads folder -->
+    <key>com.apple.security.files.downloads.read-only</key>
+    <true/>
+    
+    <!-- Hardened Runtime - Required for notarization and .NET Runtime -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    
+    <!-- Required for NSApplication initialization in sandbox -->
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array>
+        <string>com.apple.coreservices.launchservicesd</string>
+    </array>
+</dict>
+</plist>

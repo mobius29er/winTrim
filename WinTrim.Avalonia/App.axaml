@@ -245,13 +245,20 @@
             
             <!-- Converters as static resources -->
             <conv:FileSizeConverter x:Key="FileSizeConverter"/>
+            <conv:FileSizeConverter x:Key="SizeToString"/>
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
             <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
             <conv:RiskLevelToBrushConverter x:Key="RiskToBrush"/>
             <conv:PercentageToWidthConverter x:Key="PercentageToWidth"/>
+            <conv:PercentToWidthConverter x:Key="PercentToWidthConverter"/>
             <conv:DateTimeToRelativeConverter x:Key="RelativeTime"/>
             <conv:ThemeToIconConverter x:Key="ThemeToIcon"/>
             <conv:NullToBoolConverter x:Key="NullToBool"/>
+            <conv:BoolToFontWeightConverter x:Key="BoolToFontWeight"/>
+            <conv:EvenGroupToBackgroundConverter x:Key="EvenGroupToBackground"/>
+            <conv:OriginalFileBackgroundConverter x:Key="OriginalFileBackground"/>
+            <conv:IsZeroConverter x:Key="IsZeroConverter"/>
+            <conv:IsNotZeroConverter x:Key="IsNotZeroConverter"/>
             
             <!-- 
             BRUSHES - Defined OUTSIDE ThemeDictionaries, reference Colors via DynamicResource

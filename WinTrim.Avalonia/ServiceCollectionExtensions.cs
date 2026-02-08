@@ -47,6 +47,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFileScanner, FileScanner>();
         services.AddSingleton<TreemapLayoutService>();
         services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IAppLogger, NullLogger>(); // Sandbox-safe logger
+        services.AddSingleton<IFileAccessManager, AvaloniaFileAccessManager>(); // Unified cross-platform
+        services.AddSingleton<IExportService, ExportService>(); // CSV/JSON export
+        services.AddSingleton<IDuplicateScanner, DuplicateScanner>(); // Duplicate file finder
+        services.AddSingleton<ITimeMachineAnalyzer, TimeMachineAnalyzer>(); // macOS Time Machine analyzer
         
         // Register Avalonia-specific services
         services.AddSingleton<IThemeService, ThemeService>();

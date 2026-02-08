@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace WinTrim.Core.Services;
 
@@ -12,6 +13,25 @@ public class MacPlatformService : IPlatformService
 {
     private readonly string _userHome;
     private readonly string _libraryPath;
+
+    // Objective-C Runtime P/Invoke for NSFileManager.trashItem
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_getClass")]
+    private static extern IntPtr objc_getClass(string className);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "sel_registerName")]
+    private static extern IntPtr sel_registerName(string selectorName);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern IntPtr objc_msgSend(IntPtr receiver, IntPtr selector);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern IntPtr objc_msgSend(IntPtr receiver, IntPtr selector, IntPtr arg1);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern bool objc_msgSend_bool(IntPtr receiver, IntPtr selector, IntPtr arg1, IntPtr arg2, IntPtr arg3);
+
+    [DllImport("/System/Library/Frameworks/Foundation.framework/Foundation")]
+    private static extern IntPtr NSStringFromClass(IntPtr cls);
 
     public MacPlatformService()
     {
@@ -196,8 +216,13 @@ public class MacPlatformService : IPlatformService
     {
         try
         {
-            // Use AppleScript to move to Trash (proper macOS way)
-            var script = $"tell application \"Finder\" to delete POSIX file \"{path}\"";
+            // Method 1: Use native NSFileManager.trashItem via Objective-C runtime
+            // This is the ONLY method that works properly in App Sandbox
+            if (TryTrashWithNSFileManager(path))
+                return true;
+            
+            // Method 2: Fallback to AppleScript (works outside sandbox only)
+            var script = $"tell application \"Finder\" to delete POSIX file \"{path.Replace("\"", "\\\"")}\"";
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -214,38 +239,65 @@ public class MacPlatformService : IPlatformService
             process.WaitForExit(5000);
             return process.ExitCode == 0;
         }
-        catch
+        catch (Exception ex)
         {
-            // Fallback: move to ~/.Trash manually
+            Console.WriteLine($"MoveToTrash failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Use NSFileManager.trashItem:atURL:resultingItemURL:error: via Objective-C runtime.
+    /// This is the only method that works in sandboxed macOS apps.
+    /// </summary>
+    private bool TryTrashWithNSFileManager(string path)
+    {
+        try
+        {
+            // Get NSFileManager class
+            var nsFileManagerClass = objc_getClass("NSFileManager");
+            if (nsFileManagerClass == IntPtr.Zero) return false;
+            
+            // Get default file manager: [NSFileManager defaultManager]
+            var defaultManagerSel = sel_registerName("defaultManager");
+            var fileManager = objc_msgSend(nsFileManagerClass, defaultManagerSel);
+            if (fileManager == IntPtr.Zero) return false;
+            
+            // Create NSURL from path: [NSURL fileURLWithPath:]
+            var nsUrlClass = objc_getClass("NSURL");
+            if (nsUrlClass == IntPtr.Zero) return false;
+            
+            // Create NSString from path
+            var nsStringClass = objc_getClass("NSString");
+            if (nsStringClass == IntPtr.Zero) return false;
+            
+            var stringWithUTF8Sel = sel_registerName("stringWithUTF8String:");
+            var pathPtr = Marshal.StringToHGlobalAnsi(path);
             try
             {
-                var trashPath = Path.Combine(_userHome, ".Trash");
-                var fileName = Path.GetFileName(path);
-                var destPath = Path.Combine(trashPath, fileName);
+                var nsPath = objc_msgSend(nsStringClass, stringWithUTF8Sel, pathPtr);
+                if (nsPath == IntPtr.Zero) return false;
                 
-                // Handle name collisions
-                var counter = 1;
-                while (File.Exists(destPath) || Directory.Exists(destPath))
-                {
-                    var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
-                    var ext = Path.GetExtension(fileName);
-                    destPath = Path.Combine(trashPath, $"{nameWithoutExt} {counter}{ext}");
-                    counter++;
-                }
+                // Create NSURL: [NSURL fileURLWithPath:nsPath]
+                var fileURLWithPathSel = sel_registerName("fileURLWithPath:");
+                var nsUrl = objc_msgSend(nsUrlClass, fileURLWithPathSel, nsPath);
+                if (nsUrl == IntPtr.Zero) return false;
                 
-                if (File.Exists(path))
-                {
-                    File.Move(path, destPath);
-                    return true;
-                }
-                else if (Directory.Exists(path))
-                {
-                    Directory.Move(path, destPath);
-                    return true;
-                }
+                // Call trashItemAtURL:resultingItemURL:error:
+                var trashItemSel = sel_registerName("trashItemAtURL:resultingItemURL:error:");
+                var result = objc_msgSend_bool(fileManager, trashItemSel, nsUrl, IntPtr.Zero, IntPtr.Zero);
+                
+                return result;
             }
-            catch { }
+            finally
+            {
+                Marshal.FreeHGlobal(pathPtr);
+            }
         }
-        return false;
+        catch (Exception ex)
+        {
+            Console.WriteLine($"NSFileManager.trashItem failed: {ex.Message}");
+            return false;
+        }
     }
 }

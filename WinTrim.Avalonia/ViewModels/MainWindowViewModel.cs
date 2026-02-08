@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LiveChartsCore;
@@ -70,6 +71,137 @@ public class DriveDisplayInfo
 }
 
 /// <summary>
+/// Flat row for virtualized duplicate file display
+/// </summary>
+public class DuplicateFileRow : System.ComponentModel.INotifyPropertyChanged
+{
+    private bool _isSelected;
+    
+    /// <summary>When true, suppresses PropertyChanged events for bulk operations</summary>
+    public static bool SuppressNotifications { get; set; }
+    
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    
+    /// <summary>The underlying file</summary>
+    public DuplicateFile File { get; init; } = null!;
+    
+    /// <summary>The group this file belongs to</summary>
+    public DuplicateGroup Group { get; init; } = null!;
+    
+    /// <summary>Group number for display</summary>
+    public int GroupNumber { get; init; }
+    
+    /// <summary>Whether this is an even-numbered group (for alternating background)</summary>
+    public bool IsEvenGroup => GroupNumber % 2 == 0;
+    
+    /// <summary>Whether this row is the first in its group (for visual separation)</summary>
+    public bool IsFirstInGroup { get; init; }
+    
+    /// <summary>File name</summary>
+    public string Name => File.Name;
+    
+    /// <summary>Directory path</summary>
+    public string Directory => File.Directory;
+    
+    /// <summary>Full path for searching</summary>
+    public string FullPath => File.FullPath;
+    
+    /// <summary>File size</summary>
+    public long Size => File.Size;
+    
+    /// <summary>Last modified date</summary>
+    public DateTime LastModified => File.LastModified;
+    
+    /// <summary>Whether this is the original (keep) file</summary>
+    public bool IsOriginal => File.IsOriginal;
+    
+    /// <summary>Match percentage (100% for exact hash match)</summary>
+    public int MatchPercent => 100; // Hash-based = exact match
+    
+    /// <summary>Match type description</summary>
+    public string MatchType => "Exact";
+    
+    /// <summary>Whether this file is selected for deletion</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value && !IsOriginal)
+            {
+                _isSelected = value;
+                File.IsMarkedForDeletion = value;
+                // Only fire PropertyChanged when not in bulk update mode
+                if (!SuppressNotifications)
+                {
+                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
+                }
+            }
+        }
+    }
+    
+    /// <summary>Set selection without triggering any events</summary>
+    public void SetSelectedSilent(bool value)
+    {
+        if (!IsOriginal)
+        {
+            _isSelected = value;
+            File.IsMarkedForDeletion = value;
+        }
+    }
+    
+    /// <summary>Number of files in group</summary>
+    public int GroupFileCount => Group.Files.Count;
+    
+    /// <summary>Wasted space in group</summary>
+    public long GroupWastedSpace => Group.WastedSpace;
+}
+
+/// <summary>
+/// Item in the Collector (staging area for files to be deleted)
+/// </summary>
+public class CollectorItem
+{
+    /// <summary>Full path to the file or folder</summary>
+    public string FullPath { get; init; } = string.Empty;
+    
+    /// <summary>Display name</summary>
+    public string Name { get; init; } = string.Empty;
+    
+    /// <summary>Size in bytes</summary>
+    public long Size { get; init; }
+    
+    /// <summary>Whether this is a folder</summary>
+    public bool IsFolder { get; init; }
+    
+    /// <summary>Icon for display</summary>
+    public string Icon => IsFolder ? "📁" : GetFileIcon();
+    
+    /// <summary>Source description (e.g., "Duplicates", "Large Files", etc.)</summary>
+    public string Source { get; init; } = string.Empty;
+    
+    private string GetFileIcon()
+    {
+        var ext = System.IO.Path.GetExtension(Name)?.ToLowerInvariant();
+        return ext switch
+        {
+            ".app" => "📦",
+            ".dmg" or ".pkg" => "💿",
+            ".zip" or ".tar" or ".gz" or ".rar" or ".7z" => "🗜️",
+            ".mp3" or ".wav" or ".aac" or ".flac" => "🎵",
+            ".mp4" or ".mov" or ".avi" or ".mkv" => "🎬",
+            ".jpg" or ".jpeg" or ".png" or ".gif" or ".webp" => "🖼️",
+            ".pdf" => "📄",
+            ".doc" or ".docx" => "📝",
+            ".xls" or ".xlsx" => "📊",
+            ".log" or ".txt" => "📋",
+            ".cache" or ".tmp" => "🗑️",
+            _ => "📄"
+        };
+    }
+}
+
+/// <summary>
 /// Main ViewModel handling all disk analysis operations for Avalonia
 /// </summary>
 public partial class MainWindowViewModel : ViewModelBase
@@ -78,6 +210,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IPlatformService _platformService;
     private readonly IThemeService _themeService;
     private readonly ISettingsService _settingsService;
+    private readonly IFileAccessManager _fileAccessManager;
+    private readonly IExportService _exportService;
+    private readonly IDuplicateScanner _duplicateScanner;
+    private readonly ITimeMachineAnalyzer _timeMachineAnalyzer;
+    private readonly IAppLogger _logger;
     private CancellationTokenSource? _cancellationTokenSource;
 
     #region Observable Properties
@@ -230,18 +367,51 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _cachedScanInfo = string.Empty;
 
+    /// <summary>
+    /// Selected folder path from folder picker (takes priority over drive selection)
+    /// </summary>
+    [ObservableProperty]
+    private string? _selectedFolderPath;
+
+    /// <summary>
+    /// Display name for the selected folder
+    /// </summary>
+    [ObservableProperty]
+    private string _selectedFolderDisplayName = string.Empty;
+
+    /// <summary>
+    /// List of recently accessed folders (for quick selection)
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<GrantedFolder> _recentFolders = new();
+
+    /// <summary>
+    /// Whether to show the folder picker mode (for sandbox compliance)
+    /// </summary>
+    [ObservableProperty]
+    private bool _useFolderPickerMode;
+
     #endregion
 
     /// <summary>
     /// Constructor with DI-injected services
     /// </summary>
-    public MainWindowViewModel(IFileScanner fileScanner, IPlatformService platformService, IThemeService themeService, ISettingsService settingsService)
+    public MainWindowViewModel(IFileScanner fileScanner, IPlatformService platformService, IThemeService themeService, ISettingsService settingsService, IFileAccessManager fileAccessManager, IExportService exportService, IDuplicateScanner duplicateScanner, ITimeMachineAnalyzer timeMachineAnalyzer, IAppLogger logger)
     {
-        Console.WriteLine("[ViewModel] Constructor called");
+        _logger = logger;
+        _logger.LogInfo("MainWindowViewModel constructor called");
         _fileScanner = fileScanner;
         _platformService = platformService;
         _themeService = themeService;
         _settingsService = settingsService;
+        _fileAccessManager = fileAccessManager;
+        _exportService = exportService;
+        _duplicateScanner = duplicateScanner;
+        _timeMachineAnalyzer = timeMachineAnalyzer;
+        
+        // On macOS, use folder picker mode for sandbox compliance
+        // On Windows/Linux, drive dropdown works fine but folder picker is also available
+        UseFolderPickerMode = OperatingSystem.IsMacOS();
         
         // Load saved theme from settings (or use default)
         var savedTheme = _settingsService.Theme;
@@ -250,14 +420,27 @@ public partial class MainWindowViewModel : ViewModelBase
             _selectedTheme = savedTheme; // Set backing field directly to avoid triggering save
         }
         _themeService.ApplyTheme(_selectedTheme);
-        Console.WriteLine($"[ViewModel] Loaded theme from settings: {_selectedTheme}");
+        _logger.LogInfo($"Loaded theme from settings: {_selectedTheme}");
         
         // Load settings
         ExpressScanEnabled = _settingsService.ExpressScanEnabled;
         
+        // Load or create cleanup folder
+        var savedCleanupPath = _settingsService.CleanupFolderPath;
+        if (!string.IsNullOrEmpty(savedCleanupPath) && Directory.Exists(savedCleanupPath))
+        {
+            _cleanupFolderPath = savedCleanupPath;
+        }
+        else
+        {
+            // Auto-create a DeleteMe folder on the Desktop
+            EnsureDeleteMeFolderExists();
+        }
+        
         LoadAvailableDrives();
+        _ = LoadRecentFoldersAsync(); // Fire and forget - loads recent folders for quick access
         UpdateCachedScanInfo();
-        Console.WriteLine($"[ViewModel] Constructor complete. AvailableDrives: {AvailableDrives.Count}, SelectedDrive: {SelectedDrive?.DisplayName ?? "null"}");
+        _logger.LogInfo($"Constructor complete. AvailableDrives: {AvailableDrives.Count}, SelectedDrive: {SelectedDrive?.DisplayName ?? "null"}");
     }
     
     /// <summary>
@@ -295,13 +478,34 @@ public partial class MainWindowViewModel : ViewModelBase
         if (span.TotalDays < 7) return $"{(int)span.TotalDays}d ago";
         return date.ToString("MMM d");
     }
+
+    /// <summary>
+    /// Loads recent folders from the file access manager
+    /// </summary>
+    private async Task LoadRecentFoldersAsync()
+    {
+        try
+        {
+            var folders = await _fileAccessManager.GetGrantedFoldersAsync();
+            RecentFolders.Clear();
+            foreach (var folder in folders)
+            {
+                RecentFolders.Add(folder);
+            }
+            _logger.LogDebug($"Loaded {folders.Count} recent folders");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to load recent folders: {ex.Message}", ex);
+        }
+    }
     
     /// <summary>
     /// Called when SelectedTheme property changes
     /// </summary>
     partial void OnSelectedThemeChanged(string value)
     {
-        Console.WriteLine($"[ViewModel] OnSelectedThemeChanged called with: {value}");
+        _logger.LogDebug($"OnSelectedThemeChanged called with: {value}");
         _themeService.ApplyTheme(value);
         _settingsService.Theme = value; // Persist selection
     }
@@ -311,7 +515,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     partial void OnSelectedFontSizeChanged(int value)
     {
-        Console.WriteLine($"[ViewModel] OnSelectedFontSizeChanged called with: {value}");
+        _logger.LogDebug($"OnSelectedFontSizeChanged called with: {value}");
         _themeService.ApplyFontSize(value);
     }
 
@@ -320,7 +524,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     partial void OnSelectedTreemapColorModeChanged(string value)
     {
-        Console.WriteLine($"[ViewModel] OnSelectedTreemapColorModeChanged called with: {value}");
+        _logger.LogDebug($"OnSelectedTreemapColorModeChanged called with: {value}");
         UpdateTreemapLegend(value);
     }
 
@@ -495,27 +699,132 @@ public partial class MainWindowViewModel : ViewModelBase
 
     #region Commands
 
+    /// <summary>
+    /// Opens folder picker dialog to select a folder to scan.
+    /// Required for macOS sandbox compliance.
+    /// </summary>
+    [RelayCommand]
+    private async Task ChooseFolder()
+    {
+        _logger.LogInfo("ChooseFolder command invoked");
+        
+        var folderPath = await _fileAccessManager.RequestFolderAccessAsync();
+        if (!string.IsNullOrEmpty(folderPath))
+        {
+            SelectedFolderPath = folderPath;
+            SelectedFolderDisplayName = Path.GetFileName(folderPath) ?? folderPath;
+            
+            // Refresh recent folders list
+            await LoadRecentFoldersAsync();
+            
+            _logger.LogInfo($"Folder selected: {folderPath}");
+        }
+    }
+
+    /// <summary>
+    /// Select a folder from the recent folders list
+    /// </summary>
+    [RelayCommand]
+    private async Task SelectRecentFolder(GrantedFolder folder)
+    {
+        if (folder == null) return;
+        
+        _logger.LogInfo($"Selecting recent folder: {folder.Path}");
+        
+        // On macOS, we need to restore access from bookmark before scanning
+        if (OperatingSystem.IsMacOS() && _fileAccessManager is Services.AvaloniaFileAccessManager avaloniaManager)
+        {
+            var hasAccess = await avaloniaManager.RestoreAccessFromBookmarkAsync(folder.Path);
+            if (!hasAccess)
+            {
+                _logger.LogWarning($"Could not restore access to {folder.Path}, requesting new access");
+                // Bookmark may have expired - need to request access again
+                StatusText = "Access expired. Please choose the folder again.";
+                return;
+            }
+        }
+        
+        SelectedFolderPath = folder.Path;
+        SelectedFolderDisplayName = folder.DisplayName;
+    }
+
+    /// <summary>
+    /// Remove a folder from recent folders list
+    /// </summary>
+    [RelayCommand]
+    private async Task RemoveRecentFolder(GrantedFolder folder)
+    {
+        if (folder == null) return;
+        
+        await _fileAccessManager.RevokeAccessAsync(folder.Path);
+        await LoadRecentFoldersAsync();
+        
+        // Clear selection if we removed the selected folder
+        if (SelectedFolderPath == folder.Path)
+        {
+            SelectedFolderPath = null;
+            SelectedFolderDisplayName = string.Empty;
+        }
+    }
+
     [RelayCommand]
     private async Task StartScan()
     {
-        if (SelectedDrive == null) return;
-
-        // Determine scan path - Express mode scans only user's home directory for speed
-        var scanPath = SelectedDrive.Path;
+        // Determine scan path - prefer folder picker selection, fallback to drive selection
+        string? scanPath = null;
+        string displayName = string.Empty;
         var scanModeLabel = "Full";
-        
-        if (ExpressScanEnabled && SelectedDrive.Path == "/")
+
+        if (!string.IsNullOrEmpty(SelectedFolderPath) && Directory.Exists(SelectedFolderPath))
         {
-            // Express mode: scan only the current user's home directory
-            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (!string.IsNullOrEmpty(homeDir) && Directory.Exists(homeDir))
+            // Use folder picker selection (required for macOS sandbox)
+            scanPath = SelectedFolderPath;
+            displayName = SelectedFolderDisplayName;
+            
+            // On macOS, ensure we have access before scanning
+            if (OperatingSystem.IsMacOS())
             {
-                scanPath = homeDir;
-                scanModeLabel = "Express";
+                if (!_fileAccessManager.StartAccessingSecurityScopedResource(scanPath))
+                {
+                    // Try to restore from bookmark
+                    if (_fileAccessManager is Services.AvaloniaFileAccessManager avaloniaManager)
+                    {
+                        var hasAccess = await avaloniaManager.RestoreAccessFromBookmarkAsync(scanPath);
+                        if (!hasAccess)
+                        {
+                            StatusText = "Access denied. Please choose the folder again.";
+                            _logger.LogWarning($"No access to {scanPath}");
+                            return;
+                        }
+                    }
+                }
             }
         }
+        else if (SelectedDrive != null)
+        {
+            // Fallback to drive selection (Windows/Linux, or non-sandboxed macOS)
+            scanPath = SelectedDrive.Path;
+            displayName = SelectedDrive.DisplayName;
+            
+            if (ExpressScanEnabled && SelectedDrive.Path == "/")
+            {
+                // Express mode: scan only the current user's home directory
+                var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (!string.IsNullOrEmpty(homeDir) && Directory.Exists(homeDir))
+                {
+                    scanPath = homeDir;
+                    displayName = Path.GetFileName(homeDir) ?? "Home";
+                    scanModeLabel = "Express";
+                }
+            }
+        }
+        else
+        {
+            StatusText = "Please select a folder to scan";
+            return;
+        }
 
-        Console.WriteLine($"[ViewModel] StartScan called for drive: {SelectedDrive.DisplayName} ({scanPath}) - {scanModeLabel} mode");
+        _logger.LogInfo($"StartScan called for: {displayName} ({scanPath}) - {scanModeLabel} mode");
         
         CanStart = false;
         CanStop = true;
@@ -524,7 +833,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ScanProgress.State = ScanState.Scanning;
         StatusText = ExpressScanEnabled && scanModeLabel == "Express" 
             ? $"Express scanning {Path.GetFileName(scanPath)}..." 
-            : $"Scanning {SelectedDrive.DisplayName}...";
+            : $"Scanning {displayName}...";
 
         _cancellationTokenSource = new CancellationTokenSource();
 
@@ -592,10 +901,8 @@ public partial class MainWindowViewModel : ViewModelBase
         // Set treemap root item for direct binding
         TreemapRootItem = result.RootItem;
         
-        Console.WriteLine($"[PopulateResults] RootItem: {result.RootItem?.Name ?? "null"}");
-        Console.WriteLine($"[PopulateResults] LargestFiles count: {result.LargestFiles.Count}");
-        Console.WriteLine($"[PopulateResults] Games count: {result.GameInstallations.Count}");
-        Console.WriteLine($"[PopulateResults] DevTools count: {result.DevTools.Count}");
+        _logger.LogDebug($"PopulateResults - RootItem: {result.RootItem?.Name ?? "null"}");
+        _logger.LogDebug($"PopulateResults - LargestFiles: {result.LargestFiles.Count}, Games: {result.GameInstallations.Count}, DevTools: {result.DevTools.Count}");
         
         // Populate largest files
         LargestFiles.Clear();
@@ -603,7 +910,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             LargestFiles.Add(file);
         }
-        Console.WriteLine($"[PopulateResults] LargestFiles collection now has: {LargestFiles.Count} items");
+        _logger.LogDebug($"PopulateResults - LargestFiles collection now has: {LargestFiles.Count} items");
 
         // Populate largest folders
         LargestFolders.Clear();
@@ -752,7 +1059,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
         
-        Console.WriteLine($"[ViewModel] Recalling cached scan from {cache.ScanDate}");
+        _logger.LogInfo($"Recalling cached scan from {cache.ScanDate}");
         
         // Reconstruct a ScanResult from the cache
         var result = ReconstructScanResultFromCache(cache);
@@ -918,8 +1225,8 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private async Task BrowseFolder()
     {
-        // TODO: Implement folder browser dialog
-        await Task.CompletedTask;
+        // Use the file access manager for sandbox-compliant folder selection
+        await ChooseFolder();
     }
 
     [RelayCommand]
@@ -933,6 +1240,1250 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         IsSettingsOpen = !IsSettingsOpen;
     }
+
+    #region Export Commands
+
+    [RelayCommand]
+    private async Task ExportToCsv()
+    {
+        if (ScanResult == null)
+        {
+            StatusText = "No scan results to export";
+            return;
+        }
+
+        var storageProvider = GetStorageProvider();
+        if (storageProvider == null) return;
+
+        var file = await storageProvider.SaveFilePickerAsync(new global::Avalonia.Platform.Storage.FilePickerSaveOptions
+        {
+            Title = "Export to CSV",
+            SuggestedFileName = $"WinTrim_Export_{DateTime.Now:yyyy-MM-dd}",
+            DefaultExtension = "csv",
+            FileTypeChoices = new[]
+            {
+                new global::Avalonia.Platform.Storage.FilePickerFileType("CSV Files") { Patterns = new[] { "*.csv" } }
+            }
+        });
+
+        if (file != null)
+        {
+            var path = file.TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path))
+            {
+                await _exportService.ExportToCsvAsync(ScanResult, path);
+                StatusText = $"Exported to {Path.GetFileName(path)}";
+            }
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportToJson()
+    {
+        if (ScanResult == null)
+        {
+            StatusText = "No scan results to export";
+            return;
+        }
+
+        var storageProvider = GetStorageProvider();
+        if (storageProvider == null) return;
+
+        var file = await storageProvider.SaveFilePickerAsync(new global::Avalonia.Platform.Storage.FilePickerSaveOptions
+        {
+            Title = "Export to JSON",
+            SuggestedFileName = $"WinTrim_Export_{DateTime.Now:yyyy-MM-dd}",
+            DefaultExtension = "json",
+            FileTypeChoices = new[]
+            {
+                new global::Avalonia.Platform.Storage.FilePickerFileType("JSON Files") { Patterns = new[] { "*.json" } }
+            }
+        });
+
+        if (file != null)
+        {
+            var path = file.TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path))
+            {
+                await _exportService.ExportToJsonAsync(ScanResult, path);
+                StatusText = $"Exported to {Path.GetFileName(path)}";
+            }
+        }
+    }
+
+    private IStorageProvider? GetStorageProvider()
+    {
+        if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            return desktop.MainWindow?.StorageProvider;
+        }
+        return null;
+    }
+
+    #endregion
+
+    #region Delete Commands
+
+    /// <summary>
+    /// Whether we're showing a delete confirmation
+    /// </summary>
+    [ObservableProperty]
+    private bool _isDeleteConfirmationOpen;
+
+    /// <summary>
+    /// Item pending deletion (for confirmation dialog)
+    /// </summary>
+    [ObservableProperty]
+    private FileSystemItem? _itemToDelete;
+
+    /// <summary>
+    /// Request to delete the selected item (shows confirmation)
+    /// </summary>
+    [RelayCommand]
+    private void RequestDeleteItem(FileSystemItem? item)
+    {
+        if (item == null) return;
+        
+        ItemToDelete = item;
+        IsDeleteConfirmationOpen = true;
+        _logger.LogInfo($"Delete requested for: {item.FullPath}");
+    }
+
+    /// <summary>
+    /// Confirm and execute deletion
+    /// </summary>
+    [RelayCommand]
+    private void ConfirmDelete()
+    {
+        if (ItemToDelete == null) return;
+
+        var path = ItemToDelete.FullPath;
+        var name = ItemToDelete.Name;
+        var size = ItemToDelete.Size;
+
+        try
+        {
+            var success = _platformService.MoveToTrash(path);
+            if (success)
+            {
+                // Remove from UI
+                RemoveItemFromTree(ItemToDelete);
+                StatusText = $"Moved to Trash: {name} ({FormatSize(size)})";
+                _logger.LogInfo($"Deleted: {path}");
+            }
+            else
+            {
+                StatusText = $"Failed to delete: {name}";
+                _logger.LogWarning($"Failed to delete: {path}");
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error deleting: {ex.Message}";
+            _logger.LogError($"Delete error: {ex.Message}", ex);
+        }
+        finally
+        {
+            IsDeleteConfirmationOpen = false;
+            ItemToDelete = null;
+        }
+    }
+
+    /// <summary>
+    /// Cancel deletion
+    /// </summary>
+    [RelayCommand]
+    private void CancelDelete()
+    {
+        IsDeleteConfirmationOpen = false;
+        ItemToDelete = null;
+    }
+
+    /// <summary>
+    /// Open the item's containing folder in file explorer
+    /// </summary>
+    [RelayCommand]
+    private void RevealInFinder(object? item)
+    {
+        string? path = item switch
+        {
+            FileSystemItem fsi => fsi.FullPath,
+            DuplicateFile df => df.FullPath,
+            string s => s,
+            _ => null
+        };
+        
+        if (!string.IsNullOrEmpty(path))
+        {
+            _platformService.OpenInExplorer(path);
+        }
+    }
+
+    /// <summary>
+    /// Open the duplicate file row's containing folder in file explorer
+    /// </summary>
+    [RelayCommand]
+    private void RevealDuplicateInFinder(DuplicateFileRow? row)
+    {
+        if (row?.File?.FullPath != null)
+        {
+            _platformService.OpenInExplorer(row.File.FullPath);
+        }
+    }
+
+    /// <summary>
+    /// Remove an item from the tree after deletion
+    /// </summary>
+    private void RemoveItemFromTree(FileSystemItem item)
+    {
+        // Remove from parent's children
+        if (item.Parent != null)
+        {
+            item.Parent.Children.Remove(item);
+            
+            // Update parent sizes up the tree
+            var current = item.Parent;
+            while (current != null)
+            {
+                current.Size -= item.Size;
+                current = current.Parent;
+            }
+        }
+
+        // Remove from flat lists
+        LargestFiles.Remove(item);
+        LargestFolders.Remove(item);
+        
+        // Refresh treemap
+        OnPropertyChanged(nameof(TreemapRootItem));
+    }
+
+    #endregion
+
+    #region Collector (DaisyDisk-style staging area)
+
+    /// <summary>
+    /// Items collected for potential deletion
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<CollectorItem> _collectorItems = new();
+
+    /// <summary>
+    /// Whether the collector panel is expanded
+    /// </summary>
+    [ObservableProperty]
+    private bool _isCollectorOpen;
+
+    /// <summary>
+    /// Path to the cleanup folder where files are moved
+    /// </summary>
+    [ObservableProperty]
+    private string _cleanupFolderPath = string.Empty;
+
+    /// <summary>
+    /// Whether a cleanup folder has been set
+    /// </summary>
+    public bool HasCleanupFolder => !string.IsNullOrEmpty(CleanupFolderPath) && Directory.Exists(CleanupFolderPath);
+
+    /// <summary>
+    /// Display name for the cleanup folder
+    /// </summary>
+    public string CleanupFolderName => HasCleanupFolder ? Path.GetFileName(CleanupFolderPath) : "Not Set";
+
+    /// <summary>
+    /// Total size of items in collector
+    /// </summary>
+    public long CollectorTotalSize => CollectorItems.Sum(i => i.Size);
+
+    /// <summary>
+    /// Formatted total size
+    /// </summary>
+    public string CollectorTotalSizeFormatted => FormatSize(CollectorTotalSize);
+
+    /// <summary>
+    /// Number of items in collector
+    /// </summary>
+    public int CollectorItemCount => CollectorItems.Count;
+
+    /// <summary>
+    /// Whether collector has items
+    /// </summary>
+    public bool HasCollectorItems => CollectorItems.Count > 0;
+
+    /// <summary>
+    /// Storage provider for folder picker (set from View)
+    /// </summary>
+    public IStorageProvider? StorageProvider { get; set; }
+
+    /// <summary>
+    /// Choose/create the cleanup folder
+    /// </summary>
+    [RelayCommand]
+    private async Task ChooseCleanupFolderAsync()
+    {
+        if (StorageProvider == null) return;
+
+        var result = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Choose or Create a Cleanup Folder",
+            AllowMultiple = false
+        });
+
+        if (result.Count > 0)
+        {
+            var folder = result[0];
+            CleanupFolderPath = folder.Path.LocalPath;
+            _settingsService.CleanupFolderPath = CleanupFolderPath;
+            OnPropertyChanged(nameof(HasCleanupFolder));
+            OnPropertyChanged(nameof(CleanupFolderName));
+            StatusText = $"Cleanup folder set to: {CleanupFolderName}";
+            _logger.LogInfo($"Cleanup folder set: {CleanupFolderPath}");
+        }
+    }
+
+    /// <summary>
+    /// Auto-create a DeleteMe folder on the Desktop
+    /// </summary>
+    private void EnsureDeleteMeFolderExists()
+    {
+        try
+        {
+            var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            var deleteMePath = Path.Combine(desktopPath, "DeleteMe");
+            
+            if (!Directory.Exists(deleteMePath))
+            {
+                Directory.CreateDirectory(deleteMePath);
+                _logger.LogInfo($"Created DeleteMe folder: {deleteMePath}");
+            }
+            
+            CleanupFolderPath = deleteMePath;
+            _settingsService.CleanupFolderPath = deleteMePath;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"Could not create DeleteMe folder: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Reveal cleanup folder in Finder
+    /// </summary>
+    [RelayCommand]
+    private void RevealCleanupFolder()
+    {
+        if (HasCleanupFolder)
+        {
+            _platformService.OpenInExplorer(CleanupFolderPath);
+        }
+    }
+
+    /// <summary>
+    /// Add a file system item to the collector
+    /// </summary>
+    [RelayCommand]
+    private void AddToCollector(FileSystemItem? item)
+    {
+        if (item == null) return;
+        
+        // Don't add duplicates
+        if (CollectorItems.Any(c => c.FullPath == item.FullPath)) 
+        {
+            StatusText = $"Already in Collector: {item.Name}";
+            return;
+        }
+        
+        CollectorItems.Add(new CollectorItem
+        {
+            FullPath = item.FullPath,
+            Name = item.Name,
+            Size = item.Size,
+            IsFolder = item.IsFolder,
+            Source = "File Browser"
+        });
+        
+        UpdateCollectorStats();
+        IsCollectorOpen = true;
+        StatusText = $"Added to Collector: {item.Name}";
+        _logger.LogInfo($"Added to collector: {item.FullPath}");
+    }
+
+    /// <summary>
+    /// Add a duplicate file to the collector
+    /// </summary>
+    [RelayCommand]
+    private void AddDuplicateToCollector(DuplicateFileRow? row)
+    {
+        if (row == null || row.IsOriginal) return;
+        
+        // Don't add duplicates
+        if (CollectorItems.Any(c => c.FullPath == row.FullPath)) 
+        {
+            StatusText = $"Already in Collector: {row.Name}";
+            return;
+        }
+        
+        CollectorItems.Add(new CollectorItem
+        {
+            FullPath = row.FullPath,
+            Name = row.Name,
+            Size = row.Size,
+            IsFolder = false,
+            Source = "Duplicate"
+        });
+        
+        UpdateCollectorStats();
+        IsCollectorOpen = true;
+        StatusText = $"Added to Collector: {row.Name}";
+    }
+
+    /// <summary>
+    /// Add selected duplicates to collector
+    /// </summary>
+    [RelayCommand]
+    private void AddSelectedDuplicatesToCollector()
+    {
+        var selected = DuplicateFileRows
+            .Where(r => r.IsSelected && !r.IsOriginal)
+            .ToList();
+
+        if (!selected.Any()) return;
+
+        var addedCount = 0;
+        foreach (var row in selected)
+        {
+            if (!CollectorItems.Any(c => c.FullPath == row.FullPath))
+            {
+                CollectorItems.Add(new CollectorItem
+                {
+                    FullPath = row.FullPath,
+                    Name = row.Name,
+                    Size = row.Size,
+                    IsFolder = false,
+                    Source = "Duplicate"
+                });
+                addedCount++;
+            }
+        }
+        
+        UpdateCollectorStats();
+        IsCollectorOpen = true;
+        StatusText = $"Added {addedCount} items to Collector";
+    }
+
+    /// <summary>
+    /// Add a generic path to the collector (for drag-drop)
+    /// </summary>
+    public void AddPathToCollector(string path, string source = "Drop")
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        
+        // Don't add duplicates
+        if (CollectorItems.Any(c => c.FullPath == path)) return;
+        
+        try
+        {
+            var isFolder = Directory.Exists(path);
+            var name = Path.GetFileName(path);
+            long size = 0;
+            
+            if (isFolder)
+            {
+                var dirInfo = new DirectoryInfo(path);
+                size = GetDirectorySize(dirInfo);
+            }
+            else if (File.Exists(path))
+            {
+                size = new FileInfo(path).Length;
+            }
+            
+            CollectorItems.Add(new CollectorItem
+            {
+                FullPath = path,
+                Name = name,
+                Size = size,
+                IsFolder = isFolder,
+                Source = source
+            });
+            
+            UpdateCollectorStats();
+            IsCollectorOpen = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"Failed to add to collector: {path} - {ex.Message}");
+        }
+    }
+
+    private long GetDirectorySize(DirectoryInfo dir)
+    {
+        try
+        {
+            return dir.EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Remove an item from the collector
+    /// </summary>
+    [RelayCommand]
+    private void RemoveFromCollector(CollectorItem? item)
+    {
+        if (item == null) return;
+        
+        CollectorItems.Remove(item);
+        UpdateCollectorStats();
+        StatusText = $"Removed from Collector: {item.Name}";
+    }
+
+    /// <summary>
+    /// Clear all items from collector
+    /// </summary>
+    [RelayCommand]
+    private void ClearCollector()
+    {
+        CollectorItems.Clear();
+        UpdateCollectorStats();
+        StatusText = "Collector cleared";
+    }
+
+    /// <summary>
+    /// Toggle collector panel visibility
+    /// </summary>
+    [RelayCommand]
+    private void ToggleCollector()
+    {
+        IsCollectorOpen = !IsCollectorOpen;
+    }
+
+    /// <summary>
+    /// Move all collector items to the Cleanup Folder
+    /// </summary>
+    [RelayCommand]
+    private async Task MoveToCleanupFolderAsync()
+    {
+        if (!CollectorItems.Any()) return;
+        
+        // If no cleanup folder is set, prompt user to choose one
+        if (!HasCleanupFolder)
+        {
+            await ChooseCleanupFolderAsync();
+            if (!HasCleanupFolder)
+            {
+                StatusText = "Please choose a cleanup folder first";
+                return;
+            }
+        }
+        
+        var items = CollectorItems.ToList();
+        var movedCount = 0;
+        var movedSpace = 0L;
+        var failedItems = new List<string>();
+        
+        foreach (var item in items)
+        {
+            try
+            {
+                var destPath = GetUniqueDestinationPath(item.FullPath, CleanupFolderPath);
+                
+                if (item.IsFolder && Directory.Exists(item.FullPath))
+                {
+                    Directory.Move(item.FullPath, destPath);
+                    movedCount++;
+                    movedSpace += item.Size;
+                    CollectorItems.Remove(item);
+                }
+                else if (File.Exists(item.FullPath))
+                {
+                    File.Move(item.FullPath, destPath);
+                    movedCount++;
+                    movedSpace += item.Size;
+                    CollectorItems.Remove(item);
+                }
+                else
+                {
+                    failedItems.Add($"{item.Name} (not found)");
+                    CollectorItems.Remove(item); // Remove stale items
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to move {item.FullPath}: {ex.Message}");
+                failedItems.Add(item.Name);
+            }
+        }
+        
+        UpdateCollectorStats();
+        
+        if (movedCount > 0)
+        {
+            if (failedItems.Any())
+            {
+                StatusText = $"Moved {movedCount} items ({FormatSize(movedSpace)}), {failedItems.Count} failed";
+            }
+            else
+            {
+                StatusText = $"Moved {movedCount} items to cleanup folder ({FormatSize(movedSpace)})";
+                IsCollectorOpen = false;
+            }
+            
+            // Rescan duplicates if needed
+            if (DuplicateGroups.Any())
+            {
+                await ScanForDuplicatesAsync();
+            }
+        }
+        else if (failedItems.Any())
+        {
+            StatusText = $"Failed to move {failedItems.Count} items. Check folder permissions.";
+        }
+    }
+
+    /// <summary>
+    /// Get a unique destination path, adding numbers if file already exists
+    /// </summary>
+    private string GetUniqueDestinationPath(string sourcePath, string destFolder)
+    {
+        var fileName = Path.GetFileName(sourcePath);
+        var destPath = Path.Combine(destFolder, fileName);
+        
+        if (!File.Exists(destPath) && !Directory.Exists(destPath))
+            return destPath;
+        
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+        var ext = Path.GetExtension(fileName);
+        var counter = 1;
+        
+        while (File.Exists(destPath) || Directory.Exists(destPath))
+        {
+            destPath = Path.Combine(destFolder, $"{nameWithoutExt} ({counter}){ext}");
+            counter++;
+        }
+        
+        return destPath;
+    }
+
+    private void UpdateCollectorStats()
+    {
+        OnPropertyChanged(nameof(CollectorTotalSize));
+        OnPropertyChanged(nameof(CollectorTotalSizeFormatted));
+        OnPropertyChanged(nameof(CollectorItemCount));
+        OnPropertyChanged(nameof(HasCollectorItems));
+    }
+
+    #endregion
+
+    #region Duplicate Scanner
+
+    /// <summary>
+    /// Results from the duplicate scan (groups for logic)
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<DuplicateGroup> _duplicateGroups = new();
+
+    /// <summary>
+    /// Flat list of all duplicate files for virtualized display
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<DuplicateFileRow> _duplicateFileRows = new();
+
+    /// <summary>
+    /// Filtered view of duplicate file rows based on search
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<DuplicateFileRow> _filteredDuplicateRows = new();
+
+    /// <summary>
+    /// Search text for filtering duplicates
+    /// </summary>
+    private string _duplicateSearchText = string.Empty;
+    public string DuplicateSearchText
+    {
+        get => _duplicateSearchText;
+        set
+        {
+            if (SetProperty(ref _duplicateSearchText, value))
+            {
+                FilterDuplicateRows();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Filter duplicate rows based on search text
+    /// </summary>
+    private void FilterDuplicateRows()
+    {
+        if (string.IsNullOrWhiteSpace(DuplicateSearchText))
+        {
+            FilteredDuplicateRows = new ObservableCollection<DuplicateFileRow>(DuplicateFileRows);
+        }
+        else
+        {
+            var searchLower = DuplicateSearchText.ToLowerInvariant();
+            var filtered = DuplicateFileRows
+                .Where(r => r.Name.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ||
+                           r.Directory.Contains(searchLower, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            
+            // Re-number groups for filtered results and mark first-in-group
+            var reNumbered = new List<DuplicateFileRow>();
+            var seenGroups = new HashSet<int>();
+            foreach (var row in filtered)
+            {
+                // We keep the original GroupNumber for coloring but track first-in-filtered-view
+                reNumbered.Add(row);
+            }
+            
+            FilteredDuplicateRows = new ObservableCollection<DuplicateFileRow>(reNumbered);
+        }
+        
+        OnPropertyChanged(nameof(FilteredDuplicateCount));
+    }
+
+    /// <summary>
+    /// Count of filtered rows
+    /// </summary>
+    public int FilteredDuplicateCount => FilteredDuplicateRows.Count;
+
+    /// <summary>
+    /// Whether a duplicate scan is in progress
+    /// </summary>
+    [ObservableProperty]
+    private bool _isDuplicateScanRunning;
+
+    /// <summary>
+    /// Progress message for duplicate scan
+    /// </summary>
+    [ObservableProperty]
+    private string _duplicateScanStatus = string.Empty;
+
+    /// <summary>
+    /// Progress percentage for duplicate scan (0-100)
+    /// </summary>
+    [ObservableProperty]
+    private double _duplicateScanProgress;
+
+    /// <summary>
+    /// Files processed during duplicate scan
+    /// </summary>
+    [ObservableProperty]
+    private int _duplicateFilesProcessed;
+
+    /// <summary>
+    /// Total files to process during duplicate scan
+    /// </summary>
+    [ObservableProperty]
+    private int _duplicateTotalFiles;
+
+    /// <summary>
+    /// Formatted progress string (e.g., "45%")
+    /// </summary>
+    public string DuplicateScanProgressFormatted => DuplicateTotalFiles > 0 ? $"{DuplicateScanProgress:F0}%" : "";
+
+    /// <summary>
+    /// Formatted files progress string (e.g., "1,234 / 5,678") - empty during initial scan
+    /// </summary>
+    public string DuplicateFilesProgressFormatted => DuplicateTotalFiles > 0 
+        ? $"{DuplicateFilesProcessed:N0} / {DuplicateTotalFiles:N0}" 
+        : "";
+
+    /// <summary>
+    /// Total wasted space from duplicates
+    /// </summary>
+    [ObservableProperty]
+    private long _totalDuplicateWastedSpace;
+
+    /// <summary>
+    /// Total number of duplicate files
+    /// </summary>
+    [ObservableProperty]
+    private int _totalDuplicateCount;
+
+    /// <summary>
+    /// Selected duplicates count and size
+    /// </summary>
+    [ObservableProperty]
+    private int _selectedDuplicatesCount;
+
+    [ObservableProperty]
+    private long _selectedDuplicatesSize;
+
+    /// <summary>
+    /// Formatted wasted space string
+    /// </summary>
+    public string DuplicateWastedSpaceFormatted => FormatSize(TotalDuplicateWastedSpace);
+
+    /// <summary>
+    /// Formatted selected duplicates size
+    /// </summary>
+    public string SelectedDuplicatesSizeFormatted => FormatSize(SelectedDuplicatesSize);
+
+    /// <summary>
+    /// Whether we have duplicates to show
+    /// </summary>
+    public bool HasDuplicates => DuplicateFileRows.Count > 0;
+
+    /// <summary>
+    /// Whether we have selected duplicates
+    /// </summary>
+    public bool HasSelectedDuplicates => SelectedDuplicatesCount > 0;
+
+    /// <summary>
+    /// Update selected duplicates count/size
+    /// </summary>
+    private void UpdateSelectedDuplicatesStats()
+    {
+        var selected = DuplicateFileRows
+            .Where(r => r.IsSelected)
+            .ToList();
+        
+        SelectedDuplicatesCount = selected.Count;
+        SelectedDuplicatesSize = selected.Sum(r => r.Size);
+        OnPropertyChanged(nameof(SelectedDuplicatesSizeFormatted));
+        OnPropertyChanged(nameof(HasSelectedDuplicates));
+    }
+
+    /// <summary>
+    /// Handler for when a duplicate file row's selection changes
+    /// </summary>
+    private void OnDuplicateRowPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DuplicateFileRow.IsSelected) && !DuplicateFileRow.SuppressNotifications)
+        {
+            UpdateSelectedDuplicatesStats();
+        }
+    }
+
+    /// <summary>
+    /// Handler for when a duplicate file's selection changes (legacy)
+    /// </summary>
+    private void OnDuplicateFilePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DuplicateFile.IsMarkedForDeletion))
+        {
+            UpdateSelectedDuplicatesStats();
+        }
+    }
+
+    /// <summary>
+    /// Scan for duplicate files
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanForDuplicatesAsync()
+    {
+        if (ScanResult == null)
+        {
+            _logger.LogWarning("ScanForDuplicatesAsync called but ScanResult is null");
+            DuplicateScanStatus = "Please scan a folder first before searching for duplicates";
+            return;
+        }
+        
+        if (IsDuplicateScanRunning)
+        {
+            _logger.LogWarning("ScanForDuplicatesAsync called but scan already running");
+            return;
+        }
+        
+        _logger.LogInfo($"Starting duplicate scan. ScanResult has RootItem: {ScanResult.RootItem != null}");
+
+        IsDuplicateScanRunning = true;
+        
+        // Unsubscribe from existing property changes
+        foreach (var row in DuplicateFileRows)
+        {
+            row.PropertyChanged -= OnDuplicateRowPropertyChanged;
+        }
+        foreach (var group in DuplicateGroups)
+        {
+            foreach (var file in group.Files)
+            {
+                file.PropertyChanged -= OnDuplicateFilePropertyChanged;
+            }
+        }
+        DuplicateGroups.Clear();
+        DuplicateFileRows.Clear();
+        SelectedDuplicatesCount = 0;
+        SelectedDuplicatesSize = 0;
+        
+        DuplicateScanStatus = "Scanning files...";
+        DuplicateScanProgress = 0;
+        DuplicateFilesProcessed = 0;
+        DuplicateTotalFiles = 0;
+        
+        // Start cycling status messages during initial scan
+        var statusMessages = new[] { "Scanning files...", "Please wait...", "Processing will start soon..." };
+        var messageIndex = 0;
+        using var statusTimer = new System.Timers.Timer(800);
+        statusTimer.Elapsed += (s, e) =>
+        {
+            if (DuplicateTotalFiles == 0 && IsDuplicateScanRunning)
+            {
+                messageIndex = (messageIndex + 1) % statusMessages.Length;
+                global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    DuplicateScanStatus = statusMessages[messageIndex];
+                });
+            }
+        };
+        statusTimer.Start();
+
+        try
+        {
+            var progress = new Progress<DuplicateScanProgress>(p =>
+            {
+                DuplicateScanStatus = p.Message;
+                DuplicateScanProgress = p.ProgressPercent;
+                DuplicateFilesProcessed = p.FilesProcessed;
+                DuplicateTotalFiles = p.TotalFiles;
+                TotalDuplicateCount = p.DuplicateGroupsFound;
+                TotalDuplicateWastedSpace = p.WastedSpaceFound;
+                OnPropertyChanged(nameof(DuplicateScanProgressFormatted));
+                OnPropertyChanged(nameof(DuplicateFilesProgressFormatted));
+            });
+
+            var results = await _duplicateScanner.ScanForDuplicatesAsync(
+                ScanResult,
+                minFileSize: 1024, // 1KB minimum
+                progress,
+                _cancellationTokenSource?.Token ?? CancellationToken.None);
+
+            _logger.LogInfo($"Duplicate scan returned {results.Count} groups");
+
+            foreach (var group in results)
+            {
+                DuplicateGroups.Add(group);
+                // Subscribe to property changes on each file for live stats updates
+                foreach (var file in group.Files)
+                {
+                    file.PropertyChanged += OnDuplicateFilePropertyChanged;
+                }
+            }
+
+            // Build flat list for virtualized DataGrid display
+            DuplicateFileRows.Clear();
+            int groupNum = 1;
+            foreach (var group in results)
+            {
+                bool isFirst = true;
+                foreach (var file in group.Files)
+                {
+                    var row = new DuplicateFileRow
+                    {
+                        File = file,
+                        Group = group,
+                        GroupNumber = groupNum,
+                        IsFirstInGroup = isFirst
+                    };
+                    row.PropertyChanged += OnDuplicateRowPropertyChanged;
+                    DuplicateFileRows.Add(row);
+                    isFirst = false;
+                }
+                groupNum++;
+            }
+
+            TotalDuplicateWastedSpace = results.Sum(g => g.WastedSpace);
+            TotalDuplicateCount = results.Sum(g => g.DuplicateCount);
+
+            _logger.LogInfo($"Added {DuplicateFileRows.Count} rows to DuplicateFileRows");
+
+            // Initialize filtered view
+            DuplicateSearchText = string.Empty;
+            FilterDuplicateRows();
+            
+            _logger.LogInfo($"FilteredDuplicateRows has {FilteredDuplicateRows.Count} rows");
+
+            DuplicateScanStatus = results.Count > 0
+                ? $"Found {results.Count} duplicate groups ({FormatSize(TotalDuplicateWastedSpace)} recoverable)"
+                : "No duplicates found";
+
+            OnPropertyChanged(nameof(HasDuplicates));
+            OnPropertyChanged(nameof(DuplicateWastedSpaceFormatted));
+        }
+        catch (OperationCanceledException)
+        {
+            DuplicateScanStatus = "Duplicate scan cancelled";
+        }
+        catch (Exception ex)
+        {
+            DuplicateScanStatus = $"Error: {ex.Message}";
+            _logger.LogError("Duplicate scan error", ex);
+        }
+        finally
+        {
+            IsDuplicateScanRunning = false;
+        }
+    }
+
+    /// <summary>
+    /// Delete selected duplicate files
+    /// </summary>
+    [RelayCommand]
+    private async Task DeleteSelectedDuplicatesAsync()
+    {
+        var markedRows = DuplicateFileRows
+            .Where(r => r.IsSelected && !r.IsOriginal)
+            .ToList();
+
+        if (!markedRows.Any()) return;
+
+        var deletedCount = 0;
+        var freedSpace = 0L;
+
+        foreach (var row in markedRows)
+        {
+            try
+            {
+                if (_platformService.MoveToTrash(row.File.FullPath))
+                {
+                    deletedCount++;
+                    freedSpace += row.Size;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to delete {row.File.FullPath}: {ex.Message}");
+            }
+        }
+
+        // Refresh the duplicate list
+        if (deletedCount > 0)
+        {
+            StatusText = $"Deleted {deletedCount} files, freed {FormatSize(freedSpace)}";
+            await ScanForDuplicatesAsync(); // Rescan to update list
+        }
+    }
+
+    /// <summary>
+    /// Toggle selection of a duplicate file for deletion
+    /// </summary>
+    [RelayCommand]
+    private void ToggleDuplicateSelection(DuplicateFile? file)
+    {
+        if (file == null || file.IsOriginal) return; // Can't delete the "original"
+        file.IsMarkedForDeletion = !file.IsMarkedForDeletion;
+        UpdateSelectedDuplicatesStats();
+    }
+
+    /// <summary>
+    /// Select all duplicates (except originals) for deletion
+    /// </summary>
+    [RelayCommand]
+    private void SelectAllDuplicates()
+    {
+        // Use silent selection to avoid triggering thousands of UI updates
+        DuplicateFileRow.SuppressNotifications = true;
+        try
+        {
+            foreach (var row in DuplicateFileRows)
+            {
+                if (!row.IsOriginal)
+                {
+                    row.SetSelectedSilent(true);
+                }
+            }
+        }
+        finally
+        {
+            DuplicateFileRow.SuppressNotifications = false;
+        }
+        
+        // Single update at the end
+        UpdateSelectedDuplicatesStats();
+        
+        // Notify DataGrid that items have changed (triggers refresh)
+        OnPropertyChanged(nameof(FilteredDuplicateRows));
+    }
+
+    /// <summary>
+    /// Deselect all duplicates
+    /// </summary>
+    [RelayCommand]
+    private void DeselectAllDuplicates()
+    {
+        // Use silent selection to avoid triggering thousands of UI updates
+        DuplicateFileRow.SuppressNotifications = true;
+        try
+        {
+            foreach (var row in DuplicateFileRows)
+            {
+                row.SetSelectedSilent(false);
+            }
+        }
+        finally
+        {
+            DuplicateFileRow.SuppressNotifications = false;
+        }
+        
+        // Single update at the end
+        UpdateSelectedDuplicatesStats();
+        
+        // Notify DataGrid that items have changed
+        OnPropertyChanged(nameof(FilteredDuplicateRows));
+    }
+
+    /// <summary>
+    /// Toggle selection of a duplicate row (called from checkbox command)
+    /// </summary>
+    [RelayCommand]
+    private void ToggleDuplicateRowSelection(DuplicateFileRow? row)
+    {
+        // The checkbox binding handles the toggle, we just update stats
+        UpdateSelectedDuplicatesStats();
+    }
+
+    #endregion
+
+    #region Time Machine Analyzer (macOS only)
+
+    /// <summary>
+    /// Whether Time Machine is available on this system
+    /// </summary>
+    public bool IsTimeMachineAvailable => _timeMachineAnalyzer.IsTimeMachineAvailable;
+
+    /// <summary>
+    /// Available Time Machine destinations
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<TimeMachineDestination> _timeMachineDestinations = new();
+
+    /// <summary>
+    /// Selected Time Machine destination
+    /// </summary>
+    [ObservableProperty]
+    private TimeMachineDestination? _selectedTimeMachineDestination;
+
+    /// <summary>
+    /// Current Time Machine analysis results
+    /// </summary>
+    [ObservableProperty]
+    private TimeMachineAnalysis? _timeMachineAnalysis;
+
+    /// <summary>
+    /// Whether a Time Machine scan is running
+    /// </summary>
+    [ObservableProperty]
+    private bool _isTimeMachineScanRunning;
+
+    /// <summary>
+    /// Time Machine scan progress message
+    /// </summary>
+    [ObservableProperty]
+    private string _timeMachineStatus = string.Empty;
+
+    /// <summary>
+    /// Time Machine scan progress percentage
+    /// </summary>
+    [ObservableProperty]
+    private double _timeMachineProgress;
+
+    /// <summary>
+    /// Whether we have Time Machine analysis results
+    /// </summary>
+    public bool HasTimeMachineAnalysis => TimeMachineAnalysis != null && TimeMachineAnalysis.Suggestions.Any();
+
+    /// <summary>
+    /// Load available Time Machine destinations
+    /// </summary>
+    [RelayCommand]
+    private async Task LoadTimeMachineDestinationsAsync()
+    {
+        if (!IsTimeMachineAvailable) return;
+
+        TimeMachineDestinations.Clear();
+        TimeMachineStatus = "Discovering backup destinations...";
+
+        try
+        {
+            var destinations = await _timeMachineAnalyzer.GetBackupDestinationsAsync();
+            foreach (var dest in destinations)
+            {
+                TimeMachineDestinations.Add(dest);
+            }
+
+            if (TimeMachineDestinations.Any())
+            {
+                SelectedTimeMachineDestination = TimeMachineDestinations.First();
+                TimeMachineStatus = $"Found {destinations.Count} backup destination(s)";
+            }
+            else
+            {
+                TimeMachineStatus = "No Time Machine destinations found";
+            }
+        }
+        catch (Exception ex)
+        {
+            TimeMachineStatus = $"Error: {ex.Message}";
+            _logger.LogError("Error loading Time Machine destinations", ex);
+        }
+    }
+
+    /// <summary>
+    /// Analyze Time Machine backups
+    /// </summary>
+    [RelayCommand]
+    private async Task AnalyzeTimeMachineAsync()
+    {
+        if (SelectedTimeMachineDestination == null || IsTimeMachineScanRunning) return;
+
+        IsTimeMachineScanRunning = true;
+        TimeMachineStatus = "Analyzing backups...";
+        TimeMachineProgress = 0;
+
+        try
+        {
+            var progress = new Progress<TimeMachineProgress>(p =>
+            {
+                TimeMachineStatus = p.Message;
+                TimeMachineProgress = p.ProgressPercent;
+            });
+
+            TimeMachineAnalysis = await _timeMachineAnalyzer.AnalyzeBackupsAsync(
+                SelectedTimeMachineDestination,
+                progress,
+                _cancellationTokenSource?.Token ?? CancellationToken.None);
+
+            OnPropertyChanged(nameof(HasTimeMachineAnalysis));
+        }
+        catch (OperationCanceledException)
+        {
+            TimeMachineStatus = "Analysis cancelled";
+        }
+        catch (Exception ex)
+        {
+            TimeMachineStatus = $"Error: {ex.Message}";
+            _logger.LogError("Time Machine analysis error", ex);
+        }
+        finally
+        {
+            IsTimeMachineScanRunning = false;
+        }
+    }
+
+    /// <summary>
+    /// Exclude a path from Time Machine backups
+    /// </summary>
+    [RelayCommand]
+    private async Task ExcludeFromTimeMachineAsync(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+
+        var success = await _timeMachineAnalyzer.ExcludePathAsync(path);
+        if (success)
+        {
+            StatusText = $"Added to Time Machine exclusions: {Path.GetFileName(path)}";
+        }
+        else
+        {
+            StatusText = $"Failed to exclude path from Time Machine";
+        }
+    }
+
+    #endregion
 
     [RelayCommand]
     private void SelectCategory(string? categoryName)

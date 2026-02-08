@@ -80,17 +80,21 @@ public sealed class FileScanner : IFileScanner
     };
 
     public bool IsPaused => _isPaused;
+    
+    private readonly IAppLogger _logger;
 
     public FileScanner(
         IGameDetector gameDetector, 
         ICleanupAdvisor cleanupAdvisor, 
         ICategoryClassifier categoryClassifier,
-        IDevToolDetector devToolDetector)
+        IDevToolDetector devToolDetector,
+        IAppLogger logger)
     {
         _gameDetector = gameDetector;
         _cleanupAdvisor = cleanupAdvisor;
         _categoryClassifier = categoryClassifier;
         _devToolDetector = devToolDetector;
+        _logger = logger;
     }
     
     /// <summary>
@@ -132,7 +136,7 @@ public sealed class FileScanner : IFileScanner
             DriveStorageType.Network => NetworkParallelism,
             _ => HddParallelism
         };
-        Console.WriteLine($"[FileScanner] Drive type: {driveType}, using {_currentMaxParallelism} parallel workers");
+        _logger.LogDebug($"Drive type: {driveType}, using {_currentMaxParallelism} parallel workers");
         
         var result = new ScanResult
         {
@@ -148,11 +152,11 @@ public sealed class FileScanner : IFileScanner
             var driveInfo = new DriveInfo(Path.GetPathRoot(path) ?? path);
             totalDriveBytes = driveInfo.TotalSize;
             usedDriveBytes = driveInfo.TotalSize - driveInfo.AvailableFreeSpace;
-            Console.WriteLine($"[FileScanner] Disk size: {FormatBytes(totalDriveBytes)} total, {FormatBytes(usedDriveBytes)} used, {FormatBytes(driveInfo.AvailableFreeSpace)} free");
+            _logger.LogDebug($"Disk size: {FormatBytes(totalDriveBytes)} total, {FormatBytes(usedDriveBytes)} used, {FormatBytes(driveInfo.AvailableFreeSpace)} free");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[FileScanner] Could not get drive info: {ex.Message}");
+            _logger.LogWarning($"Could not get drive info: {ex.Message}");
         }
 
         var scanProgress = new ScanProgress
@@ -206,14 +210,14 @@ public sealed class FileScanner : IFileScanner
 
             // Start game and dev tool detection IN PARALLEL with main scan
             // These scan different directories (Steam paths, dev caches) than the main file scan
-            Console.WriteLine($"[FileScanner] Starting game detection (parallel)...");
+            _logger.LogDebug("Starting game detection (parallel)...");
             var gameTask = _gameDetector.DetectGamesAsync(path, cancellationToken);
-            Console.WriteLine($"[FileScanner] Starting dev tools detection (parallel)...");
+            _logger.LogDebug("Starting dev tools detection (parallel)...");
             var devToolTask = _devToolDetector.ScanAllAsync();
 
             // Use parallel breadth-first scan with work-stealing for better performance
             await ScanDirectoryParallelAsync(rootItem, scanProgress, progress, cancellationToken);
-            Console.WriteLine($"[FileScanner] Recursive scan complete. Total files in bag: {_largestFiles.Count}");
+            _logger.LogDebug($"Recursive scan complete. Total files in bag: {_largestFiles.Count}");
 
             // Post-scan analysis phase
             scanProgress.ProgressPercentage = 96;
@@ -234,15 +238,15 @@ public sealed class FileScanner : IFileScanner
                 .OrderByDescending(f => f.Size)
                 .Take(LargestFilesLimit)
                 .ToList();
-            Console.WriteLine($"[FileScanner] LargestFiles sorted and limited: {result.LargestFiles.Count}");
+            _logger.LogDebug($"LargestFiles sorted and limited: {result.LargestFiles.Count}");
             if (result.LargestFiles.Count > 0)
             {
-                Console.WriteLine($"[FileScanner] Top file: {result.LargestFiles[0].Name} ({result.LargestFiles[0].Size} bytes)");
+                _logger.LogDebug($"Top file: {result.LargestFiles[0].Name} ({result.LargestFiles[0].Size} bytes)");
             }
 
             // Get largest folders
             result.LargestFolders = GetLargestFolders(rootItem, 50);
-            Console.WriteLine($"[FileScanner] LargestFolders: {result.LargestFolders.Count}");
+            _logger.LogDebug($"LargestFolders: {result.LargestFolders.Count}");
 
             // Get oldest accessed files
             result.OldestAccessedFiles = _largestFiles
@@ -256,7 +260,7 @@ public sealed class FileScanner : IFileScanner
             scanProgress.StatusMessage = "Processing detected games and dev tools...";
             progress.Report(scanProgress);
             
-            Console.WriteLine($"[FileScanner] Processing inline-detected items...");
+            _logger.LogDebug("Processing inline-detected items...");
             
             // Fill in sizes for games (lookup from scanned tree)
             result.GameInstallations = FillGameSizes(rootItem, _detectedGames.ToList());
@@ -268,8 +272,8 @@ public sealed class FileScanner : IFileScanner
                 .OrderByDescending(d => d.SizeBytes)
                 .ToList();
             
-            Console.WriteLine($"[FileScanner] Games found (inline): {result.GameInstallations.Count}");
-            Console.WriteLine($"[FileScanner] DevTools found (inline): {result.DevTools.Count}");
+            _logger.LogDebug($"Games found (inline): {result.GameInstallations.Count}");
+            _logger.LogDebug($"DevTools found (inline): {result.DevTools.Count}");
 
             // Get cleanup suggestions
             scanProgress.ProgressPercentage = 98;
@@ -292,7 +296,7 @@ public sealed class FileScanner : IFileScanner
             result.ErrorCount = scanProgress.ErrorCount;
             result.ScanCompleted = DateTime.Now;
 
-            Console.WriteLine($"[FileScanner] Scan completed. Files: {result.TotalFiles}, Folders: {result.TotalFolders}");
+            _logger.LogInfo($"Scan completed. Files: {result.TotalFiles}, Folders: {result.TotalFolders}");
 
             scanProgress.State = ScanState.Completed;
             scanProgress.StatusMessage = "Scan complete!";
@@ -1384,7 +1388,7 @@ public sealed class FileScanner : IFileScanner
     /// <summary>
     /// macOS drive detection - checks for network mounts and drive type
     /// </summary>
-    private static DriveStorageType DetectDriveTypeMacOS(string path)
+    private DriveStorageType DetectDriveTypeMacOS(string path)
     {
         try
         {
@@ -1448,7 +1452,7 @@ public sealed class FileScanner : IFileScanner
                             optionsLower.Contains("afpfs") ||    // AFP (older Mac shares)
                             optionsLower.Contains("webdav"))     // WebDAV
                         {
-                            Console.WriteLine($"[FileScanner] Detected NETWORK mount: {bestMatchMount} ({bestMatchOptions})");
+                            _logger.LogDebug($"Detected NETWORK mount: {bestMatchMount} ({bestMatchOptions})");
                             return DriveStorageType.Network;
                         }
                         
@@ -1456,12 +1460,12 @@ public sealed class FileScanner : IFileScanner
                         if (optionsLower.Contains("local"))
                         {
                             // For local drives, assume SSD (all Macs since 2012)
-                            Console.WriteLine($"[FileScanner] Detected LOCAL drive: {bestMatchMount} ({bestMatchOptions})");
+                            _logger.LogDebug($"Detected LOCAL drive: {bestMatchMount} ({bestMatchOptions})");
                             return DriveStorageType.Ssd;
                         }
                         
                         // Not explicitly local - might be external or network
-                        Console.WriteLine($"[FileScanner] Detected UNKNOWN mount type: {bestMatchMount} ({bestMatchOptions})");
+                        _logger.LogDebug($"Detected UNKNOWN mount type: {bestMatchMount} ({bestMatchOptions})");
                     }
                 }
             }
@@ -1471,7 +1475,7 @@ public sealed class FileScanner : IFileScanner
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[FileScanner] macOS drive detection error: {ex.Message}");
+            _logger.LogWarning($"macOS drive detection error: {ex.Message}");
             return DriveStorageType.Ssd; // Default to SSD for local Macs
         }
     }
@@ -1479,7 +1483,7 @@ public sealed class FileScanner : IFileScanner
     /// <summary>
     /// Uses diskutil to detect if a drive is SSD on macOS
     /// </summary>
-    private static DriveStorageType DetectSsdMacOSDiskutil(string path)
+    private DriveStorageType DetectSsdMacOSDiskutil(string path)
     {
         try
         {
@@ -1513,7 +1517,7 @@ public sealed class FileScanner : IFileScanner
             // Network paths don't start with /dev/
             if (!devicePath.StartsWith("/dev/"))
             {
-                Console.WriteLine($"[FileScanner] Non-local device (network): {devicePath}");
+                _logger.LogDebug($"Non-local device (network): {devicePath}");
                 return DriveStorageType.Network;
             }
             
@@ -1541,7 +1545,7 @@ public sealed class FileScanner : IFileScanner
             {
                 var isSsd = output.Contains("Solid State:   Yes") || 
                            output.Contains("Solid State: Yes");
-                Console.WriteLine($"[FileScanner] diskutil reports Solid State: {isSsd}");
+                _logger.LogDebug($"diskutil reports Solid State: {isSsd}");
                 return isSsd ? DriveStorageType.Ssd : DriveStorageType.Hdd;
             }
             
@@ -1556,7 +1560,7 @@ public sealed class FileScanner : IFileScanner
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[FileScanner] diskutil detection error: {ex.Message}");
+            _logger.LogWarning($"diskutil detection error: {ex.Message}");
             return DriveStorageType.Ssd;
         }
     }
@@ -1564,7 +1568,7 @@ public sealed class FileScanner : IFileScanner
     /// <summary>
     /// Windows drive type detection using PowerShell/WMI query
     /// </summary>
-    private static DriveStorageType DetectDriveTypeWindows(string driveLetter)
+    private DriveStorageType DetectDriveTypeWindows(string driveLetter)
     {
         try
         {
@@ -1572,7 +1576,7 @@ public sealed class FileScanner : IFileScanner
             var driveInfo = new DriveInfo(driveLetter);
             if (driveInfo.DriveType == DriveType.Network)
             {
-                Console.WriteLine($"[FileScanner] Windows detected network drive: {driveLetter}");
+                _logger.LogDebug($"Windows detected network drive: {driveLetter}");
                 return DriveStorageType.Network;
             }
             
@@ -1615,7 +1619,7 @@ public sealed class FileScanner : IFileScanner
     /// <summary>
     /// Linux drive type detection using /sys/block rotational flag
     /// </summary>
-    private static DriveStorageType DetectDriveTypeLinux(string path)
+    private DriveStorageType DetectDriveTypeLinux(string path)
     {
         try
         {
@@ -1639,7 +1643,7 @@ public sealed class FileScanner : IFileScanner
                     if (mountOutput.Contains("nfs") || mountOutput.Contains("cifs") || 
                         mountOutput.Contains("smb") || mountOutput.Contains("sshfs"))
                     {
-                        Console.WriteLine($"[FileScanner] Linux detected network mount: {path}");
+                        _logger.LogDebug($"Linux detected network mount: {path}");
                         return DriveStorageType.Network;
                     }
                 }

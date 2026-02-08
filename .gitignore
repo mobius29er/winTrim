@@ -80,6 +80,22 @@ $RECYCLE.BIN/
 .AppleDouble
 .LSOverride
 
+# Apple signing - NEVER COMMIT THESE
+*.provisionprofile
+*.mobileprovision
+*.p12
+*.cer
+embedded.provisionprofile
+
+# App Store builds
+publish/macos-appstore/
+publish/windows-store/
+publish/macos-test/
+publish/WinTrim.app/
+publish/*.app/
+publish/*.pkg
+publish/*.dmg
+
 # JetBrains
 *.sln.iml
 
@@ -92,3 +108,5 @@ prn
 PRN
 aux
 AUX
+
+/private

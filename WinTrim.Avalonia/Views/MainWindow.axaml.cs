@@ -13,6 +13,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using WinTrim.Avalonia.Controls;
+using WinTrim.Avalonia.ViewModels;
 using WinTrim.Core.Models;
 
 namespace WinTrim.Avalonia.Views;
@@ -31,6 +32,12 @@ public partial class MainWindow : Window
 
     private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
     {
+        // Set the StorageProvider on the ViewModel for folder picker dialogs
+        if (DataContext is ViewModels.MainWindowViewModel vm)
+        {
+            vm.StorageProvider = StorageProvider;
+        }
+        
         // Find the TreemapControl by name and wire up events
         var treemapControl = this.FindControl<TreemapControl>("TreemapView");
         if (treemapControl != null)
@@ -211,6 +218,14 @@ public partial class MainWindow : Window
         if (_rightClickedFileItem?.FullPath != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
         {
             clipboard.SetTextAsync(_rightClickedFileItem.FullPath);
+        }
+    }
+
+    private void FileItemDelete_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedFileItem != null && DataContext is MainWindowViewModel vm)
+        {
+            vm.RequestDeleteItemCommand.Execute(_rightClickedFileItem);
         }
     }
 
@@ -493,4 +508,99 @@ public partial class MainWindow : Window
         maxWidth = Math.Min(maxWidth, 400);
         column.Width = new DataGridLength(maxWidth);
     }
+
+    /// <summary>
+    /// Cancel any edit attempts in the duplicates DataGrid
+    /// </summary>
+    private void DataGrid_BeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
+    {
+        // Cancel edit mode to prevent loading/hanging issues
+        e.Cancel = true;
+    }
+
+    #region Collector Context Menu Handlers
+
+    private DuplicateFileRow? _rightClickedDuplicateRow;
+
+    private void DuplicatesDataGrid_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // Capture right-click to set the selected row for context menu
+        if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed && sender is DataGrid dataGrid)
+        {
+            // Use hit testing to find the DataGridRow under the pointer
+            var point = e.GetPosition(dataGrid);
+            var hitTestResult = dataGrid.InputHitTest(point);
+            
+            // Walk up the visual tree to find the DataGridRow
+            var visual = hitTestResult as global::Avalonia.Visual;
+            while (visual != null)
+            {
+                if (visual is DataGridRow row && row.DataContext is DuplicateFileRow duplicateRow)
+                {
+                    _rightClickedDuplicateRow = duplicateRow;
+                    dataGrid.SelectedItem = duplicateRow;
+                    break;
+                }
+                visual = visual.Parent as global::Avalonia.Visual;
+            }
+        }
+    }
+
+    private void Duplicate_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is DataGrid dataGrid && dataGrid.SelectedItem is DuplicateFileRow row)
+        {
+            _rightClickedDuplicateRow = row;
+        }
+    }
+
+    private void DuplicateOpenFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedDuplicateRow?.FullPath != null)
+        {
+            try
+            {
+                var folder = System.IO.Path.GetDirectoryName(_rightClickedDuplicateRow.FullPath);
+                if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+                {
+                    Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+                }
+            }
+            catch { /* Ignore errors */ }
+        }
+    }
+
+    private void DuplicateCopyPath_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedDuplicateRow?.FullPath != null && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            clipboard.SetTextAsync(_rightClickedDuplicateRow.FullPath);
+        }
+    }
+
+    private void DuplicateAddToCollector_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedDuplicateRow != null && DataContext is MainWindowViewModel vm)
+        {
+            vm.AddDuplicateToCollectorCommand.Execute(_rightClickedDuplicateRow);
+        }
+    }
+
+    private void FileItemAddToCollector_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedFileItem != null && DataContext is MainWindowViewModel vm)
+        {
+            vm.AddToCollectorCommand.Execute(_rightClickedFileItem);
+        }
+    }
+
+    private void TreemapAddToCollector_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_rightClickedTile?.SourceItem != null && DataContext is MainWindowViewModel vm)
+        {
+            vm.AddToCollectorCommand.Execute(_rightClickedTile.SourceItem);
+        }
+    }
+
+    #endregion
 }

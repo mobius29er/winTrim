@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Styling;
 using WinTrim.Avalonia.Themes;
+using WinTrim.Core.Services;
 
 namespace WinTrim.Avalonia.Services;
 
@@ -29,6 +30,7 @@ public interface IThemeService
 public class ThemeService : IThemeService
 {
     private readonly Application _application;
+    private readonly IAppLogger _logger;
     
     // Map theme names to our custom ThemeVariant values
     // Each maps to a unique ThemeDictionary in App.axaml
@@ -44,35 +46,35 @@ public class ThemeService : IThemeService
     public string CurrentTheme { get; private set; } = "Retrofuturistic";
     public int CurrentFontSize { get; private set; } = 14;
 
-    public ThemeService()
+    public ThemeService(IAppLogger logger)
     {
+        _logger = logger;
         _application = Application.Current ?? throw new InvalidOperationException("Application.Current is null");
         
         // Debug: Print theme dictionary keys
         if (_application.Resources is global::Avalonia.Controls.ResourceDictionary rd)
         {
-            Console.WriteLine($"[ThemeService] ThemeDictionaries count: {rd.ThemeDictionaries.Count}");
+            _logger.LogDebug($"ThemeDictionaries count: {rd.ThemeDictionaries.Count}");
             foreach (var kvp in rd.ThemeDictionaries)
             {
-                Console.WriteLine($"[ThemeService]   Key: {kvp.Key} (Type: {kvp.Key.GetType().Name}, HashCode: {kvp.Key.GetHashCode()})");
+                _logger.LogDebug($"ThemeDictionary Key: {kvp.Key}");
             }
-            Console.WriteLine($"[ThemeService] ThemeVariants.Retrofuturistic: {ThemeVariants.Retrofuturistic} (HashCode: {ThemeVariants.Retrofuturistic.GetHashCode()})");
         }
     }
 
     public void ApplyTheme(string themeName)
     {
-        Console.WriteLine($"[ThemeService] ApplyTheme called with: {themeName}, current: {CurrentTheme}");
+        _logger.LogDebug($"ApplyTheme called: {themeName}, current: {CurrentTheme}");
         
         if (string.IsNullOrEmpty(themeName))
         {
-            Console.WriteLine($"[ThemeService] Skipping - empty theme name");
+            _logger.LogWarning("Skipping - empty theme name");
             return;
         }
         
         if (themeName == CurrentTheme)
         {
-            Console.WriteLine($"[ThemeService] Same theme requested, skipping");
+            _logger.LogDebug("Same theme requested, skipping");
             return;
         }
 
@@ -81,33 +83,32 @@ public class ThemeService : IThemeService
             // Get the ThemeVariant for this theme name
             if (!ThemeVariantMap.TryGetValue(themeName, out var themeVariant))
             {
-                Console.WriteLine($"[ThemeService] Unknown theme: {themeName}, defaulting to Dark");
+                _logger.LogWarning($"Unknown theme: {themeName}, defaulting to Dark");
                 themeVariant = ThemeVariant.Dark;
             }
             
-            Console.WriteLine($"[ThemeService] Setting RequestedThemeVariant to: {themeVariant}");
+            _logger.LogDebug($"Setting RequestedThemeVariant to: {themeVariant}");
             
             // This is the key - changing RequestedThemeVariant causes all
             // DynamicResource bindings to automatically re-evaluate
             _application.RequestedThemeVariant = themeVariant;
             
             CurrentTheme = themeName;
-            Console.WriteLine($"[ThemeService] Theme successfully applied: {themeName} -> {themeVariant}");
+            _logger.LogInfo($"Theme applied: {themeName}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ThemeService] ERROR: {ex.Message}");
-            Console.WriteLine($"[ThemeService] Stack: {ex.StackTrace}");
+            _logger.LogError($"Failed to apply theme: {themeName}", ex);
         }
     }
     
     public void ApplyFontSize(int fontSize)
     {
-        Console.WriteLine($"[ThemeService] ApplyFontSize called with: {fontSize}, current: {CurrentFontSize}");
+        _logger.LogDebug($"ApplyFontSize called: {fontSize}, current: {CurrentFontSize}");
         
         if (fontSize < 10 || fontSize > 24 || fontSize == CurrentFontSize)
         {
-            Console.WriteLine($"[ThemeService] Skipping font size change");
+            _logger.LogDebug("Skipping font size change");
             return;
         }
             
@@ -116,11 +117,11 @@ public class ThemeService : IThemeService
             // Update font size resource
             _application.Resources["BaseFontSize"] = (double)fontSize;
             CurrentFontSize = fontSize;
-            Console.WriteLine($"[ThemeService] Font size successfully applied: {fontSize}");
+            _logger.LogInfo($"Font size applied: {fontSize}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ThemeService] Font size ERROR: {ex.Message}");
+            _logger.LogError($"Failed to apply font size: {fontSize}", ex);
         }
     }
 }

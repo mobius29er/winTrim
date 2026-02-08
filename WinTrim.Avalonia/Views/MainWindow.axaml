@@ -26,6 +26,8 @@
         <MenuFlyout x:Key="FileItemContextMenu">
             <MenuItem Header="📂 Open File Location" Click="FileItemOpenFolder_Click"/>
             <MenuItem Header="📋 Copy Path" Click="FileItemCopyPath_Click"/>
+            <Separator/>
+            <MenuItem Header="� Add to Collector" Click="FileItemAddToCollector_Click"/>
         </MenuFlyout>
         
         <!-- Game Context Menu -->
@@ -45,6 +47,8 @@
             <MenuItem Header="📋 Copy Path" Click="TreemapCopyPath_Click"/>
             <MenuItem Header="📂 Open Folder Location" Click="TreemapOpenFolder_Click"/>
             <Separator/>
+            <MenuItem Header="📥 Add to Collector" Click="TreemapAddToCollector_Click"/>
+            <Separator/>
             <MenuItem Header="⬆️ Navigate Back (Up)" Click="TreemapNavigateBack_Click"/>
         </MenuFlyout>
         
@@ -59,9 +63,17 @@
             <MenuItem Header="📂 Open Location" Click="CleanupSuggestionOpenFolder_Click"/>
             <MenuItem Header="📋 Copy Path" Click="CleanupSuggestionCopyPath_Click"/>
         </MenuFlyout>
+        
+        <!-- Duplicate File Context Menu -->
+        <MenuFlyout x:Key="DuplicateContextMenu">
+            <MenuItem Header="📂 Open File Location" Click="DuplicateOpenFolder_Click"/>
+            <MenuItem Header="📋 Copy Path" Click="DuplicateCopyPath_Click"/>
+            <Separator/>
+            <MenuItem Header="📥 Add to Collector" Click="DuplicateAddToCollector_Click"/>
+        </MenuFlyout>
     </Window.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
         
         <!-- Header -->
         <Border Grid.Row="0" 
@@ -82,12 +94,15 @@
                     </StackPanel>
                 </StackPanel>
                 
-                <!-- Drive Selection -->
+                <!-- Drive/Folder Selection -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="24,0">
+                    
+                    <!-- Drive Dropdown (Windows/Linux) - hidden on macOS sandbox -->
                     <ComboBox ItemsSource="{Binding AvailableDrives}" 
                               SelectedItem="{Binding SelectedDrive}"
                               Width="280" Margin="0,0,8,0"
-                              VerticalContentAlignment="Center">
+                              VerticalContentAlignment="Center"
+                              IsVisible="{Binding !UseFolderPickerMode}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
@@ -105,22 +120,55 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
                     
-                    <!-- Express Scan Toggle -->
+                    <!-- Folder Selection Display (macOS sandbox mode) -->
+                    <Border IsVisible="{Binding UseFolderPickerMode}"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1" CornerRadius="4"
+                            Padding="12,6" MinWidth="200" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📁" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedFolderDisplayName, FallbackValue='Choose a folder...'}" 
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontWeight="Medium"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Express Scan Toggle (only for drive mode, not folder mode) -->
                     <CheckBox IsChecked="{Binding ExpressScanEnabled}" 
                               Content="⚡ Express" 
                               ToolTip.Tip="Express mode: Scan only your user folder (~/) for faster results. Disable for full disk scan."
                               Margin="0,0,8,0"
-                              VerticalAlignment="Center"/>
+                              VerticalAlignment="Center"
+                              IsVisible="{Binding !UseFolderPickerMode}"/>
                     
-                    <Button Content="📁 Browse" Command="{Binding BrowseFolderCommand}" 
+                    <Button Content="📁 Choose Folder" Command="{Binding BrowseFolderCommand}" 
                             Classes="Outline" Margin="0,0,8,0"/>
                     
                     <Button Content="🔄" Command="{Binding RefreshDrivesCommand}" 
-                            Classes="Outline" ToolTip.Tip="Refresh drives" Padding="8"/>
+                            Classes="Outline" ToolTip.Tip="Refresh drives" Padding="8"
+                            IsVisible="{Binding !UseFolderPickerMode}"/>
                 </StackPanel>
                 
                 <!-- Scan Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Export Menu -->
+                    <Button Classes="Outline" 
+                            ToolTip.Tip="Export scan results" Padding="10,8" Margin="0,0,8,0"
+                            FontSize="16"
+                            IsEnabled="{Binding ScanResult, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <Button.Content>
+                            <TextBlock Text="📤"/>
+                        </Button.Content>
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                <MenuItem Header="Export to CSV..." Command="{Binding ExportToCsvCommand}"/>
+                                <MenuItem Header="Export to JSON..." Command="{Binding ExportToJsonCommand}"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                    
                     <Button Content="⚙" Command="{Binding ToggleSettingsCommand}"
                             Classes="Outline" 
                             ToolTip.Tip="Settings" Padding="10,8" Margin="0,0,8,0"
@@ -757,25 +805,812 @@
                 </Border>
             </TabItem>
             
+            <!-- Duplicates Tab -->
+            <TabItem Header="🔁 Duplicates">
+                <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+                    <!-- Header with scan button -->
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,12">
+                        <Button Grid.Column="0" Content="🔍 Scan for Duplicates" 
+                                Command="{Binding ScanForDuplicatesCommand}"
+                                IsEnabled="{Binding !IsDuplicateScanRunning}"
+                                Classes="Primary" Padding="16,8"/>
+                        
+                        <!-- Status text when not scanning -->
+                        <TextBlock Grid.Column="1" 
+                                   Text="{Binding DuplicateScanStatus}" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="12" Margin="16,0,0,0"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding !IsDuplicateScanRunning}"/>
+                        
+                        <!-- Stats on the right -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" 
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    IsVisible="{Binding HasDuplicates}">
+                            <Border Background="#2F10B981" CornerRadius="4" Padding="8,4">
+                                <TextBlock Foreground="#10B981" FontSize="11">
+                                    <Run Text="Total: "/>
+                                    <Run Text="{Binding DuplicateWastedSpaceFormatted}" FontWeight="SemiBold"/>
+                                </TextBlock>
+                            </Border>
+                            <Border Background="{DynamicResource AccentBrush}" CornerRadius="4" Padding="8,4"
+                                    IsVisible="{Binding HasSelectedDuplicates}">
+                                <TextBlock Foreground="White" FontSize="11" FontWeight="SemiBold">
+                                    <Run Text="{Binding SelectedDuplicatesCount}"/>
+                                    <Run Text=" selected ("/>
+                                    <Run Text="{Binding SelectedDuplicatesSizeFormatted}"/>
+                                    <Run Text=")"/>
+                                </TextBlock>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- Premium Progress Bar Panel (only visible when scanning) -->
+                    <Border Grid.Row="1" 
+                            Background="#161B22" 
+                            CornerRadius="12" 
+                            Padding="20,16" 
+                            Margin="0,0,0,16"
+                            BorderBrush="#30363D" 
+                            BorderThickness="1"
+                            IsVisible="{Binding IsDuplicateScanRunning}">
+                        <Grid RowDefinitions="Auto,Auto,Auto">
+                            <!-- Header row: Status message and percentage -->
+                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <!-- Animated scanning indicator -->
+                                    <Border Background="#1F10B981" CornerRadius="4" Padding="6,4">
+                                        <TextBlock Text="⏳" FontSize="12"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding DuplicateScanStatus}" 
+                                               Foreground="#E6EDF3"
+                                               FontSize="14" FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                
+                                <!-- Percentage badge -->
+                                <Border Grid.Column="1" 
+                                        CornerRadius="8" 
+                                        Padding="12,6"
+                                        Background="#1F3B82F6">
+                                    <TextBlock Text="{Binding DuplicateScanProgressFormatted}" 
+                                               Foreground="#3B82F6"
+                                               FontSize="16" FontWeight="Bold"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                            
+                            <!-- Progress bar with glow effect -->
+                            <Border Grid.Row="1" 
+                                    Background="#21262D" 
+                                    CornerRadius="6" 
+                                    Height="12"
+                                    Margin="0,0,0,10">
+                                <Grid>
+                                    <!-- Background track -->
+                                    <Border Background="#21262D" CornerRadius="6"/>
+                                    
+                                    <!-- Progress fill with gradient -->
+                                    <Border CornerRadius="6" 
+                                            HorizontalAlignment="Left"
+                                            Width="{Binding DuplicateScanProgress, Converter={StaticResource PercentToWidthConverter}}">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                                                <GradientStop Color="#10B981" Offset="0"/>
+                                                <GradientStop Color="#34D399" Offset="0.5"/>
+                                                <GradientStop Color="#10B981" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            
+                            <!-- Footer row: Files processed -->
+                            <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+                                <!-- Show "Scanning..." when no file count yet, otherwise show progress -->
+                                <TextBlock Foreground="#8B949E" FontSize="12"
+                                           IsVisible="{Binding DuplicateTotalFiles, Converter={StaticResource IsZeroConverter}}">
+                                    <Run Text="Scanning files..." Foreground="#C9D1D9"/>
+                                </TextBlock>
+                                <TextBlock Foreground="#8B949E" FontSize="12"
+                                           IsVisible="{Binding DuplicateTotalFiles, Converter={StaticResource IsNotZeroConverter}}">
+                                    <Run Text="Processing: "/>
+                                    <Run Text="{Binding DuplicateFilesProgressFormatted}" FontWeight="SemiBold" Foreground="#C9D1D9"/>
+                                    <Run Text=" candidates"/>
+                                </TextBlock>
+                                
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+                                            IsVisible="{Binding DuplicateTotalFiles, Converter={StaticResource IsNotZeroConverter}}">
+                                    <TextBlock Foreground="#8B949E" FontSize="12">
+                                        <Run Text="Groups found: "/>
+                                        <Run Text="{Binding TotalDuplicateCount}" Foreground="#10B981" FontWeight="SemiBold"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Premium Search bar -->
+                    <Border Grid.Row="2" Background="#161B22" 
+                            CornerRadius="10" Padding="16,12" Margin="0,0,0,16"
+                            BorderBrush="#30363D" BorderThickness="1"
+                            IsVisible="{Binding HasDuplicates}">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Border Grid.Column="0" Background="#1F6B7280" CornerRadius="6" 
+                                    Padding="8,6" Margin="0,0,12,0">
+                                <TextBlock Text="🔍" FontSize="14" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBox Grid.Column="1" 
+                                     Text="{Binding DuplicateSearchText, Mode=TwoWay}"
+                                     Watermark="Search files by name or location..."
+                                     BorderThickness="0"
+                                     Background="Transparent"
+                                     Foreground="#E6EDF3"
+                                     FontSize="14"
+                                     VerticalAlignment="Center"/>
+                            <Border Grid.Column="2" Background="#238636" CornerRadius="16" 
+                                    Padding="12,6">
+                                <TextBlock Foreground="White" FontSize="12" FontWeight="SemiBold" 
+                                           VerticalAlignment="Center">
+                                    <Run Text="{Binding FilteredDuplicateCount}"/>
+                                    <Run Text=" files"/>
+                                </TextBlock>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Fast Virtualized DataGrid - Premium Styling -->
+                    <DataGrid Grid.Row="3" 
+                              x:Name="DuplicatesDataGrid"
+                              ItemsSource="{Binding FilteredDuplicateRows}"
+                              AutoGenerateColumns="False"
+                              CanUserReorderColumns="False"
+                              CanUserResizeColumns="True"
+                              CanUserSortColumns="False"
+                              IsReadOnly="False"
+                              SelectionMode="Single"
+                              GridLinesVisibility="None"
+                              BorderThickness="0"
+                              CornerRadius="12"
+                              Background="#0D1117"
+                              BeginningEdit="DataGrid_BeginningEdit"
+                              ContextFlyout="{StaticResource DuplicateContextMenu}"
+                              PointerPressed="DuplicatesDataGrid_PointerPressed">
+                        
+                        <DataGrid.Styles>
+                            <Style Selector="DataGridRow">
+                                <Setter Property="MinHeight" Value="48"/>
+                            </Style>
+                            <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+                                <Setter Property="Fill" Value="#1A3B82F6"/>
+                            </Style>
+                            <Style Selector="DataGridColumnHeader">
+                                <Setter Property="Background" Value="#161B22"/>
+                                <Setter Property="Foreground" Value="#8B949E"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="FontSize" Value="11"/>
+                                <Setter Property="Padding" Value="12,10"/>
+                            </Style>
+                        </DataGrid.Styles>
+                        
+                        <DataGrid.Columns>
+                            <!-- Colored group stripe -->
+                            <DataGridTemplateColumn Header="" Width="6" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{Binding IsEvenGroup, Converter={StaticResource EvenGroupToBackground}}"
+                                                CornerRadius="3,0,0,3"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- Group number - stylish badge -->
+                            <DataGridTemplateColumn Header="" Width="50" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#1F6B7280" CornerRadius="6" 
+                                                Padding="8,4" Margin="4,6"
+                                                IsVisible="{Binding IsFirstInGroup}"
+                                                BoxShadow="0 1 3 0 #20000000">
+                                            <TextBlock Text="{Binding GroupNumber}" 
+                                                       HorizontalAlignment="Center"
+                                                       FontWeight="Bold"
+                                                       FontSize="13"
+                                                       Foreground="#E6EDF3"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- Checkbox with custom styling - Use Command instead of binding for IsReadOnly grid -->
+                            <DataGridTemplateColumn Header="" Width="40">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  IsEnabled="{Binding !IsOriginal}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ToggleDuplicateRowSelectionCommand}"
+                                                  CommandParameter="{Binding}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- File name with premium KEEP indicator -->
+                            <DataGridTemplateColumn Header="FILE" Width="300">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,4">
+                                            <!-- File type icon -->
+                                            <Border Grid.Column="0" 
+                                                    Background="{Binding IsOriginal, Converter={StaticResource OriginalFileBackground}}"
+                                                    CornerRadius="6" Width="32" Height="32" 
+                                                    Margin="0,0,10,0" VerticalAlignment="Center">
+                                                <TextBlock Text="📄" FontSize="14" 
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            
+                                            <!-- File name -->
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" 
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       FontSize="13"
+                                                       Foreground="#E6EDF3"
+                                                       FontWeight="{Binding IsOriginal, Converter={StaticResource BoolToFontWeight}}"/>
+                                            
+                                            <!-- KEEP badge with glow effect -->
+                                            <Border Grid.Column="2" IsVisible="{Binding IsOriginal}" 
+                                                    CornerRadius="4" Padding="8,3" Margin="8,0,0,0"
+                                                    VerticalAlignment="Center">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                                        <GradientStop Color="#10B981" Offset="0"/>
+                                                        <GradientStop Color="#059669" Offset="1"/>
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                                <TextBlock Text="KEEP" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- Directory with muted styling -->
+                            <DataGridTemplateColumn Header="LOCATION" Width="*" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Directory}" 
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Foreground="#8B949E"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- Size with emphasis -->
+                            <DataGridTemplateColumn Header="SIZE" Width="90" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Size, Converter={StaticResource FileSizeConverter}}" 
+                                                   FontWeight="Medium"
+                                                   FontSize="12"
+                                                   Foreground="#E6EDF3"
+                                                   VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- Date with subtle styling -->
+                            <DataGridTemplateColumn Header="MODIFIED" Width="95" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding LastModified, StringFormat='{}{0:MMM dd}'}"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="11"
+                                                   Foreground="#6E7681"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- Match percentage - glowing badge -->
+                            <DataGridTemplateColumn Header="MATCH" Width="70" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="12" Padding="10,4" 
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                BoxShadow="0 0 8 2 #3010B981">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                                    <GradientStop Color="#10B981" Offset="0"/>
+                                                    <GradientStop Color="#059669" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <TextBlock Text="{Binding MatchPercent, StringFormat='{}{0}%'}"
+                                                       FontSize="11" FontWeight="Bold"
+                                                       Foreground="White"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- Reveal button - modern icon button -->
+                            <DataGridTemplateColumn Header="" Width="50">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RevealDuplicateInFinderCommand}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip.Tip="Reveal in Finder"
+                                                Background="#1F6B7280"
+                                                BorderThickness="0"
+                                                CornerRadius="6"
+                                                Padding="8,6"
+                                                Cursor="Hand"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                            <TextBlock Text="📂" FontSize="14"/>
+                                        </Button>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    
+                    <!-- Premium Action Bar -->
+                    <Border Grid.Row="4" Padding="16" Margin="0,16,0,0" 
+                            Background="#161B22" CornerRadius="12"
+                            BorderBrush="#30363D" BorderThickness="1"
+                            IsVisible="{Binding HasDuplicates}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <!-- Summary on left -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                                <TextBlock Foreground="#8B949E" FontSize="13" VerticalAlignment="Center">
+                                    <Run Text="💾 Total recoverable: "/>
+                                    <Run Text="{Binding DuplicateWastedSpaceFormatted}" Foreground="#10B981" FontWeight="Bold"/>
+                                </TextBlock>
+                                <TextBlock Foreground="#8B949E" FontSize="13" VerticalAlignment="Center"
+                                           IsVisible="{Binding HasSelectedDuplicates}">
+                                    <Run Text="✓ Selected: "/>
+                                    <Run Text="{Binding SelectedDuplicatesCount}" Foreground="#3B82F6" FontWeight="Bold"/>
+                                    <Run Text=" ("/>
+                                    <Run Text="{Binding SelectedDuplicatesSizeFormatted}" Foreground="#3B82F6" FontWeight="Bold"/>
+                                    <Run Text=")"/>
+                                </TextBlock>
+                            </StackPanel>
+                            
+                            <!-- Buttons on right -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                <Button Command="{Binding SelectAllDuplicatesCommand}"
+                                        Background="#21262D" BorderBrush="#30363D" BorderThickness="1"
+                                        CornerRadius="8" Padding="16,10" Cursor="Hand">
+                                    <TextBlock Text="Select All" Foreground="#E6EDF3" FontWeight="Medium"/>
+                                </Button>
+                                <Button Command="{Binding DeselectAllDuplicatesCommand}"
+                                        Background="#21262D" BorderBrush="#30363D" BorderThickness="1"
+                                        CornerRadius="8" Padding="16,10" Cursor="Hand">
+                                    <TextBlock Text="Deselect All" Foreground="#E6EDF3" FontWeight="Medium"/>
+                                </Button>
+                                <Button Command="{Binding AddSelectedDuplicatesToCollectorCommand}"
+                                        CornerRadius="8" Padding="20,10" Cursor="Hand"
+                                        BorderThickness="0">
+                                    <Button.Background>
+                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                            <GradientStop Color="#10B981" Offset="0"/>
+                                            <GradientStop Color="#059669" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Button.Background>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="📥" FontSize="14"/>
+                                        <TextBlock Text="Add to Collector" Foreground="White" FontWeight="Bold"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+            
+            <!-- Time Machine Tab (macOS only) -->
+            <TabItem Header="⏰ Time Machine" IsVisible="{Binding IsTimeMachineAvailable}">
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <!-- Header with controls -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,8,0,16" Spacing="12">
+                        <Button Content="🔄 Refresh" 
+                                Command="{Binding LoadTimeMachineDestinationsCommand}"
+                                Classes="Outline" Padding="12,8"/>
+                        
+                        <ComboBox ItemsSource="{Binding TimeMachineDestinations}"
+                                  SelectedItem="{Binding SelectedTimeMachineDestination}"
+                                  MinWidth="200" VerticalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="💾"/>
+                                        <TextBlock Text="{Binding Name}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        
+                        <Button Content="🔍 Analyze Backups" 
+                                Command="{Binding AnalyzeTimeMachineCommand}"
+                                IsEnabled="{Binding !IsTimeMachineScanRunning}"
+                                Classes="Primary" Padding="16,8"/>
+                        
+                        <ProgressBar Value="{Binding TimeMachineProgress}" 
+                                     Maximum="100" 
+                                     Width="200" Height="8"
+                                     IsVisible="{Binding IsTimeMachineScanRunning}"
+                                     Classes="ScanProgress" VerticalAlignment="Center"/>
+                        
+                        <TextBlock Text="{Binding TimeMachineStatus}" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <!-- Destination Info -->
+                    <Border Grid.Row="1" Classes="Card" Margin="0,0,0,16"
+                            IsVisible="{Binding SelectedTimeMachineDestination, Converter={StaticResource NullToBool}}">
+                        <Grid ColumnDefinitions="*,*,*">
+                            <StackPanel>
+                                <TextBlock Text="Backup Location" 
+                                           Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                                <TextBlock Text="{Binding SelectedTimeMachineDestination.MountPath}" 
+                                           Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                <TextBlock Text="Snapshots" 
+                                           Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                                <TextBlock Text="{Binding TimeMachineAnalysis.SnapshotCount, FallbackValue='-'}" 
+                                           Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Right">
+                                <TextBlock Text="Used Space" 
+                                           Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                                <TextBlock Text="{Binding SelectedTimeMachineDestination.UsedSpace, Converter={StaticResource SizeToString}}" 
+                                           Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Analysis Results -->
+                    <ScrollViewer Grid.Row="2" IsVisible="{Binding HasTimeMachineAnalysis}">
+                        <StackPanel Spacing="16">
+                            <!-- Suggestions Section -->
+                            <StackPanel>
+                                <TextBlock Text="💡 Optimization Suggestions" Classes="SectionHeader" Margin="0,0,0,8"/>
+                                <ItemsControl ItemsSource="{Binding TimeMachineAnalysis.Suggestions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Classes="Card" Margin="0,0,0,8">
+                                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Title}" 
+                                                                   FontWeight="SemiBold" 
+                                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                        <TextBlock Text="{Binding Description}" 
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   FontSize="12" TextWrapping="Wrap" MaxWidth="500"/>
+                                                    </StackPanel>
+                                                    <Border Grid.Column="1" 
+                                                            Background="#2F10B981" CornerRadius="4" 
+                                                            Padding="8,4" Margin="8,0" VerticalAlignment="Center">
+                                                        <TextBlock Foreground="#10B981" FontSize="12">
+                                                            <Run Text="Save ~"/>
+                                                            <Run Text="{Binding EstimatedSavings, Converter={StaticResource SizeToString}}" FontWeight="SemiBold"/>
+                                                        </TextBlock>
+                                                    </Border>
+                                                    <Button Grid.Column="2" Content="Exclude" 
+                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ExcludeFromTimeMachineCommand}"
+                                                            CommandParameter="{Binding PathToExclude}"
+                                                            IsVisible="{Binding PathToExclude, Converter={StaticResource NullToBool}}"
+                                                            Classes="Outline" Padding="12,6" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            
+                            <!-- Largest Folders -->
+                            <StackPanel IsVisible="{Binding TimeMachineAnalysis.LargestFolders.Count}">
+                                <TextBlock Text="📁 Largest Folders in Backup" Classes="SectionHeader" Margin="0,0,0,8"/>
+                                <DataGrid ItemsSource="{Binding TimeMachineAnalysis.LargestFolders}"
+                                          AutoGenerateColumns="False" IsReadOnly="True"
+                                          GridLinesVisibility="Horizontal"
+                                          MaxHeight="250">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Folder" Binding="{Binding RelativePath}" Width="2*"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding TotalSize, Converter={StaticResource SizeToString}}" Width="100"/>
+                                        <DataGridTextColumn Header="Files" Binding="{Binding FileCount}" Width="80"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                    
+                    <!-- Empty State -->
+                    <StackPanel Grid.Row="2" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                IsVisible="{Binding !HasTimeMachineAnalysis}">
+                        <TextBlock Text="⏰" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+                        <TextBlock Text="Time Machine Analyzer" 
+                                   FontSize="18" FontWeight="SemiBold" 
+                                   Foreground="{DynamicResource TextPrimaryBrush}" 
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Click 'Refresh' to discover backup destinations, then 'Analyze' to find optimization opportunities." 
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+            
         </TabControl>
         
-        <!-- Status Bar -->
+        <!-- Status Bar with Collector Toggle -->
         <Border Grid.Row="3" 
                 Background="{DynamicResource SurfaceBrush}" 
                 BorderBrush="{DynamicResource BorderBrush}" 
                 BorderThickness="0,1,0,0"
                 Padding="24,8">
-            <Grid>
+            <Grid ColumnDefinitions="*,Auto,Auto">
                 <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondaryBrush}" 
                            VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding ScanResult.Duration, StringFormat='Scan time: {0:hh\\:mm\\:ss}'}" 
+                
+                <!-- Collector Toggle Button -->
+                <Button Grid.Column="1" 
+                        Command="{Binding ToggleCollectorCommand}"
+                        Background="Transparent" BorderThickness="0"
+                        Padding="12,6" Cursor="Hand"
+                        VerticalAlignment="Center" Margin="0,0,16,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="📥" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text="Collector" Foreground="{DynamicResource TextSecondaryBrush}" 
+                                   VerticalAlignment="Center"/>
+                        <Border Background="#10B981"
+                                CornerRadius="10" Padding="8,2" MinWidth="24"
+                                IsVisible="{Binding HasCollectorItems}">
+                            <TextBlock Text="{Binding CollectorItemCount}" 
+                                       Foreground="White" FontSize="11" FontWeight="Bold"
+                                       HorizontalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </Button>
+                
+                <TextBlock Grid.Column="2" Text="{Binding ScanResult.Duration, StringFormat='Scan time: {0:hh\\:mm\\:ss}'}" 
                            HorizontalAlignment="Right" Foreground="{DynamicResource TextMutedBrush}"
+                           VerticalAlignment="Center"
                            IsVisible="{Binding ScanResult, Converter={StaticResource NullToBool}}"/>
             </Grid>
         </Border>
         
+        <!-- Collector Panel (DaisyDisk-style) -->
+        <Border Grid.Row="4" 
+                Background="#0D1117"
+                BorderBrush="#30363D" 
+                BorderThickness="0,1,0,0"
+                IsVisible="{Binding IsCollectorOpen}"
+                MaxHeight="280">
+            <Grid RowDefinitions="Auto,*,Auto">
+                <!-- Collector Header -->
+                <Border Grid.Row="0" Background="#161B22" Padding="16,12">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="📥" FontSize="18" VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Collector" Foreground="#E6EDF3" FontSize="15" FontWeight="SemiBold"/>
+                                <TextBlock Foreground="#8B949E" FontSize="11">
+                                    <Run Text="Drag files here or right-click → Add to Collector"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <!-- Stats -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" 
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    IsVisible="{Binding HasCollectorItems}">
+                            <Border Background="#1F10B981" CornerRadius="8" Padding="12,6">
+                                <TextBlock Foreground="#10B981" FontSize="13">
+                                    <Run Text="{Binding CollectorItemCount}"/>
+                                    <Run Text=" items"/>
+                                </TextBlock>
+                            </Border>
+                            <Border Background="#1F3B82F6" CornerRadius="8" Padding="12,6">
+                                <TextBlock Foreground="#3B82F6" FontSize="13" FontWeight="SemiBold">
+                                    <Run Text="{Binding CollectorTotalSizeFormatted}"/>
+                                </TextBlock>
+                            </Border>
+                        </StackPanel>
+                        
+                        <!-- Close button -->
+                        <Button Grid.Column="2" 
+                                Command="{Binding ToggleCollectorCommand}"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="8" Cursor="Hand">
+                            <TextBlock Text="✕" Foreground="#8B949E" FontSize="14"/>
+                        </Button>
+                    </Grid>
+                </Border>
+                
+                <!-- Collector Items List -->
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding CollectorItems}" Margin="8">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#21262D" CornerRadius="8" 
+                                        Padding="12,8" Margin="4"
+                                        BorderBrush="#30363D" BorderThickness="1"
+                                        MinWidth="180" MaxWidth="280">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <!-- Icon -->
+                                        <TextBlock Grid.Column="0" Text="{Binding Icon}" 
+                                                   FontSize="20" VerticalAlignment="Center"
+                                                   Margin="0,0,10,0"/>
+                                        
+                                        <!-- Name and Size -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" 
+                                                       Foreground="#E6EDF3" FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxWidth="160"/>
+                                            <TextBlock Foreground="#8B949E" FontSize="10">
+                                                <Run Text="{Binding Size, Converter={StaticResource FileSizeConverter}}"/>
+                                                <Run Text=" · "/>
+                                                <Run Text="{Binding Source}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        
+                                        <!-- Remove Button -->
+                                        <Button Grid.Column="2" 
+                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveFromCollectorCommand}"
+                                                CommandParameter="{Binding}"
+                                                Background="Transparent" BorderThickness="0"
+                                                Padding="4" Cursor="Hand"
+                                                VerticalAlignment="Center">
+                                            <TextBlock Text="✕" Foreground="#6B7280" FontSize="12"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                
+                <!-- Empty State -->
+                <Border Grid.Row="1" 
+                        IsVisible="{Binding !HasCollectorItems}"
+                        Padding="40">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="📥" FontSize="32" HorizontalAlignment="Center" Opacity="0.5"/>
+                        <TextBlock Text="Right-click files → 'Add to Collector' to stage them for cleanup" 
+                                   Foreground="#6B7280" FontSize="13" 
+                                   HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Collector Action Bar -->
+                <Border Grid.Row="2" Background="#161B22" Padding="16,12">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <!-- Cleanup Folder Selector -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <TextBlock Text="📁" FontSize="14" VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Cleanup Folder:" Foreground="#8B949E" FontSize="10"/>
+                                <TextBlock Text="{Binding CleanupFolderName}" 
+                                           Foreground="#E6EDF3" FontSize="12" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <Button Command="{Binding ChooseCleanupFolderCommand}"
+                                    Background="#21262D" BorderBrush="#30363D" BorderThickness="1"
+                                    CornerRadius="6" Padding="10,6" Cursor="Hand">
+                                <TextBlock Text="Choose..." Foreground="#E6EDF3" FontSize="11"/>
+                            </Button>
+                            <Button Command="{Binding RevealCleanupFolderCommand}"
+                                    IsVisible="{Binding HasCleanupFolder}"
+                                    Background="Transparent" BorderThickness="0"
+                                    Padding="6" Cursor="Hand"
+                                    ToolTip.Tip="Open cleanup folder in Finder">
+                                <TextBlock Text="📂" FontSize="14"/>
+                            </Button>
+                        </StackPanel>
+                        
+                        <!-- Tip text -->
+                        <TextBlock Grid.Column="1" Foreground="#6B7280" FontSize="11" 
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                                   IsVisible="{Binding HasCollectorItems}">
+                            <Run Text="Files will be moved to the cleanup folder. Delete from Finder when ready."/>
+                        </TextBlock>
+                        
+                        <!-- Action Buttons -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10"
+                                    IsVisible="{Binding HasCollectorItems}">
+                            <Button Command="{Binding ClearCollectorCommand}"
+                                    Background="#21262D" BorderBrush="#30363D" BorderThickness="1"
+                                    CornerRadius="8" Padding="16,8" Cursor="Hand">
+                                <TextBlock Text="Clear All" Foreground="#E6EDF3"/>
+                            </Button>
+                            <Button Command="{Binding MoveToCleanupFolderCommand}"
+                                    CornerRadius="8" Padding="20,10" Cursor="Hand"
+                                    BorderThickness="0">
+                                <Button.Background>
+                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                        <GradientStop Color="#10B981" Offset="0"/>
+                                        <GradientStop Color="#059669" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Button.Background>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="📦" FontSize="14"/>
+                                    <TextBlock Text="Move to Cleanup Folder" Foreground="White" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+        
+        <!-- Delete Confirmation Dialog Overlay -->
+        <Border Grid.RowSpan="5" Background="#80000000" 
+                IsVisible="{Binding IsDeleteConfirmationOpen}">
+            <Border Background="{DynamicResource SurfaceBrush}" 
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="24"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    MinWidth="380" MaxWidth="450">
+                <StackPanel>
+                    <TextBlock Text="🗑️ Confirm Delete" FontSize="18" FontWeight="SemiBold" 
+                               Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,16"/>
+                    
+                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" 
+                               Margin="0,0,0,12">
+                        <Run Text="Are you sure you want to move this item to Trash?"/>
+                    </TextBlock>
+                    
+                    <!-- Item Details -->
+                    <Border Background="{DynamicResource BackgroundBrush}" 
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            CornerRadius="4" Padding="12" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{Binding ItemToDelete.Name}" 
+                                       FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding ItemToDelete.FullPath}" 
+                                       FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                                       TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                            <TextBlock FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,4,0,0">
+                                <Run Text="Size: "/>
+                                <Run Text="{Binding ItemToDelete.Size, Converter={StaticResource SizeToString}}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Warning -->
+                    <Border Background="#2FEF4444" BorderBrush="#EF4444" BorderThickness="1" 
+                            CornerRadius="4" Padding="8" Margin="0,0,0,16">
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#EF4444">
+                            <Run FontWeight="SemiBold">⚠️ Note:</Run>
+                            <Run> Items will be moved to Trash and can be restored from there.</Run>
+                        </TextBlock>
+                    </Border>
+                    
+                    <!-- Action Buttons -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                        <Button Content="Cancel" Command="{Binding CancelDeleteCommand}"
+                                Classes="Outline" Padding="16,8"/>
+                        <Button Content="Move to Trash" Command="{Binding ConfirmDeleteCommand}"
+                                Classes="Danger" Padding="16,8"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+        
         <!-- Settings Popup Overlay -->
-        <Border Grid.RowSpan="4" Background="#80000000" 
+        <Border Grid.RowSpan="5" Background="#80000000" 
                 IsVisible="{Binding IsSettingsOpen}"
                 PointerPressed="SettingsOverlay_PointerPressed">
             <Border Background="{DynamicResource SurfaceBrush}" 

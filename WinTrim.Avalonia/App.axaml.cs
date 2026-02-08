@@ -21,23 +21,24 @@ public partial class App : Application
     /// Gets the service provider for dependency injection
     /// </summary>
     public static IServiceProvider? Services { get; private set; }
+    
+    private static IAppLogger? _logger;
 
     public override void Initialize()
     {
-        Console.WriteLine("[App] Initializing Avalonia XAML...");
         AvaloniaXamlLoader.Load(this);
-        Console.WriteLine("[App] Avalonia XAML loaded.");
-        Console.WriteLine($"[App] Current RequestedThemeVariant: {this.RequestedThemeVariant}");
     }
 
     public override void OnFrameworkInitializationCompleted()
     {
-        Console.WriteLine("[App] Framework initialization completed.");
         // Configure dependency injection
         var services = new ServiceCollection();
         services.AddWinTrimServices();
         Services = services.BuildServiceProvider();
-        Console.WriteLine("[App] Services built.");
+        
+        // Get logger after DI is configured
+        _logger = Services.GetRequiredService<IAppLogger>();
+        _logger.LogInfo("App framework initialization completed");
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -46,9 +47,8 @@ public partial class App : Application
             DisableAvaloniaDataAnnotationValidation();
             
             // Create and show MainWindow first
-            Console.WriteLine("[App] Resolving MainWindowViewModel...");
+            _logger.LogInfo("Resolving MainWindowViewModel");
             var mainViewModel = Services.GetRequiredService<MainWindowViewModel>();
-            Console.WriteLine("[App] MainWindowViewModel resolved.");
             
             var mainWindow = new MainWindow
             {
@@ -56,7 +56,7 @@ public partial class App : Application
             };
             
             desktop.MainWindow = mainWindow;
-            Console.WriteLine("[App] MainWindow created with DataContext.");
+            _logger.LogInfo("MainWindow created successfully");
             
             // Check if EULA needs to be shown after window is ready
             var settingsService = Services.GetRequiredService<ISettingsService>();
