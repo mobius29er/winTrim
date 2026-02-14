@@ -2686,12 +2686,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
-    private async Task QuickClean()
-    {
-        // TODO: Implement quick clean functionality
-        await Task.CompletedTask;
-    }
+    // Note: QuickClean functionality is implemented through the UI event handler
+    // in MainWindow.axaml.cs (QuickCleanButton_Click), which opens QuickCleanDialog
 
     #endregion
 }

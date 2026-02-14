@@ -27,9 +27,9 @@ export default function PrivacyPage() {
             <Link href="/" className="text-sm text-gray-400 hover:text-[#00F3FF] transition-colors tracking-wider uppercase">
               Home
             </Link>
-            <a 
-              href="https://github.com/mobius29er/winLose" 
-              target="_blank" 
+            <a
+              href="https://github.com/mobius29er/winTrim"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-gray-400 hover:text-[#00F3FF] transition-colors tracking-wider uppercase"
             >
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
               <span className="text-white">POLICY</span>
             </h1>
             <p className="text-gray-500 text-sm">
-              Last updated: January 2026
+              Last updated: February 2026
             </p>
           </div>
 
@@ -122,15 +122,74 @@ export default function PrivacyPage() {
               <p className="text-gray-400 leading-relaxed mb-4">
                 WinTrim is open source software. You can verify these privacy claims by reviewing the source code:
               </p>
-              <a 
-                href="https://github.com/mobius29er/winLose"
+              <a
+                href="https://github.com/mobius29er/winTrim"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-[#00F3FF] hover:underline"
               >
-                <span>github.com/mobius29er/winLose</span>
+                <span>github.com/mobius29er/winTrim</span>
                 <span>→</span>
               </a>
+            </section>
+
+            <section className="glass-card rounded-xl p-6 border border-gray-800/50">
+              <h2 className="text-white text-xl font-bold mb-4 tracking-wider uppercase" style={{ fontFamily: 'Rajdhani' }}>
+                // macOS-Specific Permissions
+              </h2>
+              <p className="text-gray-400 leading-relaxed mb-4">
+                WinTrim for macOS may request the following system permissions to provide disk analysis features.
+                All data processing remains entirely local on your machine:
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-white font-semibold mb-2">Full Disk Access (Optional)</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed mb-2">
+                    Enables comprehensive disk scanning and Time Machine backup analysis. You can choose to grant or deny this permission—WinTrim will work with user-selected folders if denied.
+                  </p>
+                  <ul className="space-y-1 text-gray-500 text-sm ml-4">
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#00F3FF]">•</span>
+                      <span>Analyze complete file system for accurate disk usage reports</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#00F3FF]">•</span>
+                      <span>Detect system files and hidden caches</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#00F3FF]">•</span>
+                      <span>Analyze Time Machine backups (macOS only)</span>
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold mb-2">Folder Access</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    When you select a folder to scan, WinTrim requests access only to that specific folder.
+                    These permissions use macOS security-scoped bookmarks and can be revoked anytime through System Settings → Privacy & Security.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold mb-2">Time Machine Analysis</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    Reads metadata about backup snapshots to identify large files and suggest exclusions.
+                    This feature runs entirely locally, does not modify backups, and does not transmit any information.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold mb-2">Desktop Folder Access</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    Creates a &quot;DeleteMe&quot; folder on your Desktop to safely stage files for cleanup.
+                    Files moved here remain on your computer until you manually delete them.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-[#00F3FF]/5 border border-[#00F3FF]/20 rounded">
+                <p className="text-[#00F3FF] text-sm">
+                  <strong>Privacy Control:</strong> All permission requests use macOS standard dialogs.
+                  You can grant, deny, or revoke access at any time through System Settings.
+                </p>
+              </div>
             </section>
 
             <section className="glass-card rounded-xl p-6 border border-gray-800/50">
@@ -138,7 +197,7 @@ export default function PrivacyPage() {
                 // Third-Party Services
               </h2>
               <p className="text-gray-400 leading-relaxed">
-                WinTrim does not integrate with any third-party services, APIs, or analytics platforms. 
+                WinTrim does not integrate with any third-party services, APIs, or analytics platforms.
                 There are no embedded trackers, advertising SDKs, or data collection libraries.
               </p>
             </section>
