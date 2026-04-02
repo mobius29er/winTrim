@@ -27,7 +27,7 @@ set -e
 APP_NAME="WinTrim"
 BUNDLE_ID="com.mobius29er.wintrim"
 VERSION="1.0.0"
-BUILD_NUMBER="4"
+BUILD_NUMBER="6"
 
 # Signing identities (from Keychain)
 # Run: security find-identity -v -p codesigning

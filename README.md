@@ -1,98 +1,106 @@
 # WinTrim - Cross-Platform Disk Analyzer
 
-A clean, safe, and powerful disk analyzer application to view and analyze file contents and storage allocation. Now available on **Windows**, **macOS**, and **Linux**!
+A fast, safe, and powerful disk analyzer to visualize storage, find duplicates, detect developer caches, and clean up disk space. Available on **Windows**, **macOS**, and **Linux**.
 
 ![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![Avalonia UI](https://img.shields.io/badge/Avalonia-11.2-8B5CF6)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## 🖥️ Platform Support
+![WinTrim Dashboard](screenshots/demo_mac.png)
 
-| Platform | Status | Scan Speed (1TB) | Notes |
-|----------|--------|------------------|-------|
-| **Windows 10/11** | ✅ Fully Supported | ~20-30 seconds | Native x64 builds |
-| **macOS** | ✅ Fully Supported | ~2 minutes | Apple Silicon (M1/M2/M3) & Intel |
-| **Linux** | ✅ Fully Supported | ~60-90 seconds | x64, tested on Ubuntu/Debian |
+## Platform Support
 
-## 🎯 Features
+| Platform | Status | Notes |
+| --- | --- | --- |
+| **Windows 10/11** | Fully Supported | Native x64 builds |
+| **macOS** | Fully Supported | Apple Silicon (M1/M2/M3/M4) & Intel |
+| **Linux** | Fully Supported | x64, tested on Ubuntu/Debian |
 
-### Core Functionality
-- ✅ **Disk Scanning** - Fast recursive scanning with async processing
-- ✅ **Storage Analytics** - Visual breakdown of how data is allocated by category
-- ✅ **Cleanup Recommendations** - Safe suggestions for freeing disk space
-- ✅ **Quick Clean** - One-click cleanup with preview and file-level selection
-- ✅ **Largest Files Finder** - Top 50 largest files with quick access
-- ✅ **Game Detection** - Auto-detect Steam, Epic, GOG, and Xbox game installations
-- ✅ **Developer Tools Scanner** - Detect npm, NuGet, pip, Maven, Cargo caches with cleanup recommendations
-- ✅ **File Age Analysis** - Identify files not accessed in 90+ days
-- ✅ **Session Persistence** - Automatically saves and restores your last scan (including treemap & dev tools)
-- ✅ **Rich Cleanup Details** - View file name, size, last accessed date, and risk level for each cleanup item
+## Features
+
+### Disk Scanning & Analysis
+
+- **Fast recursive scanning** with async parallel processing and work-stealing
+- **Storage analytics** — visual breakdown by category (Documents, Media, Games, etc.)
+- **Largest files finder** — top 50 largest files with quick access
+- **File age analysis** — identify files not accessed in 90+ days
+- **Session persistence** — automatically saves and restores your last scan
 
 ### Interactive Visualization
-- 🗺️ **Treemap View** - Visual representation of disk usage with drill-down navigation
-- 🎨 **5 Treemap Color Schemes** - Vivid, Pastel, Ocean, Warm, and Cool palettes
-- 📊 **Pie Charts** - Category breakdown (Documents, Media, Games, etc.)
-- 📈 **Bar Charts** - Largest folders at a glance
-- 🌲 **Tree View** - Hierarchical folder navigation with search & filters
 
-### Quick Clean Features
-- 🧹 **Preview Before Delete** - See exactly what will be removed
-- ☑️ **File-Level Selection** - Expand categories to select individual files
-- 📁 **Smart Detection** - Finds temp files, browser cache, Windows Update cache, old logs
-- ⚠️ **Risk Indicators** - Safe/Low/Medium/High risk levels for each item
+- **Treemap view** — SkiaSharp-based squarified treemap with drill-down navigation
+- **5 treemap color schemes** — Vivid, Pastel, Ocean, Warm, and Cool
+- **Pie charts** — category breakdown
+- **Bar charts** — largest folders at a glance
+- **Tree view** — hierarchical folder navigation with search & filters
+
+### Cleanup & Disk Management
+
+- **Quick Clean** — one-click cleanup with preview and file-level selection
+- **Cleanup recommendations** — risk-rated suggestions (Safe / Low / Medium / High)
+- **Duplicate file finder** — xxHash64-based detection with bulk delete
+- **Time Machine analysis** — backup insights and exclusion suggestions (macOS)
 
 ### Developer Tools Detection
-- 📦 **npm** - node_modules, npm cache
-- 📦 **NuGet** - Package cache
-- 🐍 **pip** - Python package cache
-- ☕ **Maven** - .m2 repository
-- 🦀 **Cargo** - Rust package cache
-- 📱 **Gradle** - Android/Java build cache
 
-### Data Provided
-- 📅 Date last accessed/modified
-- 📊 Size of folders and files (human-readable)
-- 📍 Full path locations
-- 🏷️ File type categorization
-- 🎮 Game platform detection (Steam, Epic, GOG, Xbox)
+- **npm** — node_modules, npm cache
+- **NuGet** — package cache
+- **pip** — Python package cache
+- **Maven** — .m2 repository
+- **Cargo** — Rust package cache
+- **Gradle** — Android/Java build cache
+- **Docker** — images and build cache
 
-### UI/UX Features
-- 🎨 **5 Themes** - Default (Retrofuturistic), Tech (Blade Runner), Enterprise (Light), Terminal Green, Terminal Red
-- ⚙️ **Settings Panel** - Font size, treemap colors, treemap depth controls
-- 📏 **4 Font Size Presets** - Small, Medium, Large, Extra Large
-- ▶️ **Scan Controls** - Start/Stop/Pause with progress tracking
-- 📋 **Sortable Data Grids** - Click headers to sort by name, size, date
-- 🖱️ **Context Menus** - Right-click to open location or copy path
-- 📂 **Quick Actions** - Open in Explorer buttons throughout
-- 🔍 **File Explorer Filters** - Search and filter by type, size, age
+### Game Detection
 
-## 🚀 Getting Started
+- **Steam**, **Epic Games**, **GOG**, and **Xbox** game installations auto-detected with size breakdowns
+
+### Export
+
+- **CSV** and **JSON** export of scan results
+
+### UI/UX
+
+- **5 themes** — Default (Retrofuturistic), Tech (Blade Runner), Enterprise (Light), Terminal Green, Terminal Red
+- **Settings panel** — font size, treemap colors, treemap depth controls
+- **4 font size presets** — Small, Medium, Large, Extra Large
+- **Scan controls** — Start / Stop / Pause with progress tracking
+- **Sortable data grids** — click headers to sort by name, size, date
+- **Context menus** — right-click to open location or copy path
+- **File explorer filters** — search and filter by type, size, age
+
+## Screenshots
+
+| Dashboard & Treemap | Quick Clean |
+| --- | --- |
+| ![Treemap](screenshots/appstore/01-analyzer-treemap.png) | ![Quick Clean](screenshots/appstore/02-quick-clean.png) |
+
+| Detail View | Settings |
+| --- | --- |
+| ![Detail](screenshots/appstore/04-detail.png) | ![Settings](screenshots/appstore/03-settings.png) |
+
+## Getting Started
 
 ### Prerequisites
+
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
 
-### Installation
+### Download
 
-**Option 1: Download Release** (Recommended)
-- Visit the [Releases](https://github.com/mobius29er/winTrim/releases) page
-- Download for your platform (Windows, macOS, or Linux)
+Visit the [Releases](https://github.com/mobius29er/winTrim/releases) page and download for your platform.
 
-**Option 2: Build from Source**
+### Build from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/mobius29er/winTrim.git
-cd winTrim
-
-# Build and run
-cd WinTrim.Avalonia
+cd winTrim/WinTrim.Avalonia
 dotnet restore
 dotnet build
 dotnet run
 ```
 
-**Build Standalone Executables:**
+### Build Standalone Executables
 
 ```bash
 # Windows
@@ -108,149 +116,84 @@ dotnet publish -c Release -r osx-x64 --self-contained true
 dotnet publish -c Release -r linux-x64 --self-contained true
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-WinTrim.Avalonia/         # Cross-platform UI (Avalonia)
-├── Views/                # AXAML UI files
-├── ViewModels/           # MVVM ViewModels
-├── Controls/             # Custom controls (TreemapControl)
-├── Services/             # Theme service
-├── Converters/           # Value converters
-└── Themes/               # 6 color themes
+WinTrim.Avalonia/           # Cross-platform UI (Avalonia)
+├── Views/                  # AXAML UI files
+├── ViewModels/             # MVVM ViewModels
+├── Controls/               # Custom controls (TreemapControl)
+├── Services/               # Theme service
+├── Converters/             # Value converters
+└── Themes/                 # 5 color themes
 
-WinTrim.Core/             # Shared business logic
-├── Models/               # Data models
-└── Services/             # Core services
-    ├── FileScanner       # Core scanning engine
-    ├── GameDetector      # Steam/Epic/GOG/Xbox detection
-    ├── DevToolDetector   # Developer cache detection
-    ├── CleanupAdvisor    # Cleanup recommendations
-    ├── CleanupService    # Execute cleanup operations
-    ├── SettingsService   # User preferences & scan caching
+WinTrim.Core/               # Shared business logic
+├── Models/                 # Data models
+└── Services/               # Core services
+    ├── FileScanner          # Parallel scanning engine
+    ├── DuplicateScanner     # xxHash64 duplicate detection
+    ├── GameDetector         # Steam/Epic/GOG/Xbox detection
+    ├── DevToolDetector      # Developer cache detection
+    ├── CleanupAdvisor       # Risk-rated cleanup recommendations
+    ├── CleanupService       # Execute cleanup operations
+    ├── ExportService        # CSV/JSON export
+    ├── SettingsService      # User preferences & scan caching
+    ├── TimeMachineAnalyzer  # macOS Time Machine analysis
     ├── TreemapLayoutService # Squarified treemap algorithm
     └── CategoryClassifier   # File type classification
 
-DiskAnalyzer/             # Legacy WPF version (Windows only)
+wintrim-landing/            # Next.js landing page
+DiskAnalyzer/               # Legacy WPF version (Windows only)
 ```
 
-## 🛡️ Safety Features
-
-- **Read-only scanning** - No files are modified during analysis
-- **Preview before delete** - Quick Clean shows exactly what will be removed
-- **Risk levels** for cleanup suggestions (Safe/Low/Medium/High)
-- **Graceful error handling** for inaccessible folders
-- **Memory efficient** - Processes files in batches
-
-## 🔧 Technical Details
+## Technical Details
 
 - **Framework:** .NET 8.0 + Avalonia UI 11.2
-- **Platforms:** Windows, macOS, Linux
 - **Architecture:** MVVM with CommunityToolkit.Mvvm
 - **Charts:** LiveCharts2 (SkiaSharp)
-- **Treemap:** Custom SkiaSharp-based squarified treemap with iterative layout algorithm
+- **Treemap:** Custom SkiaSharp-based squarified treemap with iterative layout
+- **Hashing:** xxHash64 for duplicate file detection
 - **Async:** Full async/await with CancellationToken support
 - **Persistence:** JSON-based settings and scan caching
-- **Themes:** 6 built-in themes with dynamic resource switching
-- **Performance:** Iterative algorithms to prevent stack overflow on large datasets
+- **Performance:** Parallel breadth-first scan with work-stealing, iterative algorithms to prevent stack overflow
 
-## 📸 Screenshots
+## Safety
 
-### Dashboard with Category Breakdown
-*Pie chart showing storage allocation by file type*
+- **Read-only scanning** — no files are modified during analysis
+- **Preview before delete** — Quick Clean shows exactly what will be removed
+- **Risk levels** — every cleanup suggestion rated Safe / Low / Medium / High
+- **Graceful error handling** — inaccessible folders are skipped, not crashed on
+- **Memory efficient** — processes files in batches
 
-### Treemap Visualization  
-*Interactive treemap with double-click drill-down and 5 color schemes*
-
-### Quick Clean Dialog
-*Preview and select individual files before cleanup*
-
-### Settings Panel
-*Customize font size, treemap colors, and visualization depth*
-
-## 🎨 Themes
+## Themes
 
 | Theme | Description |
-|-------|-------------|
+| --- | --- |
 | **Default** | Retrofuturistic teal/cyan with orange accents |
-| **Tech** | Cyberpunk neon - Cyan/Pink on void black |
-| **Enterprise** | Professional Windows-style - Clean blues and grays (light mode) |
-| **Terminal Green** | Classic terminal - Green on black |
-| **Terminal Red** | Alert terminal - Red on black |
+| **Tech** | Cyberpunk neon — cyan/pink on void black |
+| **Enterprise** | Professional Windows-style — clean blues and grays (light mode) |
+| **Terminal Green** | Classic terminal — green on black |
+| **Terminal Red** | Alert terminal — red on black |
 
-## �️ Roadmap
+## Roadmap
 
-WinTrim is actively developed! Here's what's coming:
+See [docs/roadmap-v2.md](docs/roadmap-v2.md) for the full v2.0 development plan targeting DaisyDisk parity with performance optimizations, progressive rendering, Quick Look preview, cloud storage detection, APFS snapshot management, localization, and more.
 
-### Near Term
-- [ ] Mac App Store release
-- [ ] Microsoft Store release
-- [ ] Duplicate file detection
-- [ ] Browser cache cleanup (Chrome, Firefox, Safari, Edge)
-- [ ] System restore point cleanup suggestions
-
-### Future
-- [ ] Scheduled scans
-- [ ] Custom cleanup rules
-- [ ] Cloud storage integration (OneDrive, Dropbox, iCloud)
-- [ ] Disk health monitoring
-- [ ] Localization (multi-language support)
-
-*Have a feature request? [Open an issue](https://github.com/mobius29er/winTrim/issues)!*
-
-## �📋 Original Requirements
-
-Purpose of this software is to download locally a clean and safe application to view and analyze the contents and location of the files on your harddrive in Windows 10/11.
-
-The application will:
-- Read the designated drive
-- Provide analytics on how data is allocated
-- Provide recommendations on what could be cleaned
-- Provide a top hits of the largest files
-- Analyze Steam and other applications with large files
-
-It should provide:
-- Date used last
-- Size of the folders/files
-- Location of them
-
-UI/UX:
-- Simple and friendly to use
-- Ability to Start/stop/pause analysis and maintain the current results
-
-## ⚠️ Disclaimer
+## Disclaimer
 
 **USE AT YOUR OWN RISK**
 
 WinTrim is a disk cleanup utility that **permanently deletes files**. Please be aware:
 
-- **Deleted files may not be recoverable** - Files are permanently deleted, not sent to the Recycle Bin
+- **Deleted files may not be recoverable** — files are permanently deleted, not sent to the Recycle Bin
 - **Always backup important data** before using cleanup features
-- **Review items before deletion** - Use the preview feature to see exactly what will be removed
-- **Check risk levels** - Each cleanup suggestion shows Safe/Low/Medium/High risk indicators
+- **Review items before deletion** — use the preview feature to see exactly what will be removed
+- **Check risk levels** — each cleanup suggestion shows Safe / Low / Medium / High risk indicators
 
 This software is provided "AS IS" without warranty of any kind. Foxxception LLC shall not be liable for any data loss or damages arising from the use of this software.
 
-## 📄 License
+## License
 
-MIT License
+MIT License - see [LICENSE](LICENSE) for details.
 
 Copyright (c) 2026 Foxxception LLC
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.

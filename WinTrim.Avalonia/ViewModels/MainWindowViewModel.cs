@@ -528,6 +528,78 @@ public partial class MainWindowViewModel : ViewModelBase
         UpdateTreemapLegend(value);
     }
 
+    partial void OnSelectedItemChanged(FileSystemItem? value)
+    {
+        ApplyFileExplorerFilter();
+    }
+
+    partial void OnFileExplorerSearchTextChanged(string value)
+    {
+        ApplyFileExplorerFilter();
+    }
+
+    partial void OnFileExplorerFilterChanged(string value)
+    {
+        ApplyFileExplorerFilter();
+    }
+
+    partial void OnTreeSearchTextChanged(string value)
+    {
+        ApplyTreeFilter();
+    }
+
+    partial void OnTreeSortByChanged(string value)
+    {
+        ApplyTreeFilter();
+    }
+
+    private void ApplyFileExplorerFilter()
+    {
+        FilteredChildren.Clear();
+
+        if (SelectedItem == null)
+            return;
+
+        var children = SelectedItem.Children.AsEnumerable();
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(FileExplorerSearchText))
+        {
+            var search = FileExplorerSearchText;
+            children = children.Where(c => c.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Apply type filter
+        children = FileExplorerFilter switch
+        {
+            "Large Files" => children.Where(c => c.Size > 100 * 1024 * 1024), // > 100MB
+            "Old Files" => children.Where(c => c.IsStale),
+            _ => children
+        };
+
+        foreach (var child in children.OrderByDescending(c => c.Size))
+            FilteredChildren.Add(child);
+    }
+
+    private void ApplyTreeFilter()
+    {
+        if (ScanResult?.RootItem == null)
+            return;
+
+        FilteredRootItems.Clear();
+
+        if (string.IsNullOrWhiteSpace(TreeSearchText))
+        {
+            FilteredRootItems.Add(ScanResult.RootItem);
+        }
+        else
+        {
+            // Filter: show root but the search text highlights matching folders
+            // For simplicity, still show full tree (TreeView search is visual)
+            FilteredRootItems.Add(ScanResult.RootItem);
+        }
+    }
+
     /// <summary>
     /// Updates the treemap legend based on the selected color mode
     /// </summary>

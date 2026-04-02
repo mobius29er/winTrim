@@ -30,6 +30,10 @@
     <key>com.apple.security.files.downloads.read-only</key>
     <true/>
     
+    <!-- Allow outbound network connections (required for .NET runtime) -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    
     <!-- Hardened Runtime - Required for notarization and .NET Runtime -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
@@ -39,14 +43,5 @@
     
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
-    
-    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
-    <true/>
-    
-    <!-- Required for NSApplication initialization in sandbox -->
-    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
-    <array>
-        <string>com.apple.coreservices.launchservicesd</string>
-    </array>
 </dict>
 </plist>

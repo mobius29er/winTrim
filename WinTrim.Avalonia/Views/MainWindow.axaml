@@ -806,7 +806,7 @@
             </TabItem>
             
             <!-- Duplicates Tab -->
-            <TabItem Header="🔁 Duplicates">
+            <TabItem Header="🔁 Duplicates (Beta)">
                 <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
                     <!-- Header with scan button -->
                     <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,12">
@@ -1212,7 +1212,7 @@
             </TabItem>
             
             <!-- Time Machine Tab (macOS only) -->
-            <TabItem Header="⏰ Time Machine" IsVisible="{Binding IsTimeMachineAvailable}">
+            <TabItem Header="⏰ Time Machine (Beta)" IsVisible="{Binding IsTimeMachineAvailable}">
                 <Grid RowDefinitions="Auto,Auto,*">
                     <!-- Header with controls -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,8,0,16" Spacing="12">

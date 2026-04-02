@@ -72,7 +72,7 @@ public partial class MainWindow : Window
                 var tabControl = this.FindControl<TabControl>("MainTabControl");
                 if (tabControl != null)
                 {
-                    tabControl.SelectedIndex = 2; // File Explorer tab
+                    tabControl.SelectedIndex = 3; // File Explorer tab
                 }
             }
             // If it's a folder, TreemapControl.NavigateToTile() already handles drill-down
