@@ -78,7 +78,7 @@ export default function Home() {
               className="btn-cyber px-8 py-4 bg-gradient-to-r from-[#00F3FF] to-[#0099CC] text-black font-bold rounded-lg tracking-wider uppercase hover:shadow-[0_0_30px_rgba(0,243,255,0.5)] transition-all duration-300 flex items-center gap-2"
               style={{ fontFamily: 'Rajdhani, sans-serif' }}
             >
-              🍎 Download on Mac App Store
+              🍎 Download on the Mac App Store
             </a>
             <a 
               href="https://github.com/mobius29er/winTrim"
@@ -332,7 +332,7 @@ export default function Home() {
               className="btn-cyber inline-block px-12 py-5 bg-gradient-to-r from-[#00F3FF] to-[#0099CC] text-black font-bold text-lg rounded-lg tracking-wider uppercase hover:shadow-[0_0_40px_rgba(0,243,255,0.6)] transition-all duration-300"
               style={{ fontFamily: 'Rajdhani, sans-serif' }}
             >
-              🍎 Mac App Store
+              🍎 Download on the Mac App Store
             </a>
             <a 
               href="https://github.com/mobius29er/winTrim"
