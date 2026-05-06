@@ -249,7 +249,7 @@ export default function Home() {
 
           {/* Status Bar */}
           <div className="mt-16 text-center text-xs text-gray-600 uppercase tracking-[0.2em]">
-            {"// Cross_Platform // Mac_App_Store // Open_Source // No_Telemetry"}
+            {"// Cross_Platform // Mac_App_Store // Source_Available // No_Telemetry"}
           </div>
         </div>
       </section>
@@ -386,6 +386,143 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Version Comparison */}
+      <section className="relative py-24 px-6 border-t border-white/5">
+        <div className="max-w-5xl mx-auto">
+          <h2
+            className="text-4xl md:text-5xl font-bold text-center mb-4 tracking-wider"
+            style={{ fontFamily: 'Rajdhani, sans-serif' }}
+          >
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F3FF] to-[#FF00FF]">
+              EDITION COMPARISON
+            </span>
+          </h2>
+          <p className="text-center text-gray-500 text-sm tracking-[0.2em] uppercase mb-4">
+            {"// GitHub_Edition vs App_Store_Edition"}
+          </p>
+          <p className="text-center text-gray-500 text-xs mb-12 max-w-xl mx-auto leading-relaxed">
+            WinTrim follows a <span className="text-[#00F3FF]">Sentry-style source-available model</span>.
+            The GitHub edition provides core functionality — the App Store edition is the latest,
+            fully polished release with App Store security and seamless updates.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* GitHub Edition */}
+            <div className="glass-card rounded-xl border border-[#FF9900]/30 overflow-hidden">
+              <div className="px-6 py-5 border-b border-[#FF9900]/20 flex items-center gap-3">
+                <svg className="w-5 h-5 text-[#FF9900]" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+                </svg>
+                <h3 className="text-[#FF9900] text-lg font-bold tracking-widest uppercase" style={{ fontFamily: 'Rajdhani' }}>
+                  GitHub Edition
+                </h3>
+                <span className="ml-auto text-xs border border-[#FF9900]/50 px-3 py-1 rounded-full text-[#FF9900]">FREE</span>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-xs text-gray-500 mb-5 uppercase tracking-wider">Source-available · Build from source · Manual updates</p>
+                <ul className="space-y-3 text-sm text-gray-300">
+                  {[
+                    "Core disk scanning engine",
+                    "Interactive treemap visualization",
+                    "Dev environment cache detection",
+                    "Game library detection (Steam, Epic, GOG)",
+                    "Quick Clean with quarantine folder",
+                    "Session persistence (auto-save scans)",
+                    "5 treemap color schemes",
+                    "Cross-platform: Windows, macOS, Linux",
+                    "Build & run from source",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2">
+                      <span className="text-[#FF9900] mt-0.5">✓</span>
+                      {f}
+                    </li>
+                  ))}
+                  {[
+                    "App Store sandbox security (Apple-reviewed)",
+                    "Auto-updates via Mac App Store",
+                    "Mac-native polish & integration",
+                    "One-click installation",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2 opacity-40">
+                      <span className="text-gray-600 mt-0.5">✗</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href="https://github.com/mobius29er/winTrim"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold rounded-lg tracking-wider uppercase text-sm hover:shadow-[0_0_20px_rgba(255,153,0,0.4)] transition-all"
+                  style={{ fontFamily: 'Rajdhani, sans-serif' }}
+                >
+                  Get It Free on GitHub
+                </a>
+              </div>
+            </div>
+
+            {/* App Store Edition */}
+            <div className="glass-card rounded-xl border border-[#00F3FF]/40 overflow-hidden relative">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#00F3FF] to-[#FF00FF]" />
+              <div className="px-6 py-5 border-b border-[#00F3FF]/20 flex items-center gap-3">
+                <span className="text-xl">🍎</span>
+                <h3 className="text-[#00F3FF] text-lg font-bold tracking-widest uppercase" style={{ fontFamily: 'Rajdhani' }}>
+                  App Store Edition
+                </h3>
+                <span className="ml-auto text-xs border border-[#00F3FF]/50 px-3 py-1 rounded-full text-[#00F3FF] bg-[#00F3FF]/10">LATEST</span>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-xs text-gray-500 mb-5 uppercase tracking-wider">macOS · Apple-reviewed · Auto-updates</p>
+                <ul className="space-y-3 text-sm text-gray-300">
+                  {[
+                    "Core disk scanning engine",
+                    "Interactive treemap visualization",
+                    "Dev environment cache detection",
+                    "Game library detection (Steam, Epic, GOG)",
+                    "Quick Clean with quarantine folder",
+                    "Session persistence (auto-save scans)",
+                    "5 treemap color schemes",
+                    "Cross-platform: Windows, macOS, Linux",
+                    "Build & run from source",
+                    "App Store sandbox security (Apple-reviewed)",
+                    "Auto-updates via Mac App Store",
+                    "Mac-native polish & integration",
+                    "One-click installation",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2">
+                      <span className="text-[#00F3FF] mt-0.5">✓</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href="https://apps.apple.com/us/app/wintrim/id6758111636?mt=12"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-[#00F3FF] to-[#0099CC] text-black font-bold rounded-lg tracking-wider uppercase text-sm hover:shadow-[0_0_20px_rgba(0,243,255,0.4)] transition-all"
+                  style={{ fontFamily: 'Rajdhani, sans-serif' }}
+                >
+                  🍎 Download on the Mac App Store
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-gray-600 mt-8 leading-relaxed">
+            WinTrim source code is available under the{" "}
+            <a
+              href="https://github.com/mobius29er/winTrim/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#00F3FF]/70 hover:text-[#00F3FF] transition-colors"
+            >
+              Functional Source License (FSL-1.1)
+            </a>
+            . Commercial rights are retained by Foxxception LLC. Source converts to Apache 2.0 two years after each release.
+          </p>
+        </div>
+      </section>
+
       {/* Available Now + Roadmap Teaser */}
       <section className="relative py-20 px-6 border-t border-white/5">
         <div className="max-w-4xl mx-auto text-center">
@@ -454,7 +591,7 @@ export default function Home() {
             </span>
           </h2>
           <p className="text-gray-400 mb-8">
-            Free &amp; open source. No account required.
+            Source available. No account required.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a 
@@ -541,14 +678,14 @@ export default function Home() {
               >
                 @mobius29er
               </a>
-              {" "}{"// Source available on "}{" "}
+              {" "}{"// Source-available · "}{" "}
               <a 
-                href="https://github.com/mobius29er/winTrim" 
+                href="https://github.com/mobius29er/winTrim/blob/main/LICENSE" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-[#00F3FF]/60 hover:text-[#00F3FF] transition-colors"
               >
-                GitHub
+                FSL-1.1 License
               </a>
             </p>
           </div>
