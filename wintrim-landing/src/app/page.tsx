@@ -254,6 +254,138 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Mac App Store Description */}
+      <section className="relative py-24 px-6 border-t border-white/5">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 mb-4 justify-center">
+            <span className="text-3xl">🍎</span>
+            <h2
+              className="text-3xl md:text-4xl font-bold tracking-wider"
+              style={{ fontFamily: 'Rajdhani, sans-serif' }}
+            >
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F3FF] to-[#FF00FF]">
+                MAC APP STORE
+              </span>
+            </h2>
+          </div>
+          <p className="text-center text-gray-500 text-sm tracking-[0.2em] uppercase mb-12">
+            {"// App_Store_Description"}
+          </p>
+
+          {/* Intro */}
+          <div className="glass-card rounded-xl p-8 border border-[#00F3FF]/20 mb-6">
+            <h3 className="text-[#00F3FF] text-xl font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>WinTrim</h3>
+            <p className="text-gray-300 leading-relaxed">
+              WinTrim is a lightning-fast disk space analyzer built for developers, gamers, and users who need to reclaim storage quickly without all the extra stuff added on.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Blazing Fast Scanning */}
+            <div className="glass-card rounded-xl p-6 border border-[#00F3FF]/20 hover:border-[#00F3FF]/50 transition-colors">
+              <h3 className="text-[#00F3FF] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>⚡ Blazing Fast Scanning</h3>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                Analyze terabytes of data in under 2 minutes. WinTrim uses optimized parallel scanning to map your entire drive.
+              </p>
+            </div>
+
+            {/* Privacy Respecting */}
+            <div className="glass-card rounded-xl p-6 border border-[#FF00FF]/20 hover:border-[#FF00FF]/50 transition-colors">
+              <h3 className="text-[#FF00FF] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>🔒 Privacy Respecting</h3>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                WinTrim runs entirely offline. No telemetry, no cloud uploads, no accounts. Your files stay on your machine.
+              </p>
+            </div>
+          </div>
+
+          {/* Visual Treemap */}
+          <div className="glass-card rounded-xl p-6 border border-[#FF9900]/20 hover:border-[#FF9900]/50 transition-colors mb-6">
+            <h3 className="text-[#FF9900] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>🗺️ Visual Treemap</h3>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              See your storage at a glance with an interactive treemap visualization. Instantly spot the largest files and folders. Click to drill down, right-click to open in Finder or delete.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Smart Detection for Developers */}
+            <div className="glass-card rounded-xl p-6 border border-[#FF9900]/20 hover:border-[#FF9900]/50 transition-colors">
+              <h3 className="text-[#FF9900] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>💻 Smart Detection for Developers</h3>
+              <ul className="text-sm text-gray-400 space-y-2">
+                <li className="flex items-start gap-2"><span className="text-[#FF9900] mt-0.5">›</span>Automatically identifies node_modules folders across your system</li>
+                <li className="flex items-start gap-2"><span className="text-[#FF9900] mt-0.5">›</span>Finds .NET, Python, Rust, and Go build artifacts</li>
+                <li className="flex items-start gap-2"><span className="text-[#FF9900] mt-0.5">›</span>Detects Docker images, Xcode derived data, and IDE caches</li>
+                <li className="flex items-start gap-2"><span className="text-[#FF9900] mt-0.5">›</span>Shows total reclaimable space from dev tools</li>
+              </ul>
+            </div>
+
+            {/* Game Detection */}
+            <div className="glass-card rounded-xl p-6 border border-[#00F3FF]/20 hover:border-[#00F3FF]/50 transition-colors">
+              <h3 className="text-[#00F3FF] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>🎮 Game Detection</h3>
+              <ul className="text-sm text-gray-400 space-y-2">
+                <li className="flex items-start gap-2"><span className="text-[#00F3FF] mt-0.5">›</span>Recognizes Steam, Epic Games, GOG, and other game libraries</li>
+                <li className="flex items-start gap-2"><span className="text-[#00F3FF] mt-0.5">›</span>Identifies game install locations and sizes</li>
+                <li className="flex items-start gap-2"><span className="text-[#00F3FF] mt-0.5">›</span>Helps you decide which 100GB+ games to uninstall</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Intelligent Categorization */}
+          <div className="glass-card rounded-xl p-6 border border-[#FF00FF]/20 hover:border-[#FF00FF]/50 transition-colors mb-6">
+            <h3 className="text-[#FF00FF] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>🗂️ Intelligent Categorization</h3>
+            <p className="text-sm text-gray-400 mb-3">Files are automatically grouped into categories:</p>
+            <ul className="text-sm text-gray-400 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Games & Entertainment</li>
+              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Development Tools & Caches</li>
+              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Documents &amp; Media</li>
+              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>System Files</li>
+              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Applications</li>
+            </ul>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            {/* Quick Clean */}
+            <div className="glass-card rounded-xl p-6 border border-[#00F3FF]/20 hover:border-[#00F3FF]/50 transition-colors">
+              <h3 className="text-[#00F3FF] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>🧹 Quick Clean</h3>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                Get smart cleanup suggestions for temporary files, caches, logs, and downloads. Review before deleting. Nothing is removed without your approval.
+              </p>
+            </div>
+
+            {/* Multiple Themes */}
+            <div className="glass-card rounded-xl p-6 border border-[#FF9900]/20 hover:border-[#FF9900]/50 transition-colors">
+              <h3 className="text-[#FF9900] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>🎨 Multiple Themes</h3>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                Choose from multiple color themes including dark terminal modes for late-night disk cleaning sessions.
+              </p>
+            </div>
+
+            {/* Cross-Platform */}
+            <div className="glass-card rounded-xl p-6 border border-[#FF00FF]/20 hover:border-[#FF00FF]/50 transition-colors">
+              <h3 className="text-[#FF00FF] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>🌐 Cross-Platform</h3>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                Runs natively on macOS, Windows, and Linux with the same great experience everywhere.
+              </p>
+            </div>
+          </div>
+
+          {/* Perfect For */}
+          <div className="glass-card rounded-xl p-6 border border-[#00F3FF]/20 mb-6">
+            <h3 className="text-white text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>Perfect for:</h3>
+            <ul className="text-sm text-gray-400 space-y-2">
+              <li className="flex items-start gap-2"><span className="text-[#00F3FF] mt-0.5">›</span>Developers drowning in node_modules and build caches</li>
+              <li className="flex items-start gap-2"><span className="text-[#00F3FF] mt-0.5">›</span>Gamers managing large game libraries</li>
+              <li className="flex items-start gap-2"><span className="text-[#00F3FF] mt-0.5">›</span>Anyone who wants to understand their disk usage</li>
+              <li className="flex items-start gap-2"><span className="text-[#00F3FF] mt-0.5">›</span>Power users who value speed and simplicity</li>
+            </ul>
+          </div>
+
+          {/* Closing tagline */}
+          <p className="text-center text-lg text-gray-300 tracking-wider">
+            <span className="text-[#00F3FF]">Reclaim your storage.</span> See what&apos;s eating your disk.
+          </p>
+        </div>
+      </section>
+
       {/* Available Now + Roadmap Teaser */}
       <section className="relative py-20 px-6 border-t border-white/5">
         <div className="max-w-4xl mx-auto text-center">
