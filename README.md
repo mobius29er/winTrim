@@ -21,7 +21,7 @@ A clean, safe, and powerful disk analyzer application to view and analyze file c
 - ✅ **Disk Scanning** - Fast recursive scanning with async processing
 - ✅ **Storage Analytics** - Visual breakdown of how data is allocated by category
 - ✅ **Cleanup Recommendations** - Safe suggestions for freeing disk space
-- ✅ **Quick Clean** - One-click cleanup with preview and file-level selection
+- ✅ **Quick Clean** - One-click cleanup with preview and file-level selection; files are quarantined first so you stay in control
 - ✅ **Largest Files Finder** - Top 50 largest files with quick access
 - ✅ **Game Detection** - Auto-detect Steam, Epic, GOG, and Xbox game installations
 - ✅ **Developer Tools Scanner** - Detect npm, NuGet, pip, Maven, Cargo caches with cleanup recommendations
@@ -37,10 +37,11 @@ A clean, safe, and powerful disk analyzer application to view and analyze file c
 - 🌲 **Tree View** - Hierarchical folder navigation with search & filters
 
 ### Quick Clean Features
-- 🧹 **Preview Before Delete** - See exactly what will be removed
+- 🧹 **Preview Before Clean** - See exactly what will be moved
 - ☑️ **File-Level Selection** - Expand categories to select individual files
 - 📁 **Smart Detection** - Finds temp files, browser cache, Windows Update cache, old logs
 - ⚠️ **Risk Indicators** - Safe/Low/Medium/High risk levels for each item
+- 🗂️ **Quarantine Folder** - Files are moved to **"WinTrim - DELETE ME"** on your Desktop, not deleted outright
 
 ### Developer Tools Detection
 - 📦 **npm** - node_modules, npm cache
@@ -137,10 +138,23 @@ DiskAnalyzer/             # Legacy WPF version (Windows only)
 ## 🛡️ Safety Features
 
 - **Read-only scanning** - No files are modified during analysis
-- **Preview before delete** - Quick Clean shows exactly what will be removed
+- **Preview before clean** - Quick Clean shows exactly what will be moved
+- **Quarantine instead of delete** - Files are moved to a **"WinTrim - DELETE ME"** folder on your Desktop, giving you a chance to review before permanently deleting
 - **Risk levels** for cleanup suggestions (Safe/Low/Medium/High)
 - **Graceful error handling** for inaccessible folders
 - **Memory efficient** - Processes files in batches
+
+## 🗂️ How File Deletion Works
+
+WinTrim does **not** permanently delete files directly. Instead, it uses a **quarantine (staging) folder** to keep you in control:
+
+1. **Select files** to clean in the Quick Clean dialog and click **"Move to Quarantine"**.
+2. WinTrim moves the selected files to a folder called **`WinTrim - DELETE ME`** located on your **Desktop**.
+3. A confirmation pop-up shows you exactly where the folder is.
+4. **Review** the contents of `WinTrim - DELETE ME` at your own pace.
+5. When you are satisfied, **delete the folder yourself** to permanently free the disk space — or move any files back if you change your mind.
+
+> 💡 The quarantine folder is never automatically emptied. You are always the one who decides when files are gone for good.
 
 ## 🔧 Technical Details
 
@@ -222,11 +236,12 @@ UI/UX:
 
 **USE AT YOUR OWN RISK**
 
-WinTrim is a disk cleanup utility that **permanently deletes files**. Please be aware:
+WinTrim is a disk cleanup utility. Please be aware:
 
-- **Deleted files may not be recoverable** - Files are permanently deleted, not sent to the Recycle Bin
+- **Quick Clean moves files to a quarantine folder** - Files are placed in **"WinTrim - DELETE ME"** on your Desktop, not deleted immediately
+- **You control permanent deletion** - Only when you delete the quarantine folder yourself are files permanently gone
 - **Always backup important data** before using cleanup features
-- **Review items before deletion** - Use the preview feature to see exactly what will be removed
+- **Review items before deletion** - Use the preview feature to see exactly what will be moved
 - **Check risk levels** - Each cleanup suggestion shows Safe/Low/Medium/High risk indicators
 
 This software is provided "AS IS" without warranty of any kind. Foxxception LLC shall not be liable for any data loss or damages arising from the use of this software.

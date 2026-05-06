@@ -128,21 +128,25 @@ public partial class QuickCleanDialog : Window
             return;
         }
         
-        // Show enhanced warning confirmation BEFORE deleting
+        // Determine quarantine folder path for display in confirmation
+        var quarantineFolder = GetQuarantineFolder();
+
+        // Show confirmation BEFORE moving files
         var confirmResult = await ShowConfirmAsync(
-            "⚠️ Confirm Permanent Deletion", 
-            $"You are about to PERMANENTLY DELETE {selectedFiles.Count} files.\n\n" +
+            "🗂️ Confirm Move to Quarantine",
+            $"You are about to move {selectedFiles.Count} files to a quarantine folder.\n\n" +
             $"Space to recover: {FormatBytes(selectedFiles.Sum(f => f.size))}\n\n" +
-            "⚠️ WARNING:\n" +
-            "• Files will be permanently deleted (not sent to Recycle Bin)\n" +
-            "• This action CANNOT be undone\n" +
-            "• Deleted files may NOT be recoverable\n\n" +
-            "Are you absolutely sure you want to proceed?");
+            "ℹ️ HOW IT WORKS:\n" +
+            "• Files will be moved to \"WinTrim - DELETE ME\" on your Desktop\n" +
+            "• Review the folder, then delete it yourself to free space\n" +
+            "• This action CAN be undone by moving files back\n\n" +
+            $"📁 Quarantine folder:\n{quarantineFolder}\n\n" +
+            "Do you want to proceed?");
         
         if (!confirmResult)
             return;
         
-        // NOW perform the actual deletion - ONLY the files we captured above
+        // NOW perform the actual move to quarantine - ONLY the files we captured above
         var deletedCount = 0;
         var deletedSize = 0L;
         var errors = new List<string>();
@@ -152,23 +156,23 @@ public partial class QuickCleanDialog : Window
         {
             try
             {
-                Console.WriteLine($"[QuickClean] Attempting to delete: {path}");
+                Console.WriteLine($"[QuickClean] Attempting to quarantine: {path}");
                 
                 if (System.IO.File.Exists(path))
                 {
-                    System.IO.File.Delete(path);
+                    MoveFileToQuarantine(path, quarantineFolder);
                     deletedCount++;
                     deletedSize += size;
                     deletedPaths.Add(path);
-                    Console.WriteLine($"[QuickClean] Successfully deleted file: {path}");
+                    Console.WriteLine($"[QuickClean] Successfully quarantined file: {path}");
                 }
                 else if (System.IO.Directory.Exists(path))
                 {
-                    System.IO.Directory.Delete(path, true);
+                    MoveDirectoryToQuarantine(path, quarantineFolder);
                     deletedCount++;
                     deletedSize += size;
                     deletedPaths.Add(path);
-                    Console.WriteLine($"[QuickClean] Successfully deleted directory: {path}");
+                    Console.WriteLine($"[QuickClean] Successfully quarantined directory: {path}");
                 }
                 else
                 {
@@ -178,7 +182,7 @@ public partial class QuickCleanDialog : Window
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[QuickClean] Error deleting {path}: {ex.Message}");
+                Console.WriteLine($"[QuickClean] Error quarantining {path}: {ex.Message}");
                 errors.Add($"{System.IO.Path.GetFileName(path)}: {ex.Message}");
             }
         }
@@ -210,28 +214,30 @@ public partial class QuickCleanDialog : Window
         string message;
         if (deletedCount == 0 && errors.Any())
         {
-            message = $"⚠ No files were deleted.\n\n{errors.Count} errors occurred:\n" + 
+            message = $"⚠ No files were moved.\n\n{errors.Count} errors occurred:\n" + 
                       string.Join("\n", errors.Take(8));
             if (errors.Count > 8)
                 message += $"\n...and {errors.Count - 8} more";
         }
         else if (deletedCount == 0)
         {
-            message = "⚠ No files were deleted.\nFiles may have already been removed.";
+            message = "⚠ No files were moved.\nFiles may have already been removed.";
         }
         else
         {
-            message = $"✓ Deleted {deletedCount} files\n✓ Freed {FormatBytes(deletedSize)}";
+            message = $"✓ Moved {deletedCount} files to quarantine folder\n" +
+                      $"✓ Freed {FormatBytes(deletedSize)} of active disk usage\n\n" +
+                      $"📁 Review and permanently delete:\n{quarantineFolder}";
             if (errors.Any())
             {
-                message += $"\n\n⚠ {errors.Count} files could not be deleted:\n" + 
+                message += $"\n\n⚠ {errors.Count} files could not be moved:\n" + 
                            string.Join("\n", errors.Take(5));
                 if (errors.Count > 5)
                     message += $"\n...and {errors.Count - 5} more";
             }
         }
         
-        await ShowMessageAsync("Cleanup Complete", message);
+        await ShowMessageAsync("Quarantine Complete", message);
         
         // If all items are cleaned, close the dialog
         if (!Items.Any())
@@ -241,6 +247,108 @@ public partial class QuickCleanDialog : Window
         }
     }
     
+    /// <summary>
+    /// Returns (creating if needed) the "WinTrim - DELETE ME" quarantine folder on the Desktop.
+    /// </summary>
+    private static string GetQuarantineFolder()
+    {
+        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var folder = System.IO.Path.Combine(desktop, "WinTrim - DELETE ME");
+        System.IO.Directory.CreateDirectory(folder);
+        return folder;
+    }
+
+    /// <summary>
+    /// Returns a unique path inside <paramref name="quarantineFolder"/> for the given item name,
+    /// appending a numeric suffix if a name collision exists.
+    /// </summary>
+    private static string GetUniqueQuarantinePath(string quarantineFolder, string itemName)
+    {
+        var dest = System.IO.Path.Combine(quarantineFolder, itemName);
+        if (!System.IO.File.Exists(dest) && !System.IO.Directory.Exists(dest))
+            return dest;
+
+        var nameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(itemName);
+        var ext = System.IO.Path.GetExtension(itemName);
+        var counter = 1;
+        do
+        {
+            dest = System.IO.Path.Combine(quarantineFolder, $"{nameWithoutExt} ({counter}){ext}");
+            counter++;
+        }
+        while (System.IO.File.Exists(dest) || System.IO.Directory.Exists(dest));
+        return dest;
+    }
+
+    /// <summary>
+    /// Moves a single file to the quarantine folder.
+    /// Falls back to copy-then-delete for cross-device moves (or any other I/O failure during
+    /// the atomic move); if the copy itself fails the exception propagates to the caller.
+    /// </summary>
+    private static void MoveFileToQuarantine(string sourcePath, string quarantineFolder)
+    {
+        // GetUniqueQuarantinePath guarantees uniqueness at the time of the call.
+        // A narrow race condition could still cause File.Copy to fail; that exception
+        // propagates to the caller which already handles per-file errors gracefully.
+        var dest = GetUniqueQuarantinePath(quarantineFolder, System.IO.Path.GetFileName(sourcePath));
+        try
+        {
+            System.IO.File.Move(sourcePath, dest);
+        }
+        catch (System.IO.IOException)
+        {
+            // Handles cross-device moves (EXDEV on Unix) as well as any other I/O failure
+            // during the atomic rename.  Attempt copy+delete; if that also fails the
+            // exception propagates to the caller for per-file error reporting.
+            System.IO.File.Copy(sourcePath, dest, overwrite: false);
+            System.IO.File.Delete(sourcePath);
+        }
+    }
+
+    /// <summary>
+    /// Moves an entire directory to the quarantine folder.
+    /// Falls back to a recursive copy-then-delete for cross-device moves (or any other I/O
+    /// failure during the atomic move); if the copy itself fails the exception propagates.
+    /// </summary>
+    private static void MoveDirectoryToQuarantine(string sourcePath, string quarantineFolder)
+    {
+        var dirName = System.IO.Path.GetFileName(sourcePath.TrimEnd(
+            System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+        var dest = GetUniqueQuarantinePath(quarantineFolder, dirName);
+        try
+        {
+            System.IO.Directory.Move(sourcePath, dest);
+        }
+        catch (System.IO.IOException)
+        {
+            // Handles cross-device moves (EXDEV on Unix) as well as any other I/O failure
+            // during the atomic rename.  Attempt recursive copy+delete; if that also fails
+            // the exception propagates to the caller for per-file error reporting.
+            CopyDirectoryRecursive(sourcePath, dest);
+            System.IO.Directory.Delete(sourcePath, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Recursively copies a directory tree from <paramref name="sourceDir"/> to <paramref name="destDir"/>.
+    /// The destination directory is always freshly created, so overwrite is not expected; any
+    /// collision will throw rather than silently overwrite data.
+    /// </summary>
+    private static void CopyDirectoryRecursive(string sourceDir, string destDir)
+    {
+        System.IO.Directory.CreateDirectory(destDir);
+        foreach (var file in System.IO.Directory.GetFiles(sourceDir))
+        {
+            var destFile = System.IO.Path.Combine(destDir, System.IO.Path.GetFileName(file));
+            System.IO.File.Copy(file, destFile, overwrite: false);
+        }
+        foreach (var dir in System.IO.Directory.GetDirectories(sourceDir))
+        {
+            var subDirName = System.IO.Path.GetFileName(dir);
+            CopyDirectoryRecursive(dir, System.IO.Path.Combine(destDir, subDirName));
+        }
+    }
+
     private async Task ShowMessageAsync(string title, string message)
     {
         var msgBox = new Window
@@ -333,7 +441,7 @@ public partial class QuickCleanDialog : Window
         
         var confirmButton = new Button
         {
-            Content = "Delete Files",
+            Content = "Move to Quarantine",
             Padding = new Thickness(24, 10),
             Background = Brush.Parse("#EF4444"),
             Foreground = Brushes.White
