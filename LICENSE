@@ -1,0 +1,80 @@
+Functional Source License, Version 1.1, Apache 2.0 Future License
+
+Licensor:             Foxxception LLC
+Licensed Work:        WinTrim
+                      The Licensed Work is (c) 2026 Foxxception LLC
+Additional Use Grant: You may make production use of the Licensed Work,
+                      provided such use does not include offering the
+                      Licensed Work to third parties on a hosted or
+                      embedded basis in order to compete with
+                      Foxxception LLC's paid version of the Licensed Work.
+Change Date:          Two years from the date the applicable version of
+                      the Licensed Work is first publicly distributed.
+Change License:       Apache License, Version 2.0
+
+---
+
+Functional Source License
+
+Version 1.1
+
+This license allows use of the software ("Licensed Work") under specific
+conditions set by the Licensor ("Foxxception LLC").
+
+1. GRANT OF RIGHTS
+
+Subject to the terms and conditions of this License, you are hereby granted
+a non-exclusive, worldwide, royalty-free license to:
+
+  (a) copy, use, modify, and distribute the Licensed Work for any lawful,
+      non-competing purpose; and
+
+  (b) prepare derivative works of the Licensed Work for any lawful,
+      non-competing purpose.
+
+2. COMPETING USE RESTRICTION
+
+You may not make any use of the Licensed Work in a manner that competes
+with the Licensor. A "Competing Use" means providing third parties with
+access to the functionality of the Licensed Work on a hosted, embedded, or
+otherwise commercial basis in a way that substitutes for or competes with
+Foxxception LLC's paid or commercial distribution of WinTrim (including the
+Mac App Store edition, Microsoft Store edition, or any future paid editions).
+
+3. CHANGE DATE AND OPEN SOURCE CONVERSION
+
+On the Change Date stated above (two years from first public distribution of
+that version), the restrictions in Section 2 automatically terminate, and the
+Licensed Work for that version becomes available under the Apache License,
+Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0).
+
+4. NOTICE REQUIREMENT
+
+All copies or substantial portions of the Licensed Work must include this
+license notice and the following copyright notice:
+
+  Copyright (c) 2026 Foxxception LLC. All rights reserved.
+
+5. NO WARRANTY
+
+THE LICENSED WORK IS PROVIDED "AS IS," WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+IN NO EVENT SHALL FOXXCEPTION LLC BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+ARISING FROM, OUT OF, OR IN CONNECTION WITH THE LICENSED WORK OR THE USE
+OR OTHER DEALINGS IN THE LICENSED WORK.
+
+6. TERMINATION
+
+Your rights under this License terminate automatically if you breach any
+term of this License. Upon termination, you must cease all use and
+distribution of the Licensed Work and destroy all copies in your possession.
+
+---
+
+For more information about the Functional Source License, visit:
+https://fsl.software
+
+For questions about commercial licensing or competing use, contact:
+support@foxxception.com
