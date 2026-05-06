@@ -70,7 +70,16 @@ export default function Home() {
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+            <a 
+              href="https://apps.apple.com/us/app/wintrim/id6758111636?mt=12"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-cyber px-8 py-4 bg-gradient-to-r from-[#00F3FF] to-[#0099CC] text-black font-bold rounded-lg tracking-wider uppercase hover:shadow-[0_0_30px_rgba(0,243,255,0.5)] transition-all duration-300 flex items-center gap-2"
+              style={{ fontFamily: 'Rajdhani, sans-serif' }}
+            >
+              🍎 Download on Mac App Store
+            </a>
             <a 
               href="https://github.com/mobius29er/winTrim"
               target="_blank"
@@ -81,11 +90,6 @@ export default function Home() {
               Get It Free on GitHub
             </a>
           </div>
-
-          {/* App Store Coming Soon */}
-          <p className="text-sm text-gray-500 mb-8">
-            🍎 Mac App Store & Microsoft Store — <span className="text-[#00F3FF]">Coming Soon</span>
-          </p>
 
           {/* Platform Badges */}
           <div className="flex items-center justify-center gap-6 mb-16">
@@ -245,14 +249,42 @@ export default function Home() {
 
           {/* Status Bar */}
           <div className="mt-16 text-center text-xs text-gray-600 uppercase tracking-[0.2em]">
-            {"// Cross_Platform // Free_Download // Open_Source // No_Telemetry"}
+            {"// Cross_Platform // Mac_App_Store // Open_Source // No_Telemetry"}
           </div>
         </div>
       </section>
 
-      {/* Coming Soon / Roadmap Teaser */}
+      {/* Available Now + Roadmap Teaser */}
       <section className="relative py-20 px-6 border-t border-white/5">
         <div className="max-w-4xl mx-auto text-center">
+          {/* Mac App Store — Now Live */}
+          <div className="mb-16">
+            <h3 
+              className="text-2xl md:text-3xl font-bold mb-8 tracking-wider"
+              style={{ fontFamily: 'Rajdhani, sans-serif' }}
+            >
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F3FF] to-[#FF00FF]">
+                NOW AVAILABLE
+              </span>
+            </h3>
+            <a
+              href="https://apps.apple.com/us/app/wintrim/id6758111636?mt=12"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-4 glass-card rounded-xl p-6 border border-[#00F3FF]/40 hover:border-[#00F3FF]/80 transition-colors group"
+            >
+              <div className="text-4xl">🍎</div>
+              <div className="text-left">
+                <h4 className="text-[#00F3FF] text-base uppercase tracking-wider mb-1 group-hover:text-white transition-colors" style={{ fontFamily: 'Rajdhani' }}>Mac App Store</h4>
+                <p className="text-xs text-gray-400">WinTrim is live — download it now for macOS</p>
+              </div>
+              <span className="ml-2 text-xs border border-[#00F3FF]/50 px-3 py-1 rounded-full text-[#00F3FF] group-hover:bg-[#00F3FF] group-hover:text-black transition-colors whitespace-nowrap">
+                LIVE ↗
+              </span>
+            </a>
+          </div>
+
+          {/* Coming Soon */}
           <h3 
             className="text-2xl md:text-3xl font-bold mb-8 tracking-wider"
             style={{ fontFamily: 'Rajdhani, sans-serif' }}
@@ -261,12 +293,7 @@ export default function Home() {
               COMING SOON
             </span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="glass-card rounded-xl p-6 border border-gray-700/30">
-              <div className="text-2xl mb-3">🍎</div>
-              <h4 className="text-white text-sm uppercase tracking-wider mb-2" style={{ fontFamily: 'Rajdhani' }}>Mac App Store</h4>
-              <p className="text-xs text-gray-500">Official App Store listing for seamless installation</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="glass-card rounded-xl p-6 border border-gray-700/30">
               <div className="text-2xl mb-3">📦</div>
               <h4 className="text-white text-sm uppercase tracking-wider mb-2" style={{ fontFamily: 'Rajdhani' }}>Duplicate Detection</h4>
@@ -297,15 +324,26 @@ export default function Home() {
           <p className="text-gray-400 mb-8">
             Free &amp; open source. No account required.
           </p>
-          <a 
-            href="https://github.com/mobius29er/winTrim"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-cyber inline-block px-12 py-5 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold text-lg rounded-lg tracking-wider uppercase hover:shadow-[0_0_40px_rgba(255,153,0,0.6)] transition-all duration-300"
-            style={{ fontFamily: 'Rajdhani, sans-serif' }}
-          >
-            Get It Free on GitHub
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a 
+              href="https://apps.apple.com/us/app/wintrim/id6758111636?mt=12"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-cyber inline-block px-12 py-5 bg-gradient-to-r from-[#00F3FF] to-[#0099CC] text-black font-bold text-lg rounded-lg tracking-wider uppercase hover:shadow-[0_0_40px_rgba(0,243,255,0.6)] transition-all duration-300"
+              style={{ fontFamily: 'Rajdhani, sans-serif' }}
+            >
+              🍎 Mac App Store
+            </a>
+            <a 
+              href="https://github.com/mobius29er/winTrim"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-cyber inline-block px-12 py-5 bg-gradient-to-r from-[#FF9900] to-[#FF6600] text-black font-bold text-lg rounded-lg tracking-wider uppercase hover:shadow-[0_0_40px_rgba(255,153,0,0.6)] transition-all duration-300"
+              style={{ fontFamily: 'Rajdhani, sans-serif' }}
+            >
+              Get It Free on GitHub
+            </a>
+          </div>
         </div>
       </section>
 
