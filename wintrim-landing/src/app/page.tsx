@@ -334,8 +334,8 @@ export default function Home() {
             <h3 className="text-[#FF00FF] text-base font-bold tracking-widest uppercase mb-3" style={{ fontFamily: 'Rajdhani' }}>🗂️ Intelligent Categorization</h3>
             <p className="text-sm text-gray-400 mb-3">Files are automatically grouped into categories:</p>
             <ul className="text-sm text-gray-400 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Games &amp; Entertainment</li>
-              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Development Tools &amp; Caches</li>
+              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Games & Entertainment</li>
+              <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Development Tools & Caches</li>
               <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Documents &amp; Media</li>
               <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>System Files</li>
               <li className="flex items-start gap-2"><span className="text-[#FF00FF] mt-0.5">›</span>Applications</li>
