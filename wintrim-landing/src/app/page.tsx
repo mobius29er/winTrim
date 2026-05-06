@@ -401,7 +401,7 @@ export default function Home() {
             {"// GitHub_Edition vs App_Store_Edition"}
           </p>
           <p className="text-center text-gray-500 text-xs mb-12 max-w-xl mx-auto leading-relaxed">
-            WinTrim follows a <span className="text-[#00F3FF]">Sentry-style source-available model</span>.
+            WinTrim follows a <span className="text-[#00F3FF]">Sentry-style source available model</span>.
             The GitHub edition provides core functionality — the App Store edition is the latest,
             fully polished release with App Store security and seamless updates.
           </p>
@@ -419,7 +419,7 @@ export default function Home() {
                 <span className="ml-auto text-xs border border-[#FF9900]/50 px-3 py-1 rounded-full text-[#FF9900]">FREE</span>
               </div>
               <div className="px-6 py-5">
-                <p className="text-xs text-gray-500 mb-5 uppercase tracking-wider">Source-available · Build from source · Manual updates</p>
+                <p className="text-xs text-gray-500 mb-5 uppercase tracking-wider">Source available · Build from source · Manual updates</p>
                 <ul className="space-y-3 text-sm text-gray-300">
                   {[
                     "Core disk scanning engine",
@@ -482,8 +482,6 @@ export default function Home() {
                     "Quick Clean with quarantine folder",
                     "Session persistence (auto-save scans)",
                     "5 treemap color schemes",
-                    "Cross-platform: Windows, macOS, Linux",
-                    "Build & run from source",
                     "App Store sandbox security (Apple-reviewed)",
                     "Auto-updates via Mac App Store",
                     "Mac-native polish & integration",
@@ -678,7 +676,7 @@ export default function Home() {
               >
                 @mobius29er
               </a>
-              {" "}{"// Source-available · "}{" "}
+              {" "}{"// Source available · "}{" "}
               <a 
                 href="https://github.com/mobius29er/winTrim/blob/main/LICENSE" 
                 target="_blank" 
